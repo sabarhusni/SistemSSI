@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan *)",
+      "Bash(npm run *)",
+      "Bash(Get-ChildItem -Path \"d:\\\\1_PROJECT_APPLICATION\\\\VIBE\\\\SimpleERP\\\\app\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(xargs grep -l \"show\\\\|view\")"
+    ]
+  }
+}
