@@ -1,4 +1,4 @@
-# Dokumentasi Build & Deployment — SimpleERP (ARUM)
+# Dokumentasi Build & Deployment — SimpleERP (SSI)
 
 > **Stack:** Laravel 13.8 · PHP 8.3 · React 18 + TypeScript · Inertia.js · Vite · MySQL 8.0  
 > **Target OS Server:** Ubuntu 22.04 LTS  
@@ -217,7 +217,7 @@ nano .env
 Edit file `.env` dengan konfigurasi production:
 
 ```dotenv
-APP_NAME="SimpleERP ARUM"
+APP_NAME="SimpleERP SSI"
 APP_ENV=production
 APP_KEY=                          # akan diisi oleh artisan key:generate
 APP_DEBUG=false
@@ -890,4 +890,4 @@ systemctl restart php8.3-fpm
 
 ---
 
-*Dokumen ini dibuat khusus untuk project SimpleERP ARUM — 2026*
+*Dokumen ini dibuat khusus untuk project SimpleERP SSI — 2026*

@@ -16,18 +16,18 @@ export default function Index({ employees, filters }: any) {
     };
 
     return (
-        <AppLayout header="Karyawan">
-            <Head title="Karyawan" />
-            <PageHeader title="Daftar Karyawan" createHref="/employees/create" />
+        <AppLayout header="Employee">
+            <Head title="Employee" />
+            <PageHeader title="Employee List" createHref="/employees/create" />
             <SearchFilter
                 routeName="employees.index"
                 filters={filters}
                 filterOptions={[{
                     key: 'status',
-                    label: 'Semua Status',
+                    label: 'All Statuses',
                     options: [
-                        { label: 'Aktif',     value: 'active' },
-                        { label: 'Non-aktif', value: 'inactive' },
+                        { label: 'Active',   value: 'active' },
+                        { label: 'Inactive', value: 'inactive' },
                     ],
                 }]}
             />
@@ -35,21 +35,21 @@ export default function Index({ employees, filters }: any) {
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="employee_number" label="No. Karyawan" {...sortProps} />
-                            <SortableColumn sortKey="name" label="Nama" {...sortProps} />
-                            <SortableColumn sortKey="position" label="Jabatan" {...sortProps} />
-                            <SortableColumn sortKey="department" label="Divisi" {...sortProps} />
-                            <th className="px-4 py-3">Telepon</th>
-                            <SortableColumn sortKey="join_date" label="Tgl Bergabung" {...sortProps} />
+                            <SortableColumn sortKey="employee_number" label="Employee No." {...sortProps} />
+                            <SortableColumn sortKey="name" label="Name" {...sortProps} />
+                            <SortableColumn sortKey="position" label="Position" {...sortProps} />
+                            <SortableColumn sortKey="department" label="Department" {...sortProps} />
+                            <th className="px-4 py-3">Phone</th>
+                            <SortableColumn sortKey="join_date" label="Join Date" {...sortProps} />
                             <SortableColumn sortKey="status" label="Status" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
                         {employees.data?.length === 0 && (
                             <tr>
                                 <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
-                                    Belum ada data karyawan.
+                                    No employees yet.
                                 </td>
                             </tr>
                         )}

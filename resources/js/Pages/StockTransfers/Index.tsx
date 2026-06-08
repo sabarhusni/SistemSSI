@@ -16,26 +16,26 @@ export default function Index({ stockTransfers, filters }: any) {
     };
 
     return (
-        <AppLayout header="Transfer Stok">
-            <Head title="Transfer Stok" />
-            <PageHeader title="Daftar Transfer Stok" createHref="/stock-transfers/create" />
+        <AppLayout header="Stock Transfer">
+            <Head title="Stock Transfer" />
+            <PageHeader title="Stock Transfer List" createHref="/stock-transfers/create" />
             <SearchFilter routeName="stock-transfers.index" filters={filters}
-                filterOptions={[{ key: 'status', label: 'Semua Status', options: [
-                    { label: 'Draft', value: 'draft' }, { label: 'Terkirim', value: 'sent' },
-                    { label: 'Diterima', value: 'received' }, { label: 'Dibatalkan', value: 'cancelled' },
+                filterOptions={[{ key: 'status', label: 'All Statuses', options: [
+                    { label: 'Draft', value: 'draft' }, { label: 'Sent', value: 'sent' },
+                    { label: 'Received', value: 'received' }, { label: 'Cancelled', value: 'cancelled' },
                 ]}]}
             />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="transfer_number" label="No. Transfer" {...sortProps} />
-                            <th className="px-4 py-3">Dari Gudang</th>
-                            <th className="px-4 py-3">Ke Gudang</th>
-                            <SortableColumn sortKey="transfer_date" label="Tgl Transfer" {...sortProps} />
-                            <th className="px-4 py-3">Diproses Oleh</th>
+                            <SortableColumn sortKey="transfer_number" label="Transfer No." {...sortProps} />
+                            <th className="px-4 py-3">From Warehouse</th>
+                            <th className="px-4 py-3">To Warehouse</th>
+                            <SortableColumn sortKey="transfer_date" label="Transfer Date" {...sortProps} />
+                            <th className="px-4 py-3">Processed By</th>
                             <SortableColumn sortKey="status" label="Status" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">

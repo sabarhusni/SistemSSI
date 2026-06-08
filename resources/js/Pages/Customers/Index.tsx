@@ -18,28 +18,28 @@ export default function Index({ customers, filters }: any) {
     return (
         <AppLayout header="Customer">
             <Head title="Customer" />
-            <PageHeader title="Daftar Customer" createHref="/customers/create" />
+            <PageHeader title="Customer List" createHref="/customers/create" />
             <SearchFilter
                 routeName="customers.index"
                 filters={filters}
-                filterOptions={[{ key: 'status', label: 'Semua Status', options: [{ label: 'Aktif', value: 'active' }, { label: 'Tidak Aktif', value: 'inactive' }] }]}
+                filterOptions={[{ key: 'status', label: 'All Statuses', options: [{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }] }]}
             />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="code" label="Kode" {...sortProps} />
-                            <SortableColumn sortKey="name" label="Nama / Perusahaan" {...sortProps} />
+                            <SortableColumn sortKey="code" label="Code" {...sortProps} />
+                            <SortableColumn sortKey="name" label="Name / Company" {...sortProps} />
                             <SortableColumn sortKey="email" label="Email" {...sortProps} />
-                            <th className="px-4 py-3">Telepon</th>
-                            <SortableColumn sortKey="city" label="Kota" {...sortProps} />
+                            <th className="px-4 py-3">Phone</th>
+                            <SortableColumn sortKey="city" label="City" {...sortProps} />
                             <SortableColumn sortKey="status" label="Status" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
                         {customers.data?.length === 0 ? (
-                            <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Tidak ada data</td></tr>
+                            <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No data</td></tr>
                         ) : customers.data?.map((c: any) => (
                             <tr key={c.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-mono text-xs">{c.code}</td>

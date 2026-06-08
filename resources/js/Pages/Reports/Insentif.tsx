@@ -19,23 +19,23 @@ export default function Insentif({ byPerson, summary, users, filters }: any) {
     const toggleExpand = (id: string) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
     return (
-        <AppLayout header="Laporan Insentif Sales">
-            <Head title="Laporan Insentif" />
+        <AppLayout header="Sales Incentive Report">
+            <Head title="Incentive Report" />
             <FilterBar onApply={() => applyFilters('/reports/insentif', f)}>
-                <FilterDate label="Dari" value={f.from} onChange={v => setF({ ...f, from: v })} />
-                <FilterDate label="Sampai" value={f.to} onChange={v => setF({ ...f, to: v })} />
+                <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
+                <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
                 <FilterSelect label="Sales Person" value={f.user_id} onChange={v => setF({ ...f, user_id: v })}>
-                    <option value="">Semua Sales</option>
+                    <option value="">All Sales</option>
                     {users?.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </FilterSelect>
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-gray-500">Rate Insentif (%)</label>
+                    <label className="text-xs font-medium text-gray-500">Incentive Rate (%)</label>
                     <input
                         type="number"
                         min="0"
                         max="100"
                         step="0.5"
-                        className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 w-28"
+                        className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 w-28"
                         value={f.rate}
                         onChange={e => setF({ ...f, rate: e.target.value })}
                     />
@@ -43,26 +43,25 @@ export default function Insentif({ byPerson, summary, users, filters }: any) {
             </FilterBar>
 
             <div className="grid grid-cols-3 gap-4 mb-4">
-                <SummaryCard label="Total Penjualan" value={fmt(summary?.total_sales)} color="blue" />
-                <SummaryCard label="Rate Insentif" value={`${summary?.rate ?? 0}%`} color="gray" />
-                <SummaryCard label="Total Insentif" value={fmt(summary?.total_insentif)} color="emerald" />
+                <SummaryCard label="Total Sales" value={fmt(summary?.total_sales)} color="blue" />
+                <SummaryCard label="Incentive Rate" value={`${summary?.rate ?? 0}%`} color="gray" />
+                <SummaryCard label="Total Incentive" value={fmt(summary?.total_insentif)} color="emerald" />
             </div>
 
-            {/* Per-person summary table */}
             <div className="bg-white rounded-xl shadow overflow-hidden mb-4">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600 text-xs">
                             <th className="px-4 py-2.5">Sales Person</th>
-                            <th className="px-4 py-2.5 text-right">Jumlah SO</th>
-                            <th className="px-4 py-2.5 text-right">Total Penjualan</th>
-                            <th className="px-4 py-2.5 text-right text-emerald-700">Insentif ({summary?.rate ?? 0}%)</th>
+                            <th className="px-4 py-2.5 text-right">SO Count</th>
+                            <th className="px-4 py-2.5 text-right">Total Sales</th>
+                            <th className="px-4 py-2.5 text-right text-emerald-700">Incentive ({summary?.rate ?? 0}%)</th>
                             <th className="px-4 py-2.5 text-center">Detail</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
                         {(!byPerson || byPerson.length === 0) && (
-                            <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Tidak ada data pada periode ini.</td></tr>
+                            <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">No data in this period.</td></tr>
                         )}
                         {byPerson?.map((p: any) => (
                             <>
@@ -76,7 +75,7 @@ export default function Insentif({ byPerson, summary, users, filters }: any) {
                                             onClick={() => toggleExpand(p.person_id ?? p.person_name)}
                                             className="text-xs text-blue-600 hover:underline"
                                         >
-                                            {expanded[p.person_id ?? p.person_name] ? 'Sembunyikan' : 'Lihat SO'}
+                                            {expanded[p.person_id ?? p.person_name] ? 'Hide' : 'View SOs'}
                                         </button>
                                     </td>
                                 </tr>

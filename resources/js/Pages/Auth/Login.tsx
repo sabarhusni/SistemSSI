@@ -22,7 +22,7 @@ export default function Login({
 
     const inputCls =
         'w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm ' +
-        'focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition';
+        'focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-red-400 transition';
 
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden">
@@ -32,27 +32,27 @@ export default function Login({
             <div className="hidden lg:flex w-2/5 flex-col bg-slate-800 text-white px-12 py-16">
                 {/* Logo */}
                 <div className="flex items-center gap-3 mb-auto">
-                    <span className="text-3xl">🌿</span>
-                    <span className="text-2xl font-bold tracking-wide text-emerald-400">SSI</span>
+                    <img src="/images/logo_ssi_new.png" alt="SSI" className="h-10 w-10 object-contain" />
+                    <span className="text-2xl font-bold tracking-wide text-red-500">SSI</span>
                 </div>
 
                 {/* Tagline */}
                 <div className="mb-auto">
                     <h1 className="text-3xl font-bold leading-snug mb-3">
-                        Selamat Datang<br />di Sistem ERP
+                        Welcome<br />to the ERP System
                     </h1>
                     <p className="text-slate-400 text-sm leading-relaxed">
-                        Kelola operasional, kontrak, penjualan, dan keuangan bisnis Anda
-                        dalam satu platform terintegrasi.
+                        Manage your operations, contracts, sales, and finances
+                        in one integrated platform.
                     </p>
 
                     {/* Feature bullets */}
                     <ul className="mt-8 space-y-3 text-sm text-slate-300">
                         {[
-                            { icon: '📋', text: 'Manajemen Kontrak & Sales Order' },
-                            { icon: '🔧', text: 'Work Order & Teknisi' },
-                            { icon: '🧾', text: 'Invoice & Pembayaran' },
-                            { icon: '📦', text: 'Inventori & Stok' },
+                            { icon: '📋', text: 'Contract & Sales Order Management' },
+                            { icon: '🔧', text: 'Work Order & Technician' },
+                            { icon: '🧾', text: 'Invoice & Payment' },
+                            { icon: '📦', text: 'Inventory & Stock' },
                         ].map(({ icon, text }) => (
                             <li key={text} className="flex items-center gap-3">
                                 <span className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-700 text-base flex-shrink-0">
@@ -74,13 +74,13 @@ export default function Login({
                 <div className="w-full max-w-md">
                     {/* Mobile logo */}
                     <div className="flex lg:hidden items-center gap-2 justify-center mb-8">
-                        <span className="text-2xl">🌿</span>
-                        <span className="text-xl font-bold text-emerald-600 tracking-wide">SSI</span>
+                        <img src="/images/logo_ssi_new.png" alt="SSI" className="h-8 w-8 object-contain" />
+                        <span className="text-xl font-bold text-red-600 tracking-wide">SSI</span>
                     </div>
 
                     <div className="bg-white rounded-xl shadow p-8">
-                        <h2 className="text-xl font-semibold text-gray-800 mb-1">Masuk ke Akun</h2>
-                        <p className="text-sm text-gray-500 mb-6">Silakan masukkan username dan password Anda.</p>
+                        <h2 className="text-xl font-semibold text-gray-800 mb-1">Sign In to Your Account</h2>
+                        <p className="text-sm text-gray-500 mb-6">Please enter your username and password.</p>
 
                         {status && (
                             <div className="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
@@ -124,19 +124,19 @@ export default function Login({
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
                                         type="checkbox"
-                                        className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                        className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                                         checked={data.remember}
                                         onChange={e => setData('remember', e.target.checked as false)}
                                     />
-                                    <span className="text-sm text-gray-600">Ingat saya</span>
+                                    <span className="text-sm text-gray-600">Remember me</span>
                                 </label>
 
                                 {canResetPassword && (
                                     <Link
                                         href={route('password.request')}
-                                        className="text-sm text-emerald-600 hover:underline"
+                                        className="text-sm text-red-600 hover:underline"
                                     >
-                                        Lupa password?
+                                        Forgot password?
                                     </Link>
                                 )}
                             </div>
@@ -144,9 +144,9 @@ export default function Login({
                             <button
                                 type="submit"
                                 disabled={processing}
-                                className="w-full py-2.5 rounded-md bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60 transition"
+                                className="w-full py-2.5 rounded-md bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-60 transition"
                             >
-                                {processing ? 'Memproses...' : 'Masuk'}
+                                {processing ? 'Processing...' : 'Sign In'}
                             </button>
                         </form>
                     </div>

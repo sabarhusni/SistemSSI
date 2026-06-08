@@ -2,7 +2,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import FormField, { inputCls } from '@/Components/FormField';
 import { Head, Link, useForm } from '@inertiajs/react';
 
-const WAREHOUSES = ['Gudang Utama', 'Gudang Cabang Jakarta', 'Gudang Cabang Surabaya', 'Gudang Lapangan'];
+const WAREHOUSES = ['Main Warehouse', 'Jakarta Branch Warehouse', 'Surabaya Branch Warehouse', 'Field Warehouse'];
 
 export default function Form({ stockTransfer, products, users }: any) {
     const editing = !!stockTransfer;
@@ -29,51 +29,51 @@ export default function Form({ stockTransfer, products, users }: any) {
     };
 
     return (
-        <AppLayout header={editing ? 'Edit Transfer Stok' : 'Buat Transfer Stok'}>
-            <Head title="Transfer Stok" />
+        <AppLayout header={editing ? 'Edit Stock Transfer' : 'Create Stock Transfer'}>
+            <Head title="Stock Transfer" />
             <div className="max-w-3xl bg-white rounded-xl shadow p-6 space-y-4">
                 <form onSubmit={submit}>
                     <div className="grid grid-cols-2 gap-4 mb-4">
-                        <FormField label="No. Transfer" error={errors.transfer_number} required>
+                        <FormField label="Transfer No." error={errors.transfer_number} required>
                             <input className={inputCls} value={data.transfer_number} onChange={e => setData('transfer_number', e.target.value)} />
                         </FormField>
-                        <FormField label="Tgl Transfer" error={errors.transfer_date} required>
+                        <FormField label="Transfer Date" error={errors.transfer_date} required>
                             <input type="date" className={inputCls} value={data.transfer_date} onChange={e => setData('transfer_date', e.target.value)} />
                         </FormField>
-                        <FormField label="Dari Gudang" error={errors.from_warehouse} required>
+                        <FormField label="From Warehouse" error={errors.from_warehouse} required>
                             <select className={inputCls} value={data.from_warehouse} onChange={e => setData('from_warehouse', e.target.value)}>
-                                <option value="">— Pilih Gudang Asal —</option>
+                                <option value="">— Select Source Warehouse —</option>
                                 {WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
                             </select>
                         </FormField>
-                        <FormField label="Ke Gudang" error={errors.to_warehouse} required>
+                        <FormField label="To Warehouse" error={errors.to_warehouse} required>
                             <select className={inputCls} value={data.to_warehouse} onChange={e => setData('to_warehouse', e.target.value)}>
-                                <option value="">— Pilih Gudang Tujuan —</option>
+                                <option value="">— Select Destination Warehouse —</option>
                                 {WAREHOUSES.filter(w => w !== data.from_warehouse).map(w => <option key={w} value={w}>{w}</option>)}
                             </select>
                         </FormField>
-                        <FormField label="Diproses Oleh">
+                        <FormField label="Processed By">
                             <select className={inputCls} value={data.processed_by_id} onChange={e => setData('processed_by_id', e.target.value)}>
-                                <option value="">— Pilih Staf —</option>
+                                <option value="">— Select Staff —</option>
                                 {users?.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
                             </select>
                         </FormField>
                         <FormField label="Status">
                             <select className={inputCls} value={data.status} onChange={e => setData('status', e.target.value)}>
                                 <option value="draft">Draft</option>
-                                <option value="sent">Terkirim</option>
-                                <option value="received">Diterima</option>
-                                <option value="cancelled">Dibatalkan</option>
+                                <option value="sent">Sent</option>
+                                <option value="received">Received</option>
+                                <option value="cancelled">Cancelled</option>
                             </select>
                         </FormField>
                     </div>
 
-                    <h3 className="font-semibold text-gray-700 mb-2">Item Transfer</h3>
+                    <h3 className="font-semibold text-gray-700 mb-2">Transfer Items</h3>
                     <div className="border rounded-lg overflow-hidden mb-2">
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 border-b">
                                 <tr className="text-left text-gray-600">
-                                    <th className="px-3 py-2">Produk</th>
+                                    <th className="px-3 py-2">Product</th>
                                     <th className="px-3 py-2 w-28">Qty</th>
                                     <th className="px-3 py-2 w-10"></th>
                                 </tr>
@@ -83,8 +83,8 @@ export default function Form({ stockTransfer, products, users }: any) {
                                     <tr key={i}>
                                         <td className="px-3 py-2">
                                             <select className={inputCls} value={item.product_id} onChange={e => updateItem(i, 'product_id', e.target.value)}>
-                                                <option value="">— Pilih Produk —</option>
-                                                {products?.map((p: any) => <option key={p.id} value={p.id}>{p.name} (Stok: {p.stock})</option>)}
+                                                <option value="">— Select Product —</option>
+                                                {products?.map((p: any) => <option key={p.id} value={p.id}>{p.name} (Stock: {p.stock})</option>)}
                                             </select>
                                         </td>
                                         <td className="px-3 py-2">
@@ -98,17 +98,17 @@ export default function Form({ stockTransfer, products, users }: any) {
                             </tbody>
                         </table>
                     </div>
-                    <button type="button" onClick={() => setData('items', [...data.items, { product_id: '', quantity: 1 }])} className="text-sm text-emerald-600 hover:underline mb-4">+ Tambah Item</button>
+                    <button type="button" onClick={() => setData('items', [...data.items, { product_id: '', quantity: 1 }])} className="text-sm text-red-600 hover:underline mb-4">+ Add Item</button>
 
-                    <FormField label="Catatan">
+                    <FormField label="Notes">
                         <textarea rows={2} className={inputCls} value={data.notes} onChange={e => setData('notes', e.target.value)} />
                     </FormField>
 
                     <div className="flex gap-3 pt-2">
-                        <button type="submit" disabled={processing} className="px-5 py-2 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60">
-                            {processing ? 'Menyimpan...' : 'Simpan'}
+                        <button type="submit" disabled={processing} className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60">
+                            {processing ? 'Saving...' : 'Save'}
                         </button>
-                        <Link href="/stock-transfers" className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Batal</Link>
+                        <Link href="/stock-transfers" className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancel</Link>
                     </div>
                 </form>
             </div>

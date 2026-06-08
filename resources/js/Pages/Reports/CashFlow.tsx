@@ -12,21 +12,21 @@ export default function CashFlow({ rows, summary, filters }: any) {
     const netColor = (n: number) => n >= 0 ? 'text-emerald-700 font-semibold' : 'text-red-600 font-semibold';
 
     return (
-        <AppLayout header="Laporan Cash Flow">
+        <AppLayout header="Cash Flow Report">
             <Head title="Cash Flow" />
             <FilterBar onApply={() => applyFilters('/reports/cash-flow', f)}>
-                <FilterDate label="Dari" value={f.from} onChange={v => setF({ ...f, from: v })} />
-                <FilterDate label="Sampai" value={f.to} onChange={v => setF({ ...f, to: v })} />
+                <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
+                <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
             </FilterBar>
 
             <div className="grid grid-cols-3 gap-4 mb-4">
-                <SummaryCard label="Total Pemasukan" value={fmt(summary?.total_in)} color="emerald" />
-                <SummaryCard label="Total Pengeluaran" value={fmt(summary?.total_out)} color="red" />
-                <SummaryCard label="Net Cash Flow" value={fmt(summary?.net)} color={summary?.net >= 0 ? 'emerald' : 'red'} sub={summary?.net >= 0 ? 'Surplus' : 'Defisit'} />
+                <SummaryCard label="Total Inflow" value={fmt(summary?.total_in)} color="emerald" />
+                <SummaryCard label="Total Outflow" value={fmt(summary?.total_out)} color="red" />
+                <SummaryCard label="Net Cash Flow" value={fmt(summary?.net)} color={summary?.net >= 0 ? 'emerald' : 'red'} sub={summary?.net >= 0 ? 'Surplus' : 'Deficit'} />
             </div>
 
             <ReportTable
-                headers={['Periode', 'Kas Masuk', 'Bank Masuk', 'Total Masuk', 'Kas Keluar', 'Bank Keluar', 'Total Keluar', 'Net']}
+                headers={['Period', 'Cash In', 'Bank In', 'Total In', 'Cash Out', 'Bank Out', 'Total Out', 'Net']}
                 empty={!rows?.length}
             >
                 {rows?.map((r: any, i: number) => {

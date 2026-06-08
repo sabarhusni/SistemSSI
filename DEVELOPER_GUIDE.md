@@ -1,4 +1,4 @@
-# ARUM ERP - Developer Quick Reference
+# SSI ERP - Developer Quick Reference
 
 ## Quick Commands
 

@@ -10,32 +10,32 @@ export default function CashBankLedger({ rows, summary, bankAccounts, filters }:
     const [f, setF] = useState({ from: filters?.from ?? firstDay, to: filters?.to ?? today, source: filters?.source ?? '', bank_account_id: filters?.bank_account_id ?? '' });
 
     return (
-        <AppLayout header="Buku Kas / Bank">
-            <Head title="Buku Kas/Bank" />
+        <AppLayout header="Cash / Bank Ledger">
+            <Head title="Cash/Bank Ledger" />
             <FilterBar onApply={() => applyFilters('/reports/cash-bank-ledger', f)}>
-                <FilterDate label="Dari" value={f.from} onChange={v => setF({ ...f, from: v })} />
-                <FilterDate label="Sampai" value={f.to} onChange={v => setF({ ...f, to: v })} />
-                <FilterSelect label="Sumber" value={f.source} onChange={v => setF({ ...f, source: v, bank_account_id: '' })}>
-                    <option value="">Kas + Bank</option>
-                    <option value="cash">Kas saja</option>
-                    <option value="bank">Bank saja</option>
+                <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
+                <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
+                <FilterSelect label="Source" value={f.source} onChange={v => setF({ ...f, source: v, bank_account_id: '' })}>
+                    <option value="">Cash + Bank</option>
+                    <option value="cash">Cash only</option>
+                    <option value="bank">Bank only</option>
                 </FilterSelect>
                 {f.source !== 'cash' && (
-                    <FilterSelect label="Rekening Bank" value={f.bank_account_id} onChange={v => setF({ ...f, bank_account_id: v })}>
-                        <option value="">Semua Rekening</option>
+                    <FilterSelect label="Bank Account" value={f.bank_account_id} onChange={v => setF({ ...f, bank_account_id: v })}>
+                        <option value="">All Accounts</option>
                         {bankAccounts?.map((b: any) => <option key={b.id} value={b.id}>{b.bank_name} - {b.account_number}</option>)}
                     </FilterSelect>
                 )}
             </FilterBar>
 
             <div className="grid grid-cols-3 gap-4 mb-4">
-                <SummaryCard label="Total Debit (Masuk)" value={fmt(summary?.total_debit)} color="emerald" />
-                <SummaryCard label="Total Kredit (Keluar)" value={fmt(summary?.total_credit)} color="red" />
-                <SummaryCard label="Saldo Akhir" value={fmt(summary?.balance)} color={summary?.balance >= 0 ? 'blue' : 'red'} />
+                <SummaryCard label="Total Debit (In)" value={fmt(summary?.total_debit)} color="emerald" />
+                <SummaryCard label="Total Credit (Out)" value={fmt(summary?.total_credit)} color="red" />
+                <SummaryCard label="Closing Balance" value={fmt(summary?.balance)} color={summary?.balance >= 0 ? 'blue' : 'red'} />
             </div>
 
             <ReportTable
-                headers={['Tanggal', 'Sumber', 'Referensi', 'Keterangan', 'Debit (Masuk)', 'Kredit (Keluar)', 'Saldo']}
+                headers={['Date', 'Source', 'Reference', 'Description', 'Debit (In)', 'Credit (Out)', 'Balance']}
                 empty={!rows?.length}
             >
                 {rows?.map((r: any, i: number) => (

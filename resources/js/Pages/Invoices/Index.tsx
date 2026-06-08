@@ -20,26 +20,26 @@ export default function Index({ invoices, filters }: any) {
     return (
         <AppLayout header="Invoice">
             <Head title="Invoice" />
-            <PageHeader title="Daftar Invoice" createHref="/invoices/create" />
+            <PageHeader title="Invoice List" createHref="/invoices/create" />
             <SearchFilter routeName="invoices.index" filters={filters}
-                filterOptions={[{ key: 'status', label: 'Semua Status', options: [
-                    { label: 'Draft', value: 'draft' }, { label: 'Terkirim', value: 'sent' },
-                    { label: 'Lunas', value: 'paid' }, { label: 'Dibatalkan', value: 'cancelled' },
+                filterOptions={[{ key: 'status', label: 'All Statuses', options: [
+                    { label: 'Draft', value: 'draft' }, { label: 'Sent', value: 'sent' },
+                    { label: 'Paid', value: 'paid' }, { label: 'Cancelled', value: 'cancelled' },
                 ]}]}
             />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="invoice_number" label="No. Invoice" {...sortProps} />
+                            <SortableColumn sortKey="invoice_number" label="Invoice No." {...sortProps} />
                             <th className="px-4 py-3">Customer</th>
-                            <th className="px-4 py-3">Ref. SO</th>
-                            <SortableColumn sortKey="invoice_date" label="Tgl Invoice" {...sortProps} />
-                            <SortableColumn sortKey="due_date" label="Jatuh Tempo" {...sortProps} />
+                            <th className="px-4 py-3">SO Ref.</th>
+                            <SortableColumn sortKey="invoice_date" label="Invoice Date" {...sortProps} />
+                            <SortableColumn sortKey="due_date" label="Due Date" {...sortProps} />
                             <SortableColumn sortKey="total_amount" label="Total" className="text-right" {...sortProps} />
-                            <SortableColumn sortKey="paid_amount" label="Terbayar" className="text-right" {...sortProps} />
+                            <SortableColumn sortKey="paid_amount" label="Paid" className="text-right" {...sortProps} />
                             <SortableColumn sortKey="status" label="Status" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">

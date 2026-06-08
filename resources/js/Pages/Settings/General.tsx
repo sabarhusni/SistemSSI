@@ -23,8 +23,8 @@ export default function General({ settings, journalAccounts }: any) {
     const liabAccounts   = journalAccounts?.filter((a: any) => a.account_type === 'liability') ?? [];
 
     return (
-        <AppLayout header="Pengaturan Umum">
-            <Head title="Pengaturan Umum" />
+        <AppLayout header="General Settings">
+            <Head title="General Settings" />
             <div className="max-w-2xl space-y-6">
 
                 {flash?.success && (
@@ -35,22 +35,20 @@ export default function General({ settings, journalAccounts }: any) {
 
                 <form onSubmit={submit} className="space-y-6">
 
-                    {/* Perusahaan */}
                     <div className="bg-white rounded-xl shadow p-6 space-y-5">
-                        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Informasi Perusahaan</h2>
+                        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Company Information</h2>
 
-                        <FormField label="Nama Perusahaan" error={errors.company_name}>
+                        <FormField label="Company Name" error={errors.company_name}>
                             <input className={inputCls} value={data.company_name} onChange={e => setData('company_name', e.target.value)} placeholder="PT. ..." />
                         </FormField>
                     </div>
 
-                    {/* Pajak */}
                     <div className="bg-white rounded-xl shadow p-6 space-y-5">
-                        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Konfigurasi Pajak</h2>
+                        <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Tax Configuration</h2>
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Tipe Pajak PPH <span className="text-red-500">*</span>
+                                Tax Type <span className="text-red-500">*</span>
                             </label>
                             <div className="flex gap-6">
                                 <label className="flex items-center gap-2 cursor-pointer">
@@ -60,10 +58,10 @@ export default function General({ settings, journalAccounts }: any) {
                                         value="exclude"
                                         checked={data.tax_type === 'exclude'}
                                         onChange={() => setData('tax_type', 'exclude')}
-                                        className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                                        className="w-4 h-4 text-red-600 focus:ring-red-500"
                                     />
-                                    <span className="text-sm font-medium text-gray-700">Tax Exclude</span>
-                                    <span className="text-xs text-gray-400">(PPH ditambahkan di luar harga)</span>
+                                    <span className="text-sm font-medium text-gray-700">Tax Exclusive</span>
+                                    <span className="text-xs text-gray-400">(Tax added on top of price)</span>
                                 </label>
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
@@ -72,17 +70,17 @@ export default function General({ settings, journalAccounts }: any) {
                                         value="include"
                                         checked={data.tax_type === 'include'}
                                         onChange={() => setData('tax_type', 'include')}
-                                        className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                                        className="w-4 h-4 text-red-600 focus:ring-red-500"
                                     />
-                                    <span className="text-sm font-medium text-gray-700">Tax Include</span>
-                                    <span className="text-xs text-gray-400">(PPH sudah termasuk dalam harga)</span>
+                                    <span className="text-sm font-medium text-gray-700">Tax Inclusive</span>
+                                    <span className="text-xs text-gray-400">(Tax already included in price)</span>
                                 </label>
                             </div>
                             {errors.tax_type && <p className="mt-1 text-xs text-red-500">{errors.tax_type}</p>}
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                            <FormField label="PPH Default Pembelian (%)" error={errors.tax_rate_po}>
+                            <FormField label="Default Purchase Tax (%)" error={errors.tax_rate_po}>
                                 <input
                                     type="number" min={0} max={100} step="0.01"
                                     className={inputCls}
@@ -90,7 +88,7 @@ export default function General({ settings, journalAccounts }: any) {
                                     onChange={e => setData('tax_rate_po', e.target.value)}
                                 />
                             </FormField>
-                            <FormField label="PPH Default Penjualan (%)" error={errors.tax_rate_so}>
+                            <FormField label="Default Sales Tax (%)" error={errors.tax_rate_so}>
                                 <input
                                     type="number" min={0} max={100} step="0.01"
                                     className={inputCls}
@@ -101,75 +99,74 @@ export default function General({ settings, journalAccounts }: any) {
                         </div>
 
                         <div className="rounded-md bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
-                            <strong>Tax Exclude:</strong> Subtotal = Qty × Harga Satuan, kemudian ditambah PPH.<br />
-                            <strong>Tax Include:</strong> Subtotal = Qty × Harga Satuan (PPH sudah termasuk, hanya informatif).
+                            <strong>Tax Exclusive:</strong> Subtotal = Qty × Unit Price, then tax is added.<br />
+                            <strong>Tax Inclusive:</strong> Subtotal = Qty × Unit Price (tax already included, informational only).
                         </div>
                     </div>
 
-                    {/* Akun Jurnal Transaksi */}
                     <div className="bg-white rounded-xl shadow p-6 space-y-5">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Konfigurasi Akun Jurnal Pembelian</h2>
-                            <Link href="/journal-settings" className="text-xs text-emerald-600 hover:underline">
-                                Kelola Akun Jurnal →
+                            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Purchase Journal Account Configuration</h2>
+                            <Link href="/journal-settings" className="text-xs text-red-600 hover:underline">
+                                Manage Journal Accounts →
                             </Link>
                         </div>
 
                         <p className="text-sm text-gray-500">
-                            Pilih akun yang digunakan saat proses penerimaan barang (Receive Item) dari Purchase Order.
+                            Select the accounts used during goods receipt (Receive Item) from a Purchase Order.
                         </p>
 
                         {journalAccounts?.length === 0 ? (
                             <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
-                                Belum ada akun jurnal aktif. Tambahkan akun terlebih dahulu di{' '}
-                                <Link href="/journal-settings/create" className="font-semibold underline">Akun Jurnal</Link>.
+                                No active journal accounts yet. Add accounts first in{' '}
+                                <Link href="/journal-settings/create" className="font-semibold underline">Journal Accounts</Link>.
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 gap-4">
-                                <FormField label="Akun Persediaan / Inventory (Debit)" error={errors.journal_account_inventory}>
+                                <FormField label="Inventory Account (Debit)" error={errors.journal_account_inventory}>
                                     <select
                                         className={inputCls}
                                         value={data.journal_account_inventory}
                                         onChange={e => setData('journal_account_inventory', e.target.value)}
                                     >
-                                        <option value="">— Pilih Akun Asset —</option>
+                                        <option value="">— Select Asset Account —</option>
                                         {assetAccounts.map((a: any) => (
                                             <option key={a.id} value={a.account_code}>
                                                 {a.account_code} — {a.account_name}
                                             </option>
                                         ))}
                                         {assetAccounts.length === 0 && (
-                                            <option disabled>Tidak ada akun Asset aktif</option>
+                                            <option disabled>No active Asset accounts</option>
                                         )}
                                     </select>
-                                    <p className="text-xs text-gray-400 mt-1">Debit saat menerima barang (nilai persediaan bertambah)</p>
+                                    <p className="text-xs text-gray-400 mt-1">Debited when receiving goods (inventory value increases)</p>
                                 </FormField>
 
-                                <FormField label="Akun Hutang Usaha / Accounts Payable (Kredit)" error={errors.journal_account_ap}>
+                                <FormField label="Accounts Payable (Credit)" error={errors.journal_account_ap}>
                                     <select
                                         className={inputCls}
                                         value={data.journal_account_ap}
                                         onChange={e => setData('journal_account_ap', e.target.value)}
                                     >
-                                        <option value="">— Pilih Akun Liability —</option>
+                                        <option value="">— Select Liability Account —</option>
                                         {liabAccounts.map((a: any) => (
                                             <option key={a.id} value={a.account_code}>
                                                 {a.account_code} — {a.account_name}
                                             </option>
                                         ))}
                                         {liabAccounts.length === 0 && (
-                                            <option disabled>Tidak ada akun Liability aktif</option>
+                                            <option disabled>No active Liability accounts</option>
                                         )}
                                     </select>
-                                    <p className="text-xs text-gray-400 mt-1">Kredit saat menerima barang (hutang ke supplier bertambah)</p>
+                                    <p className="text-xs text-gray-400 mt-1">Credited when receiving goods (payable to supplier increases)</p>
                                 </FormField>
                             </div>
                         )}
 
                         <div className="rounded-md bg-gray-50 border border-gray-200 px-4 py-3 text-sm text-gray-600">
-                            <p className="font-semibold mb-1">Jurnal saat Receive Item:</p>
-                            <p>Debit: Persediaan Barang &nbsp;|&nbsp; Kredit: Hutang Usaha</p>
-                            <p className="text-xs text-gray-400 mt-1">Nilai = Qty Diterima × HPP rata-rata (average cost method)</p>
+                            <p className="font-semibold mb-1">Journal entry on Receive Item:</p>
+                            <p>Debit: Inventory &nbsp;|&nbsp; Credit: Accounts Payable</p>
+                            <p className="text-xs text-gray-400 mt-1">Amount = Received Qty × weighted average cost</p>
                         </div>
                     </div>
 
@@ -177,9 +174,9 @@ export default function General({ settings, journalAccounts }: any) {
                         <button
                             type="submit"
                             disabled={processing}
-                            className="px-5 py-2 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60"
+                            className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60"
                         >
-                            {processing ? 'Menyimpan...' : 'Simpan Pengaturan'}
+                            {processing ? 'Saving...' : 'Save Settings'}
                         </button>
                     </div>
                 </form>

@@ -100,7 +100,7 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
     };
 
     return (
-        <AppLayout header={editing ? 'Edit Purchase Order' : 'Buat Purchase Order'}>
+        <AppLayout header={editing ? 'Edit Purchase Order' : 'Create Purchase Order'}>
             <Head title="Purchase Order" />
 
             {pickerIdx !== null && (
@@ -108,7 +108,7 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                     products={products ?? []}
                     onSelect={handleSelectProduct}
                     onClose={() => setPickerIdx(null)}
-                    extraLabel="Harga Pokok"
+                    extraLabel="Cost"
                     extraKey="cost"
                     extraFormat="currency"
                 />
@@ -125,13 +125,13 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
             <div className="max-w-5xl bg-white rounded-xl shadow p-6 space-y-4">
                 <form onSubmit={submit}>
                     <div className="grid grid-cols-3 gap-4 mb-4">
-                        <FormField label="No. PO" error={errors.po_number} required>
+                        <FormField label="PO No." error={errors.po_number} required>
                             <input className={inputCls + ' bg-gray-50'} value={data.po_number} readOnly tabIndex={-1} />
                         </FormField>
-                        <FormField label="Tgl PO" error={errors.po_date} required>
+                        <FormField label="PO Date" error={errors.po_date} required>
                             <input type="date" className={inputCls} value={data.po_date} onChange={e => setData('po_date', e.target.value)} />
                         </FormField>
-                        <FormField label="Tgl Exp. Terima">
+                        <FormField label="Exp. Delivery Date">
                             <input type="date" className={inputCls} value={data.expected_delivery_date} onChange={e => setData('expected_delivery_date', e.target.value)} />
                         </FormField>
                     </div>
@@ -140,11 +140,11 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                             <button
                                 type="button"
                                 onClick={() => setSupplierPickerOpen(true)}
-                                className={`w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 transition ${errors.supplier_id ? 'border-red-400' : ''}`}
+                                className={`w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition ${errors.supplier_id ? 'border-red-400' : ''}`}
                             >
                                 {selectedSupplier
                                     ? <span className="text-gray-800 font-medium">{selectedSupplier.name}</span>
-                                    : <span className="text-gray-400">— Pilih Supplier —</span>
+                                    : <span className="text-gray-400">— Select Supplier —</span>
                                 }
                             </button>
                             {selectedSupplier?.phone && (
@@ -153,7 +153,7 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                         </FormField>
                         <FormField label="Payment Terms">
                             <select className={inputCls} value={data.payment_terms} onChange={e => setData('payment_terms', e.target.value)}>
-                                <option value="">— Pilih —</option>
+                                <option value="">— Select —</option>
                                 <option value="COD">COD</option>
                                 <option value="NET7">NET 7</option>
                                 <option value="NET14">NET 14</option>
@@ -165,23 +165,23 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                         <FormField label="Status">
                             <select className={inputCls} value={data.status} onChange={e => setData('status', e.target.value)}>
                                 <option value="draft">Draft</option>
-                                <option value="sent">Terkirim</option>
-                                <option value="received">Diterima</option>
-                                <option value="cancelled">Dibatalkan</option>
+                                <option value="sent">Sent</option>
+                                <option value="received">Received</option>
+                                <option value="cancelled">Cancelled</option>
                             </select>
                         </FormField>
                     </div>
 
                     <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold text-gray-700">Item Pembelian</h3>
+                        <h3 className="font-semibold text-gray-700">Purchase Items</h3>
                         <span className="text-xs text-gray-400 bg-gray-100 rounded px-2 py-1">
-                            PPH: <strong>{taxType === 'exclude' ? 'Tax Exclude' : 'Tax Include'}</strong>
+                            Tax: <strong>{taxType === 'exclude' ? 'Tax Exclusive' : 'Tax Inclusive'}</strong>
                         </span>
                     </div>
 
                     {hasDuplicates && (
                         <div className="mb-2 rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-700">
-                            Terdapat produk yang sama dalam daftar item. Harap hapus duplikat sebelum menyimpan.
+                            Duplicate products in the item list. Please remove duplicates before saving.
                         </div>
                     )}
 
@@ -189,12 +189,12 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 border-b">
                                 <tr className="text-left text-gray-600">
-                                    <th className="px-3 py-2">Produk</th>
+                                    <th className="px-3 py-2">Product</th>
                                     <th className="px-3 py-2 w-20">Qty</th>
                                     <th className="px-3 py-2 w-20">Unit</th>
-                                    <th className="px-3 py-2 w-32">Harga Satuan</th>
-                                    <th className="px-3 py-2 w-20">PPH (%)</th>
-                                    {taxType === 'exclude' && <th className="px-3 py-2 w-28 text-right">PPH (Rp)</th>}
+                                    <th className="px-3 py-2 w-32">Unit Price</th>
+                                    <th className="px-3 py-2 w-20">Tax (%)</th>
+                                    {taxType === 'exclude' && <th className="px-3 py-2 w-28 text-right">Tax (Rp)</th>}
                                     <th className="px-3 py-2 w-32 text-right">Subtotal</th>
                                     <th className="px-3 py-2 w-8"></th>
                                 </tr>
@@ -209,21 +209,21 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                                                 <button
                                                     type="button"
                                                     onClick={() => setPickerIdx(i)}
-                                                    className={`w-full text-left px-3 py-1.5 border rounded-md text-sm bg-white hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 transition ${isDuplicate ? 'border-red-400' : ''}`}
+                                                    className={`w-full text-left px-3 py-1.5 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition ${isDuplicate ? 'border-red-400' : ''}`}
                                                 >
                                                     {selected
                                                         ? <span className="text-gray-800">{selected.name}</span>
-                                                        : <span className="text-gray-400">— Pilih Produk —</span>
+                                                        : <span className="text-gray-400">— Select Product —</span>
                                                     }
                                                 </button>
-                                                {isDuplicate && <p className="text-xs text-red-500 mt-1">Produk sudah ada di baris lain</p>}
+                                                {isDuplicate && <p className="text-xs text-red-500 mt-1">Product already exists on another row</p>}
                                             </td>
                                             <td className="px-3 py-2">
                                                 <input type="number" min={1} className={inputCls} value={item.quantity} onChange={e => updateItem(i, 'quantity', e.target.value)} />
                                             </td>
                                             <td className="px-3 py-2">
                                                 <select className={inputCls} value={item.unit} onChange={e => updateItem(i, 'unit', e.target.value)}>
-                                                    <option value="">— Pilih —</option>
+                                                    <option value="">— Select —</option>
                                                     {uoms.map((u: any) => (
                                                         <option key={u.id} value={u.symbol}>{u.symbol} — {u.name}</option>
                                                     ))}
@@ -241,7 +241,7 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                                             <td className="px-3 py-2 text-right font-medium">
                                                 {fmt(item.subtotal)}
                                                 {taxType === 'include' && item.pph > 0 && (
-                                                    <div className="text-xs text-gray-400 italic">PPH: {fmt(pphOf(item))}</div>
+                                                    <div className="text-xs text-gray-400 italic">Tax: {fmt(pphOf(item))}</div>
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">
@@ -258,21 +258,21 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                             <tfoot className="bg-gray-50 border-t text-sm">
                                 <tr className="text-gray-600">
                                     <td colSpan={taxType === 'exclude' ? 6 : 5} className="px-3 py-1 text-right">
-                                        {taxType === 'include' ? 'Harga Sebelum Pajak' : 'Subtotal (sebelum PPH)'}
+                                        {taxType === 'include' ? 'Pre-Tax Amount' : 'Subtotal (before tax)'}
                                     </td>
                                     <td className="px-3 py-1 text-right">{fmt(baseAmount)}</td>
                                     <td></td>
                                 </tr>
                                 <tr className="text-gray-600">
                                     <td colSpan={taxType === 'exclude' ? 6 : 5} className="px-3 py-1 text-right">
-                                        {taxType === 'include' ? 'Jumlah PPH (termasuk)' : 'Jumlah PPH'}
+                                        {taxType === 'include' ? 'Tax Amount (included)' : 'Tax Amount'}
                                     </td>
                                     <td className="px-3 py-1 text-right text-amber-600">{fmt(pphAll)}</td>
                                     <td></td>
                                 </tr>
                                 <tr>
                                     <td colSpan={taxType === 'exclude' ? 6 : 5} className="px-3 py-2 text-right font-semibold">
-                                        {taxType === 'exclude' ? 'Grand Total (incl. PPH)' : 'Total'}
+                                        {taxType === 'exclude' ? 'Grand Total (incl. Tax)' : 'Total'}
                                     </td>
                                     <td className="px-3 py-2 text-right font-bold text-emerald-700">{fmt(grandTotal)}</td>
                                     <td></td>
@@ -284,12 +284,12 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                     <button
                         type="button"
                         onClick={() => setData('items', [...data.items, emptyItem()])}
-                        className="text-sm text-emerald-600 hover:underline mb-4"
+                        className="text-sm text-red-600 hover:underline mb-4"
                     >
-                        + Tambah Item
+                        + Add Item
                     </button>
 
-                    <FormField label="Catatan">
+                    <FormField label="Notes">
                         <textarea rows={2} className={inputCls} value={data.notes} onChange={e => setData('notes', e.target.value)} />
                     </FormField>
 
@@ -297,11 +297,11 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                         <button
                             type="submit"
                             disabled={processing || hasDuplicates}
-                            className="px-5 py-2 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60"
+                            className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60"
                         >
-                            {processing ? 'Menyimpan...' : 'Simpan'}
+                            {processing ? 'Saving...' : 'Save'}
                         </button>
-                        <Link href="/purchase-orders" className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Batal</Link>
+                        <Link href="/purchase-orders" className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancel</Link>
                     </div>
                 </form>
             </div>

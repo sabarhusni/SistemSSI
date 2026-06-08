@@ -41,8 +41,9 @@ Route::middleware('auth')->group(function () {
 
     // Operations (Modul 6-9)
     Route::resource('contracts', ContractController::class);
-    Route::post('contracts/{contract}/generate-work-orders', [ContractController::class, 'generateWorkOrders'])->name('contracts.generate-work-orders');
+    Route::get('contracts/{contract}/print', [ContractController::class, 'print'])->name('contracts.print');
     Route::resource('sales-orders', SalesOrderController::class);
+    Route::get('work-orders/{workOrder}/print', [WorkOrderController::class, 'print'])->name('work-orders.print');
     Route::resource('work-orders', WorkOrderController::class);
     Route::resource('invoices', InvoiceController::class);
 

@@ -16,18 +16,18 @@ export default function Index({ roles, filters }: any) {
 
     return (
         <AppLayout header="Role">
-            <Head title="Manajemen Role" />
-            <PageHeader title="Daftar Role" createHref="/roles/create" />
+            <Head title="Role Management" />
+            <PageHeader title="Role List" createHref="/roles/create" />
             <SearchFilter routeName="roles.index" filters={filters} filterOptions={[]} />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="name" label="Nama Role" {...sortProps} />
-                            <th className="px-4 py-3">Deskripsi</th>
-                            <SortableColumn sortKey="users_count" label="Jml Pengguna" className="text-center" {...sortProps} />
-                            <SortableColumn sortKey="permissions_count" label="Jml Permission" className="text-center" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <SortableColumn sortKey="name" label="Role Name" {...sortProps} />
+                            <th className="px-4 py-3">Description</th>
+                            <SortableColumn sortKey="users_count" label="Users" className="text-center" {...sortProps} />
+                            <SortableColumn sortKey="permissions_count" label="Permissions" className="text-center" {...sortProps} />
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">

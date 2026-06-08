@@ -10,36 +10,36 @@ export default function Sales({ orders, summary, customers, users, filters }: an
     const [f, setF] = useState({ from: filters?.from ?? firstDay, to: filters?.to ?? today, customer_id: filters?.customer_id ?? '', status: filters?.status ?? '', sales_person_id: filters?.sales_person_id ?? '' });
 
     return (
-        <AppLayout header="Laporan Sales">
-            <Head title="Laporan Sales" />
+        <AppLayout header="Sales Report">
+            <Head title="Sales Report" />
             <FilterBar onApply={() => applyFilters('/reports/sales', f)}>
-                <FilterDate label="Dari" value={f.from} onChange={v => setF({ ...f, from: v })} />
-                <FilterDate label="Sampai" value={f.to} onChange={v => setF({ ...f, to: v })} />
+                <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
+                <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
                 <FilterSelect label="Customer" value={f.customer_id} onChange={v => setF({ ...f, customer_id: v })}>
-                    <option value="">Semua Customer</option>
+                    <option value="">All Customers</option>
                     {customers?.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </FilterSelect>
                 <FilterSelect label="Sales" value={f.sales_person_id} onChange={v => setF({ ...f, sales_person_id: v })}>
-                    <option value="">Semua Sales</option>
+                    <option value="">All Sales</option>
                     {users?.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </FilterSelect>
                 <FilterSelect label="Status" value={f.status} onChange={v => setF({ ...f, status: v })}>
-                    <option value="">Semua Status</option>
+                    <option value="">All Statuses</option>
                     <option value="draft">Draft</option>
-                    <option value="confirmed">Dikonfirmasi</option>
-                    <option value="completed">Selesai</option>
-                    <option value="cancelled">Dibatalkan</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
                 </FilterSelect>
             </FilterBar>
 
             <div className="grid grid-cols-3 gap-4 mb-4">
                 <SummaryCard label="Total SO" value={summary?.total_orders?.toString() ?? '0'} color="gray" />
                 <SummaryCard label="Total Revenue" value={fmt(summary?.total_revenue)} color="emerald" />
-                <SummaryCard label="Rata-rata per SO" value={summary?.total_orders ? fmt((summary.total_revenue ?? 0) / summary.total_orders) : '—'} color="blue" />
+                <SummaryCard label="Average per SO" value={summary?.total_orders ? fmt((summary.total_revenue ?? 0) / summary.total_orders) : '—'} color="blue" />
             </div>
 
             <ReportTable
-                headers={['Tgl Order', 'No. SO', 'Customer', 'Sales', 'Items', 'Total', 'Status']}
+                headers={['Order Date', 'SO No.', 'Customer', 'Sales', 'Items', 'Total', 'Status']}
                 empty={!orders?.length}
             >
                 {orders?.map((o: any) => (

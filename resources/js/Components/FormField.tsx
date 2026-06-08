@@ -21,4 +21,4 @@ export default function FormField({ label, error, required, children }: Props) {
 
 // Shared input className
 export const inputCls =
-    'w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 disabled:bg-gray-50';
+    'w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 disabled:bg-gray-50';

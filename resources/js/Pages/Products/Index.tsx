@@ -19,30 +19,30 @@ export default function Index({ products, filters, categories }: any) {
     };
 
     return (
-        <AppLayout header="Produk">
-            <Head title="Produk" />
-            <PageHeader title="Daftar Produk" createHref="/products/create" />
+        <AppLayout header="Product">
+            <Head title="Product" />
+            <PageHeader title="Product List" createHref="/products/create" />
             <SearchFilter
                 routeName="products.index"
                 filters={filters}
                 filterOptions={[
-                    { key: 'category_id', label: 'Semua Kategori', options: categories?.map((c: any) => ({ label: c.name, value: c.id })) ?? [] },
-                    { key: 'status', label: 'Semua Status', options: [{ label: 'Aktif', value: 'active' }, { label: 'Tidak Aktif', value: 'inactive' }] },
+                    { key: 'category_id', label: 'All Categories', options: categories?.map((c: any) => ({ label: c.name, value: c.id })) ?? [] },
+                    { key: 'status', label: 'All Statuses', options: [{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }] },
                 ]}
             />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="code" label="Kode" {...sortProps} />
-                            <SortableColumn sortKey="name" label="Nama" {...sortProps} />
-                            <th className="px-4 py-3">Kategori</th>
+                            <SortableColumn sortKey="code" label="Code" {...sortProps} />
+                            <SortableColumn sortKey="name" label="Name" {...sortProps} />
+                            <th className="px-4 py-3">Category</th>
                             <SortableColumn sortKey="sales_price" label="Sales Price" className="text-right" {...sortProps} />
                             <SortableColumn sortKey="cost" label="Cost" className="text-right" {...sortProps} />
-                            <SortableColumn sortKey="stock" label="Stok" className="text-right" {...sortProps} />
-                            <th className="px-4 py-3">Satuan</th>
+                            <SortableColumn sortKey="stock" label="Stock" className="text-right" {...sortProps} />
+                            <th className="px-4 py-3">Unit</th>
                             <SortableColumn sortKey="status" label="Status" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">

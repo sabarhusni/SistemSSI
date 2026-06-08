@@ -18,12 +18,12 @@ const colors: Record<string, string> = {
 };
 
 const labels: Record<string, string> = {
-    active: 'Aktif', inactive: 'Tidak Aktif', draft: 'Draft',
-    confirmed: 'Dikonfirmasi', completed: 'Selesai', cancelled: 'Dibatalkan',
-    pending: 'Menunggu', in_progress: 'Dikerjakan', sent: 'Dikirim',
-    paid: 'Lunas', received: 'Diterima', verified: 'Terverifikasi',
-    rejected: 'Ditolak', matched: 'Cocok', reconciled: 'Rekonsiliasi',
-    unmatched: 'Tidak Cocok',
+    active: 'Active', inactive: 'Inactive', draft: 'Draft',
+    confirmed: 'Confirmed', completed: 'Completed', cancelled: 'Cancelled',
+    pending: 'Pending', in_progress: 'In Progress', sent: 'Sent',
+    paid: 'Paid', received: 'Received', verified: 'Verified',
+    rejected: 'Rejected', matched: 'Matched', reconciled: 'Reconciled',
+    unmatched: 'Unmatched',
 };
 
 export default function StatusBadge({ status }: { status: string }) {

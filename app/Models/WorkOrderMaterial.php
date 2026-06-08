@@ -11,7 +11,7 @@ class WorkOrderMaterial extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
 
-    protected $fillable = ['work_order_id', 'product_id', 'quantity_used'];
+    protected $fillable = ['work_order_id', 'product_id', 'month', 'parent_product_id', 'uom', 'quantity_used'];
 
     public function workOrder() { return $this->belongsTo(WorkOrder::class); }
     public function product() { return $this->belongsTo(Product::class); }

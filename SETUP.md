@@ -1,8 +1,8 @@
-# ARUM ERP System - Setup Guide
+# SSI ERP System - Setup Guide
 
 ## Deskripsi Proyek
 
-ARUM adalah sistem ERP sederhana berbasis web untuk perusahaan yang bergerak di bidang jasa pemasangan pengharum ruangan. Sistem ini dibangun menggunakan:
+SSI adalah sistem ERP sederhana berbasis web untuk perusahaan yang bergerak di bidang jasa pemasangan penghSSI ruangan. Sistem ini dibangun menggunakan:
 
 - **Backend**: Laravel 13 (PHP 8.3)
 - **Frontend**: Blade Templates + React + TailwindCSS
@@ -61,7 +61,7 @@ Pastikan MySQL berjalan, kemudian:
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=arum
+DB_DATABASE=SSI
 DB_USERNAME=root
 DB_PASSWORD=
 
@@ -78,7 +78,7 @@ npm run dev
 DB_CONNECTION=pgsql
 DB_HOST=127.0.0.1
 DB_PORT=5432
-DB_DATABASE=arum
+DB_DATABASE=SSI
 DB_USERNAME=postgres
 DB_PASSWORD=your_password
 
@@ -112,12 +112,12 @@ Akses aplikasi di: http://localhost:8000
 
 | Role | Email | Password | Username |
 |------|-------|----------|----------|
-| Admin | admin@arum.test | password | admin |
-| Manager | manager@arum.test | password | manager |
-| Sales | budi@arum.test | password | budi |
-| Technician | rini@arum.test | password | rini |
-| Accountant | siti@arum.test | password | siti |
-| Warehouse | hendra@arum.test | password | hendra |
+| Admin | admin@SSI.test | password | admin |
+| Manager | manager@SSI.test | password | manager |
+| Sales | budi@SSI.test | password | budi |
+| Technician | rini@SSI.test | password | rini |
+| Accountant | siti@SSI.test | password | siti |
+| Warehouse | hendra@SSI.test | password | hendra |
 
 ## Struktur Database
 
@@ -293,4 +293,4 @@ Untuk informasi lebih lanjut:
 
 ## License
 
-ARUM ERP System - All Rights Reserved
+SSI ERP System - All Rights Reserved

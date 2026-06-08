@@ -37,7 +37,7 @@ export default function SupplierPickerModal({ suppliers, onSelect, onClose }: Pr
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl mx-4 flex flex-col" style={{ maxHeight: '80vh' }}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b">
-                    <span className="font-semibold text-gray-800">Pilih Supplier</span>
+                    <span className="font-semibold text-gray-800">Select Supplier</span>
                     <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
                 </div>
 
@@ -45,8 +45,8 @@ export default function SupplierPickerModal({ suppliers, onSelect, onClose }: Pr
                 <div className="px-4 py-3 border-b">
                     <input
                         ref={inputRef}
-                        className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                        placeholder="Cari nama, kode, telepon, atau email..."
+                        className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                        placeholder="Search by name, code, phone, or email..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                     />
@@ -55,14 +55,14 @@ export default function SupplierPickerModal({ suppliers, onSelect, onClose }: Pr
                 {/* List */}
                 <div className="overflow-y-auto flex-1">
                     {filtered.length === 0 ? (
-                        <p className="px-4 py-8 text-center text-sm text-gray-400">Supplier tidak ditemukan.</p>
+                        <p className="px-4 py-8 text-center text-sm text-gray-400">No suppliers found.</p>
                     ) : (
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 sticky top-0 border-b">
                                 <tr className="text-left text-gray-500 text-xs">
-                                    <th className="px-4 py-2">Nama</th>
-                                    <th className="px-3 py-2">Kode</th>
-                                    <th className="px-3 py-2">Telepon</th>
+                                    <th className="px-4 py-2">Name</th>
+                                    <th className="px-3 py-2">Code</th>
+                                    <th className="px-3 py-2">Phone</th>
                                     <th className="px-3 py-2">Email</th>
                                 </tr>
                             </thead>
@@ -70,7 +70,7 @@ export default function SupplierPickerModal({ suppliers, onSelect, onClose }: Pr
                                 {filtered.map((s: any) => (
                                     <tr
                                         key={s.id}
-                                        className="hover:bg-emerald-50 cursor-pointer"
+                                        className="hover:bg-red-50 cursor-pointer"
                                         onClick={() => { onSelect(s); onClose(); }}
                                     >
                                         <td className="px-4 py-2 font-medium text-gray-800">{s.name}</td>
@@ -86,8 +86,8 @@ export default function SupplierPickerModal({ suppliers, onSelect, onClose }: Pr
 
                 {/* Footer */}
                 <div className="px-4 py-2 border-t flex items-center justify-between text-xs text-gray-400">
-                    <span>{filtered.length} supplier ditemukan</span>
-                    <span>Tekan <kbd className="px-1 py-0.5 border rounded text-gray-500">Esc</kbd> untuk tutup</span>
+                    <span>{filtered.length} suppliers found</span>
+                    <span>Press <kbd className="px-1 py-0.5 border rounded text-gray-500">Esc</kbd> to close</span>
                 </div>
             </div>
         </div>

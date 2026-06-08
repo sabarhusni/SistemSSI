@@ -12,7 +12,7 @@ interface Props {
 export default function Pagination({ links, from, to, total }: Props) {
     return (
         <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
-            <p>Menampilkan {from}–{to} dari {total} data</p>
+            <p>Showing {from}–{to} of {total} records</p>
             <div className="flex gap-1">
                 {links.map((link, i) => (
                     link.url ? (
@@ -22,7 +22,7 @@ export default function Pagination({ links, from, to, total }: Props) {
                             preserveState
                             className={`px-3 py-1 rounded border text-sm ${
                                 link.active
-                                    ? 'bg-emerald-600 text-white border-emerald-600'
+                                    ? 'bg-red-600 text-white border-red-600'
                                     : 'bg-white border-gray-300 hover:bg-gray-50'
                             }`}
                             dangerouslySetInnerHTML={{ __html: link.label }}

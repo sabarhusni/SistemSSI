@@ -40,15 +40,15 @@ export default function Form({ role, permissions }: any) {
     });
 
     return (
-        <AppLayout header={editing ? 'Edit Role' : 'Tambah Role'}>
+        <AppLayout header={editing ? 'Edit Role' : 'Add Role'}>
             <Head title="Role" />
             <div className="max-w-3xl bg-white rounded-xl shadow p-6">
                 <form onSubmit={submit} className="space-y-5">
                     <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Nama Role" error={errors.name} required>
+                        <FormField label="Role Name" error={errors.name} required>
                             <input className={inputCls} value={data.name} onChange={e => setData('name', e.target.value)} />
                         </FormField>
-                        <FormField label="Deskripsi">
+                        <FormField label="Description">
                             <input className={inputCls} value={data.description} onChange={e => setData('description', e.target.value)} />
                         </FormField>
                     </div>
@@ -67,10 +67,10 @@ export default function Form({ role, permissions }: any) {
                                                 checked={allChecked}
                                                 ref={el => { if (el) el.indeterminate = someChecked && !allChecked; }}
                                                 onChange={() => toggleGroup(perms)}
-                                                className="w-4 h-4 text-emerald-600 rounded"
+                                                className="w-4 h-4 text-red-600 rounded"
                                             />
                                             <span className="font-medium text-gray-700 capitalize">{group}</span>
-                                            <span className="text-xs text-gray-400">({perms.length} permission)</span>
+                                            <span className="text-xs text-gray-400">({perms.length} permissions)</span>
                                         </label>
                                         <div className="grid grid-cols-2 gap-x-4 gap-y-1 pl-6">
                                             {perms.map(perm => (
@@ -79,7 +79,7 @@ export default function Form({ role, permissions }: any) {
                                                         type="checkbox"
                                                         checked={data.permissions.includes(perm.id)}
                                                         onChange={() => togglePermission(perm.id)}
-                                                        className="w-3.5 h-3.5 text-emerald-600 rounded"
+                                                        className="w-3.5 h-3.5 text-red-600 rounded"
                                                     />
                                                     {perm.name}
                                                 </label>
@@ -92,10 +92,10 @@ export default function Form({ role, permissions }: any) {
                     </div>
 
                     <div className="flex gap-3 pt-2">
-                        <button type="submit" disabled={processing} className="px-5 py-2 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60">
-                            {processing ? 'Menyimpan...' : 'Simpan'}
+                        <button type="submit" disabled={processing} className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60">
+                            {processing ? 'Saving...' : 'Save'}
                         </button>
-                        <Link href="/roles" className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Batal</Link>
+                        <Link href="/roles" className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancel</Link>
                     </div>
                 </form>
             </div>

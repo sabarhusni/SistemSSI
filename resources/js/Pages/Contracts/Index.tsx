@@ -5,26 +5,23 @@ import SortableColumn from '@/Components/SortableColumn';
 import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
 import ConfirmDelete from '@/Components/ConfirmDelete';
-import { Head, Link, useForm } from '@inertiajs/react';
-
-function GenerateWOButton({ contractId }: { contractId: string }) {
-    const { post, processing } = useForm({});
-    return (
-        <button
-            type="button"
-            disabled={processing}
-            onClick={() => post(`/contracts/${contractId}/generate-work-orders`)}
-            className="text-emerald-600 hover:underline disabled:opacity-50 text-xs"
-            title="Generate Work Order dari rencana kunjungan"
-        >
-            Gen WO
-        </button>
-    );
-}
+import { Head, Link, usePage } from '@inertiajs/react';
 
 const fmt = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
+// Duration in months between two dates (matches the contract form's derivation).
+function monthsBetween(start: string, end: string): number | null {
+    if (!start || !end) return null;
+    const s = new Date(start);
+    const e = new Date(end);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return null;
+    let m = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
+    if (e.getDate() < s.getDate()) m -= 1;
+    return m > 0 ? m : null;
+}
+
 export default function Index({ contracts, filters }: any) {
+    const { flash } = usePage().props as any;
     const sortProps = {
         currentSort: filters.sort_by ?? 'created_at',
         currentDir: filters.sort_dir ?? 'desc',
@@ -33,27 +30,32 @@ export default function Index({ contracts, filters }: any) {
     };
 
     return (
-        <AppLayout header="Kontrak">
-            <Head title="Kontrak" />
-            <PageHeader title="Daftar Kontrak" createHref="/contracts/create" />
+        <AppLayout header="Contract">
+            <Head title="Contract" />
+            <PageHeader title="Contract List" createHref="/contracts/create" />
+            {flash?.error && (
+                <div className="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                    {flash.error}
+                </div>
+            )}
             <SearchFilter routeName="contracts.index" filters={filters}
-                filterOptions={[{ key: 'status', label: 'Semua Status', options: [
-                    { label: 'Draft', value: 'draft' }, { label: 'Aktif', value: 'active' },
-                    { label: 'Selesai', value: 'completed' }, { label: 'Dibatalkan', value: 'cancelled' },
+                filterOptions={[{ key: 'status', label: 'All Statuses', options: [
+                    { label: 'Draft', value: 'draft' }, { label: 'Active', value: 'active' },
+                    { label: 'Completed', value: 'completed' }, { label: 'Cancelled', value: 'cancelled' },
                 ]}]}
             />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="contract_number" label="No. Kontrak" {...sortProps} />
+                            <SortableColumn sortKey="contract_number" label="Contract No." {...sortProps} />
                             <th className="px-4 py-3">Customer</th>
-                            <th className="px-4 py-3">Area</th>
-                            <SortableColumn sortKey="start_date" label="Mulai" {...sortProps} />
-                            <SortableColumn sortKey="end_date" label="Selesai" {...sortProps} />
-                            <SortableColumn sortKey="contract_value" label="Nilai" className="text-right" {...sortProps} />
+                            <SortableColumn sortKey="start_date" label="Start" {...sortProps} />
+                            <th className="px-4 py-3 text-right">Duration (Months)</th>
+                            <SortableColumn sortKey="end_date" label="End" {...sortProps} />
+                            <SortableColumn sortKey="contract_value" label="Value" className="text-right" {...sortProps} />
                             <SortableColumn sortKey="status" label="Status" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -61,15 +63,30 @@ export default function Index({ contracts, filters }: any) {
                             <tr key={c.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-mono text-xs font-medium">{c.contract_number}</td>
                                 <td className="px-4 py-3">{c.customer?.name}</td>
-                                <td className="px-4 py-3 text-gray-500">{c.service_area}</td>
                                 <td className="px-4 py-3">{c.start_date}</td>
+                                <td className="px-4 py-3 text-right">{c.duration_months ?? monthsBetween(c.start_date, c.end_date) ?? '—'}</td>
                                 <td className="px-4 py-3">{c.end_date}</td>
                                 <td className="px-4 py-3 text-right">{fmt(c.contract_value)}</td>
                                 <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
                                 <td className="px-4 py-3 flex gap-3 items-center">
-                                    <Link href={`/contracts/${c.id}/edit`} className="text-blue-600 hover:underline">Edit</Link>
-                                    {c.status === 'active' && <GenerateWOButton contractId={c.id} />}
-                                    <ConfirmDelete href={`/contracts/${c.id}`} itemName={c.contract_number} />
+                                    <Link
+                                        href={`/contracts/${c.id}/edit`}
+                                        className="text-blue-600 hover:underline"
+                                        title={c.active_so_count > 0 ? 'Sales Order aktif — hanya dapat dilihat (read-only)' : undefined}
+                                    >
+                                        {c.active_so_count > 0 ? 'View' : 'Edit'}
+                                    </Link>
+                                    <a href={`/contracts/${c.id}/print`} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:underline">Print</a>
+                                    {c.active_so_count > 0 ? (
+                                        <span
+                                            className="text-gray-300 cursor-not-allowed text-sm font-medium"
+                                            title="Sales Order aktif — kontrak tidak dapat dihapus"
+                                        >
+                                            Delete
+                                        </span>
+                                    ) : (
+                                        <ConfirmDelete href={`/contracts/${c.id}`} itemName={c.contract_number} />
+                                    )}
                                 </td>
                             </tr>
                         ))}

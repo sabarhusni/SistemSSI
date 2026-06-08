@@ -7,11 +7,11 @@ import ConfirmDelete from '@/Components/ConfirmDelete';
 import { Head, Link, usePage } from '@inertiajs/react';
 
 const TYPE_LABELS: Record<string, string> = {
-    asset:     'Asset (Aktiva)',
-    liability: 'Liability (Kewajiban)',
-    equity:    'Equity (Modal)',
-    revenue:   'Revenue (Pendapatan)',
-    expense:   'Expense (Biaya)',
+    asset:     'Asset',
+    liability: 'Liability',
+    equity:    'Equity',
+    revenue:   'Revenue',
+    expense:   'Expense',
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -33,9 +33,9 @@ export default function Index({ journalSettings, filters }: any) {
     };
 
     return (
-        <AppLayout header="Akun Jurnal">
-            <Head title="Akun Jurnal" />
-            <PageHeader title="Daftar Akun Jurnal" createHref="/journal-settings/create" />
+        <AppLayout header="Journal Account">
+            <Head title="Journal Account" />
+            <PageHeader title="Journal Account List" createHref="/journal-settings/create" />
 
             {flash?.success && (
                 <div className="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-700">
@@ -49,7 +49,7 @@ export default function Index({ journalSettings, filters }: any) {
                 filterOptions={[
                     {
                         key: 'account_type',
-                        label: 'Semua Tipe',
+                        label: 'All Types',
                         options: Object.entries(TYPE_LABELS).map(([value, label]) => ({ label, value })),
                     },
                 ]}
@@ -59,19 +59,19 @@ export default function Index({ journalSettings, filters }: any) {
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="account_code" label="Kode Akun" className="w-28" {...sortProps} />
-                            <SortableColumn sortKey="account_name" label="Nama Akun" {...sortProps} />
-                            <SortableColumn sortKey="account_type" label="Tipe" className="w-44" {...sortProps} />
-                            <th className="px-4 py-3 w-28">Kategori</th>
-                            <SortableColumn sortKey="is_active" label="Aktif" className="w-20 text-center" {...sortProps} />
-                            <th className="px-4 py-3 w-24">Aksi</th>
+                            <SortableColumn sortKey="account_code" label="Account Code" className="w-28" {...sortProps} />
+                            <SortableColumn sortKey="account_name" label="Account Name" {...sortProps} />
+                            <SortableColumn sortKey="account_type" label="Type" className="w-44" {...sortProps} />
+                            <th className="px-4 py-3 w-28">Category</th>
+                            <SortableColumn sortKey="is_active" label="Active" className="w-20 text-center" {...sortProps} />
+                            <th className="px-4 py-3 w-24">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
                         {journalSettings.data?.length === 0 && (
                             <tr>
                                 <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
-                                    Belum ada akun jurnal. Klik "+ Tambah" untuk menambahkan.
+                                    No journal accounts yet. Click "+ Add" to create one.
                                 </td>
                             </tr>
                         )}

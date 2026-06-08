@@ -23,9 +23,13 @@ export default function AppLayout({
             >
                 {/* Logo */}
                 <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-700">
-                    <span className="text-xl font-bold text-emerald-400">🌿</span>
+                    <img
+                        src="/images/logo_ssi_new.png"
+                        alt="SSI"
+                        className="h-8 w-8 flex-shrink-0 object-contain"
+                    />
                     {sidebarOpen && (
-                        <span className="text-lg font-bold tracking-wide">SSI</span>
+                        <span className="text-lg font-bold tracking-wide text-red-500">SSI</span>
                     )}
                     <button
                         onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -51,7 +55,7 @@ export default function AppLayout({
                                     href={item.href}
                                     className={`flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
                                         isActive(item.href)
-                                            ? 'bg-emerald-600 text-white'
+                                            ? 'bg-red-600 text-white'
                                             : 'text-slate-300 hover:bg-slate-700 hover:text-white'
                                     }`}
                                     title={!sidebarOpen ? item.label : undefined}
@@ -75,7 +79,7 @@ export default function AppLayout({
                             as="button"
                             className="mt-2 text-red-400 hover:text-red-300"
                         >
-                            Keluar
+                            Logout
                         </Link>
                     </div>
                 )}

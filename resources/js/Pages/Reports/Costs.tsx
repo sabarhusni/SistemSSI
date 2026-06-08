@@ -10,23 +10,22 @@ export default function Costs({ rows, byCategory, summary, filters }: any) {
     const [f, setF] = useState({ from: filters?.from ?? firstDay, to: filters?.to ?? today });
 
     const categoryColors: Record<string, string> = {
-        'Pembelian Barang': 'bg-blue-100 text-blue-700',
-        'Material WO':      'bg-amber-100 text-amber-700',
-        'Operasional':      'bg-gray-100 text-gray-600',
+        'Goods Purchase': 'bg-blue-100 text-blue-700',
+        'WO Material':    'bg-amber-100 text-amber-700',
+        'Operational':    'bg-gray-100 text-gray-600',
     };
 
     return (
-        <AppLayout header="Laporan Biaya (Costs)">
-            <Head title="Laporan Costs" />
+        <AppLayout header="Costs Report">
+            <Head title="Costs Report" />
             <FilterBar onApply={() => applyFilters('/reports/costs', f)}>
-                <FilterDate label="Dari" value={f.from} onChange={v => setF({ ...f, from: v })} />
-                <FilterDate label="Sampai" value={f.to} onChange={v => setF({ ...f, to: v })} />
+                <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
+                <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
             </FilterBar>
 
-            {/* Summary per Kategori */}
             {byCategory && Object.keys(byCategory).length > 0 && (
                 <div className="bg-white rounded-xl shadow px-5 py-4 mb-4">
-                    <p className="text-sm font-semibold text-gray-700 mb-3">Ringkasan per Kategori</p>
+                    <p className="text-sm font-semibold text-gray-700 mb-3">Summary by Category</p>
                     <div className="flex flex-wrap gap-3">
                         {Object.entries(byCategory as Record<string, number>).map(([cat, total]) => (
                             <div key={cat} className="flex items-center gap-2">
@@ -39,11 +38,11 @@ export default function Costs({ rows, byCategory, summary, filters }: any) {
             )}
 
             <div className="grid grid-cols-1 gap-4 mb-4">
-                <SummaryCard label="Total Biaya" value={fmt(summary?.total)} color="red" />
+                <SummaryCard label="Total Costs" value={fmt(summary?.total)} color="red" />
             </div>
 
             <ReportTable
-                headers={['Tanggal', 'Kategori', 'Sumber', 'Keterangan', 'Jumlah']}
+                headers={['Date', 'Category', 'Source', 'Description', 'Amount']}
                 empty={!rows?.length}
             >
                 {rows?.map((r: any, i: number) => (

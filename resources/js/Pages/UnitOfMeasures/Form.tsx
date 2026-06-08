@@ -21,33 +21,32 @@ export default function Form({ uom, allUoms }: any) {
     };
 
     return (
-        <AppLayout header={editing ? 'Edit Satuan' : 'Tambah Satuan'}>
-            <Head title={editing ? 'Edit Satuan' : 'Tambah Satuan'} />
+        <AppLayout header={editing ? 'Edit Unit' : 'Add Unit'}>
+            <Head title={editing ? 'Edit Unit' : 'Add Unit'} />
             <div className="max-w-lg bg-white rounded-xl shadow p-6">
                 <form onSubmit={submit} className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Nama Satuan" error={errors.name} required>
+                        <FormField label="Unit Name" error={errors.name} required>
                             <input
                                 className={inputCls}
                                 value={data.name}
                                 onChange={e => setData('name', e.target.value)}
-                                placeholder="cth: Kilogram, Pieces"
+                                placeholder="e.g. Kilogram, Pieces"
                             />
                         </FormField>
-                        <FormField label="Simbol" error={errors.symbol} required>
+                        <FormField label="Symbol" error={errors.symbol} required>
                             <input
                                 className={inputCls}
                                 value={data.symbol}
                                 onChange={e => setData('symbol', e.target.value)}
-                                placeholder="cth: kg, pcs"
+                                placeholder="e.g. kg, pcs"
                             />
                         </FormField>
                     </div>
 
-                    {/* Konversi ke satuan terkecil */}
                     <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
-                        <p className="text-sm font-semibold text-gray-700">Konversi ke Satuan Terkecil</p>
-                        <FormField label="Satuan Terkecil (Dasar)" error={errors.base_uom_id}>
+                        <p className="text-sm font-semibold text-gray-700">Conversion to Base Unit</p>
+                        <FormField label="Base Unit" error={errors.base_uom_id}>
                             <select
                                 className={inputCls}
                                 value={data.base_uom_id}
@@ -56,7 +55,7 @@ export default function Form({ uom, allUoms }: any) {
                                     if (!e.target.value) setData('conversion_factor', '');
                                 }}
                             >
-                                <option value="">— Ini adalah satuan terkecil —</option>
+                                <option value="">— This is the base unit —</option>
                                 {allUoms?.map((u: any) => (
                                     <option key={u.id} value={u.id}>{u.name} ({u.symbol})</option>
                                 ))}
@@ -64,7 +63,7 @@ export default function Form({ uom, allUoms }: any) {
                         </FormField>
 
                         {!isBaseUnit && (
-                            <FormField label={`Faktor Konversi (1 ${data.symbol || '…'} = ? ${selectedBase?.symbol ?? '…'})`} error={errors.conversion_factor} required>
+                            <FormField label={`Conversion Factor (1 ${data.symbol || '…'} = ? ${selectedBase?.symbol ?? '…'})`} error={errors.conversion_factor} required>
                                 <input
                                     type="number"
                                     min={0}
@@ -72,21 +71,20 @@ export default function Form({ uom, allUoms }: any) {
                                     className={inputCls}
                                     value={data.conversion_factor}
                                     onChange={e => setData('conversion_factor', e.target.value)}
-                                    placeholder="cth: 1000"
+                                    placeholder="e.g. 1000"
                                 />
                             </FormField>
                         )}
 
-                        {/* Preview konversi */}
                         {!isBaseUnit && data.conversion_factor && selectedBase && (
                             <div className="rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm text-emerald-700">
                                 <span className="font-semibold">Preview:</span>{' '}
-                                1 <strong>{data.name || data.symbol}</strong> = {Number(data.conversion_factor).toLocaleString('id-ID')} <strong>{selectedBase.name} ({selectedBase.symbol})</strong>
+                                1 <strong>{data.name || data.symbol}</strong> = {Number(data.conversion_factor).toLocaleString('en-US')} <strong>{selectedBase.name} ({selectedBase.symbol})</strong>
                             </div>
                         )}
 
                         {isBaseUnit && (
-                            <p className="text-xs text-gray-400">Satuan ini merupakan satuan terkecil / dasar. Tidak memerlukan faktor konversi.</p>
+                            <p className="text-xs text-gray-400">This is a base unit. No conversion factor required.</p>
                         )}
                     </div>
 
@@ -96,9 +94,9 @@ export default function Form({ uom, allUoms }: any) {
                                 type="checkbox"
                                 checked={data.status === 'active'}
                                 onChange={e => setData('status', e.target.checked ? 'active' : 'inactive')}
-                                className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                             />
-                            <span className="text-sm text-gray-700">Aktif</span>
+                            <span className="text-sm text-gray-700">Active</span>
                         </label>
                     </FormField>
 
@@ -106,15 +104,15 @@ export default function Form({ uom, allUoms }: any) {
                         <button
                             type="submit"
                             disabled={processing}
-                            className="px-5 py-2 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60"
+                            className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60"
                         >
-                            {processing ? 'Menyimpan...' : 'Simpan'}
+                            {processing ? 'Saving...' : 'Save'}
                         </button>
                         <Link
                             href="/unit-of-measures"
                             className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
                         >
-                            Batal
+                            Cancel
                         </Link>
                     </div>
                 </form>

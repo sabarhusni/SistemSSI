@@ -16,26 +16,26 @@ export default function Index({ stockOpnames, filters }: any) {
     };
 
     return (
-        <AppLayout header="Opname Stok">
-            <Head title="Opname Stok" />
-            <PageHeader title="Daftar Opname Stok" createHref="/stock-opnames/create" />
+        <AppLayout header="Stock Opname">
+            <Head title="Stock Opname" />
+            <PageHeader title="Stock Opname List" createHref="/stock-opnames/create" />
             <SearchFilter routeName="stock-opnames.index" filters={filters}
-                filterOptions={[{ key: 'status', label: 'Semua Status', options: [
-                    { label: 'Draft', value: 'draft' }, { label: 'Dalam Proses', value: 'in_progress' },
-                    { label: 'Selesai', value: 'completed' }, { label: 'Dibatalkan', value: 'cancelled' },
+                filterOptions={[{ key: 'status', label: 'All Statuses', options: [
+                    { label: 'Draft', value: 'draft' }, { label: 'In Progress', value: 'in_progress' },
+                    { label: 'Completed', value: 'completed' }, { label: 'Cancelled', value: 'cancelled' },
                 ]}]}
             />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="opname_number" label="No. Opname" {...sortProps} />
-                            <th className="px-4 py-3">Gudang</th>
-                            <SortableColumn sortKey="opname_date" label="Tgl Opname" {...sortProps} />
-                            <th className="px-4 py-3">Dilakukan Oleh</th>
-                            <th className="px-4 py-3 text-right">Jml Item</th>
+                            <SortableColumn sortKey="opname_number" label="Opname No." {...sortProps} />
+                            <th className="px-4 py-3">Warehouse</th>
+                            <SortableColumn sortKey="opname_date" label="Opname Date" {...sortProps} />
+                            <th className="px-4 py-3">Conducted By</th>
+                            <th className="px-4 py-3 text-right">Items</th>
                             <SortableColumn sortKey="status" label="Status" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">

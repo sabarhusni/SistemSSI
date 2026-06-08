@@ -59,6 +59,10 @@ class HandleInertiaRequests extends Middleware
                 'permissions' => $permissions,
             ],
             'navGroups' => $navGroups,
+            'flash' => [
+                'success' => $request->session()->get('success'),
+                'error'   => $request->session()->get('error'),
+            ],
         ];
     }
 }

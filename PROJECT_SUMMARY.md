@@ -1,4 +1,4 @@
-# ARUM ERP - Project Structure & Summary
+# SSI ERP - Project Structure & Summary
 
 ## Project Structure
 
@@ -203,7 +203,7 @@ Total: 73 endpoints (18 resource controllers × standard REST operations)
    ```
 
 3. **Login to Dashboard**
-   - Email: admin@arum.test
+   - Email: admin@SSI.test
    - Password: password
 
 4. **Begin Frontend Development**

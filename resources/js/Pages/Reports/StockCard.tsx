@@ -7,8 +7,8 @@ const IN_TYPES  = ['in', 'purchase', 'adjustment_in', 'opname_in', 'transfer_in'
 const OUT_TYPES = ['out', 'sale', 'adjustment_out', 'opname_out', 'transfer_out', 'wo_usage'];
 
 const typeLabel: Record<string, string> = {
-    in: 'Masuk', purchase: 'Pembelian', adjustment_in: 'Adj. Masuk', opname_in: 'Opname Masuk', transfer_in: 'Transfer Masuk',
-    out: 'Keluar', sale: 'Penjualan', adjustment_out: 'Adj. Keluar', opname_out: 'Opname Keluar', transfer_out: 'Transfer Keluar', wo_usage: 'Pemakaian WO',
+    in: 'In', purchase: 'Purchase', adjustment_in: 'Adj. In', opname_in: 'Opname In', transfer_in: 'Transfer In',
+    out: 'Out', sale: 'Sale', adjustment_out: 'Adj. Out', opname_out: 'Opname Out', transfer_out: 'Transfer Out', wo_usage: 'WO Usage',
 };
 
 export default function StockCard({ movements, openingBalance, product, products, filters }: any) {
@@ -28,41 +28,41 @@ export default function StockCard({ movements, openingBalance, product, products
     const totalOut = rows.filter((r: any) => !r.isIn).reduce((s: number, r: any) => s + r.quantity, 0);
 
     return (
-        <AppLayout header="Kartu Stok / Histori Stok">
-            <Head title="Kartu Stok" />
+        <AppLayout header="Stock Card / Stock History">
+            <Head title="Stock Card" />
             <FilterBar onApply={() => applyFilters('/reports/stock-card', f)}>
-                <FilterSelect label="Produk" value={f.product_id} onChange={v => setF({ ...f, product_id: v })}>
-                    <option value="">— Pilih Produk —</option>
+                <FilterSelect label="Product" value={f.product_id} onChange={v => setF({ ...f, product_id: v })}>
+                    <option value="">— Select Product —</option>
                     {products?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </FilterSelect>
-                <FilterDate label="Dari" value={f.from} onChange={v => setF({ ...f, from: v })} />
-                <FilterDate label="Sampai" value={f.to} onChange={v => setF({ ...f, to: v })} />
+                <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
+                <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
             </FilterBar>
 
             {product && (
                 <div className="bg-white rounded-xl shadow px-5 py-3 mb-4 flex items-center gap-6">
                     <div>
-                        <p className="text-xs text-gray-500">Produk</p>
+                        <p className="text-xs text-gray-500">Product</p>
                         <p className="font-semibold text-gray-800">{product.name}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-500">Satuan</p>
+                        <p className="text-xs text-gray-500">Unit</p>
                         <p className="font-medium">{product.unit ?? '—'}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-500">Saldo Awal Periode</p>
+                        <p className="text-xs text-gray-500">Opening Balance</p>
                         <p className="font-bold text-blue-700">{fmtNum(openingBalance)}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-500">Total Masuk</p>
+                        <p className="text-xs text-gray-500">Total In</p>
                         <p className="font-bold text-emerald-700">+{fmtNum(totalIn)}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-500">Total Keluar</p>
+                        <p className="text-xs text-gray-500">Total Out</p>
                         <p className="font-bold text-red-600">-{fmtNum(totalOut)}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-gray-500">Saldo Akhir</p>
+                        <p className="text-xs text-gray-500">Closing Balance</p>
                         <p className="font-bold text-gray-800">{fmtNum(balance)}</p>
                     </div>
                 </div>
@@ -72,22 +72,22 @@ export default function StockCard({ movements, openingBalance, product, products
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600 text-xs">
-                            <th className="px-4 py-2.5">Tanggal</th>
-                            <th className="px-4 py-2.5">Tipe</th>
-                            <th className="px-4 py-2.5">Referensi</th>
-                            <th className="px-4 py-2.5">Keterangan</th>
-                            <th className="px-4 py-2.5 text-right text-emerald-600">Masuk</th>
-                            <th className="px-4 py-2.5 text-right text-red-600">Keluar</th>
-                            <th className="px-4 py-2.5 text-right">Saldo</th>
-                            <th className="px-4 py-2.5">Oleh</th>
+                            <th className="px-4 py-2.5">Date</th>
+                            <th className="px-4 py-2.5">Type</th>
+                            <th className="px-4 py-2.5">Reference</th>
+                            <th className="px-4 py-2.5">Notes</th>
+                            <th className="px-4 py-2.5 text-right text-emerald-600">In</th>
+                            <th className="px-4 py-2.5 text-right text-red-600">Out</th>
+                            <th className="px-4 py-2.5 text-right">Balance</th>
+                            <th className="px-4 py-2.5">By</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
                         {!product && (
-                            <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Pilih produk untuk melihat kartu stok.</td></tr>
+                            <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Select a product to view the stock card.</td></tr>
                         )}
                         {product && rows.length === 0 && (
-                            <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">Tidak ada mutasi stok pada periode ini.</td></tr>
+                            <tr><td colSpan={8} className="px-4 py-8 text-center text-gray-400">No stock movements in this period.</td></tr>
                         )}
                         {rows.map((r: any, i: number) => (
                             <tr key={i} className="hover:bg-gray-50">

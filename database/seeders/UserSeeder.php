@@ -22,7 +22,7 @@ class UserSeeder extends Seeder
         $users = [
             [
                 'name' => 'Admin User',
-                'email' => 'admin@arum.test',
+                'email' => 'admin@SSI.test',
                 'username' => 'admin',
                 'password' => bcrypt('password'),
                 'role_id' => $adminRole?->id,
@@ -30,7 +30,7 @@ class UserSeeder extends Seeder
             ],
             [
                 'name' => 'Manager',
-                'email' => 'manager@arum.test',
+                'email' => 'manager@SSI.test',
                 'username' => 'manager',
                 'password' => bcrypt('password'),
                 'role_id' => $managerRole?->id,
@@ -38,7 +38,7 @@ class UserSeeder extends Seeder
             ],
             [
                 'name' => 'Budi Santoso',
-                'email' => 'budi@arum.test',
+                'email' => 'budi@SSI.test',
                 'username' => 'budi',
                 'password' => bcrypt('password'),
                 'role_id' => $salesRole?->id,
@@ -46,7 +46,7 @@ class UserSeeder extends Seeder
             ],
             [
                 'name' => 'Rini Wijaya',
-                'email' => 'rini@arum.test',
+                'email' => 'rini@SSI.test',
                 'username' => 'rini',
                 'password' => bcrypt('password'),
                 'role_id' => $technicianRole?->id,
@@ -54,7 +54,7 @@ class UserSeeder extends Seeder
             ],
             [
                 'name' => 'Ahmad Irawan',
-                'email' => 'ahmad@arum.test',
+                'email' => 'ahmad@SSI.test',
                 'username' => 'ahmad',
                 'password' => bcrypt('password'),
                 'role_id' => $technicianRole?->id,
@@ -62,7 +62,7 @@ class UserSeeder extends Seeder
             ],
             [
                 'name' => 'Siti Nurhaliza',
-                'email' => 'siti@arum.test',
+                'email' => 'siti@SSI.test',
                 'username' => 'siti',
                 'password' => bcrypt('password'),
                 'role_id' => $accountantRole?->id,
@@ -70,7 +70,7 @@ class UserSeeder extends Seeder
             ],
             [
                 'name' => 'Hendra Kusuma',
-                'email' => 'hendra@arum.test',
+                'email' => 'hendra@SSI.test',
                 'username' => 'hendra',
                 'password' => bcrypt('password'),
                 'role_id' => $warehouseRole?->id,

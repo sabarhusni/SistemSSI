@@ -7,17 +7,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class ContractVisitPlan extends Model
+class SalesOrderVisitPlan extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'contract_id', 'visit_number', 'planned_date', 'notes',
+        'sales_order_id', 'visit_number', 'visit_date', 'quantity',
     ];
 
     protected $casts = [
-        'planned_date' => 'date',
+        'visit_date' => 'date:Y-m-d',
     ];
 
-    public function contract() { return $this->belongsTo(Contract::class); }
+    public function salesOrder() { return $this->belongsTo(SalesOrder::class); }
 }

@@ -14,7 +14,7 @@ class MasterDataSeeder extends Seeder
     {
         // Product Categories
         $categories = [
-            ['name' => 'Pengharum Ruangan', 'description' => 'Produk pengharum ruangan berbagai varian'],
+            ['name' => 'PenghSSI Ruangan', 'description' => 'Produk penghSSI ruangan berbagai varian'],
             ['name' => 'Perlengkapan Instalasi', 'description' => 'Peralatan untuk instalasi dan maintenance'],
             ['name' => 'Bahan Kimia', 'description' => 'Bahan baku kimia pendukung'],
         ];
@@ -24,14 +24,14 @@ class MasterDataSeeder extends Seeder
         }
 
         // Products — resolve category UUIDs by name
-        $catPengharum = \App\Models\ProductCategory::where('name', 'Pengharum Ruangan')->first()->id;
+        $catPenghSSI = \App\Models\ProductCategory::where('name', 'PenghSSI Ruangan')->first()->id;
         $catInstalasi = \App\Models\ProductCategory::where('name', 'Perlengkapan Instalasi')->first()->id;
         $catKimia     = \App\Models\ProductCategory::where('name', 'Bahan Kimia')->first()->id;
 
         $products = [
-            ['category_id' => $catPengharum, 'code' => 'PRD001', 'name' => 'Pengharum Ruangan Aroma Lavender', 'price' => 150000, 'unit' => 'botol'],
-            ['category_id' => $catPengharum, 'code' => 'PRD002', 'name' => 'Pengharum Ruangan Aroma Jasmine',  'price' => 150000, 'unit' => 'botol'],
-            ['category_id' => $catPengharum, 'code' => 'PRD003', 'name' => 'Pengharum Ruangan Aroma Vanilla',  'price' => 150000, 'unit' => 'botol'],
+            ['category_id' => $catPenghSSI, 'code' => 'PRD001', 'name' => 'PenghSSI Ruangan Aroma Lavender', 'price' => 150000, 'unit' => 'botol'],
+            ['category_id' => $catPenghSSI, 'code' => 'PRD002', 'name' => 'PenghSSI Ruangan Aroma Jasmine',  'price' => 150000, 'unit' => 'botol'],
+            ['category_id' => $catPenghSSI, 'code' => 'PRD003', 'name' => 'PenghSSI Ruangan Aroma Vanilla',  'price' => 150000, 'unit' => 'botol'],
             ['category_id' => $catInstalasi, 'code' => 'PRD004', 'name' => 'Dispenser Otomatis',               'price' => 500000, 'unit' => 'pcs'],
             ['category_id' => $catInstalasi, 'code' => 'PRD005', 'name' => 'Filter Kertas',                    'price' =>  25000, 'unit' => 'pack'],
             ['category_id' => $catKimia,     'code' => 'PRD006', 'name' => 'Alkohol Pembersih',                'price' =>  50000, 'unit' => 'liter'],
@@ -67,8 +67,8 @@ class MasterDataSeeder extends Seeder
 
         // Bank Accounts
         $bankAccounts = [
-            ['account_number' => '123456789', 'account_name' => 'ARUM - BCA', 'bank_name' => 'Bank Central Asia', 'account_type' => 'Checking'],
-            ['account_number' => '987654321', 'account_name' => 'ARUM - Mandiri', 'bank_name' => 'Bank Mandiri', 'account_type' => 'Checking'],
+            ['account_number' => '123456789', 'account_name' => 'SSI - BCA', 'bank_name' => 'Bank Central Asia', 'account_type' => 'Checking'],
+            ['account_number' => '987654321', 'account_name' => 'SSI - Mandiri', 'bank_name' => 'Bank Mandiri', 'account_type' => 'Checking'],
         ];
 
         foreach ($bankAccounts as $bank) {

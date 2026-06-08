@@ -9,11 +9,8 @@ interface Props {
     products: any[];
     onSelect: (product: any) => void;
     onClose: () => void;
-    /** Label untuk kolom nilai tambahan — default otomatis berdasarkan data */
     extraLabel?: string;
-    /** Key field produk yang ditampilkan di kolom nilai tambahan */
     extraKey?: string;
-    /** Format nilai kolom tambahan: 'currency' | 'number' | 'text' */
     extraFormat?: 'currency' | 'number' | 'text';
 }
 
@@ -30,7 +27,6 @@ export default function ProductPickerModal({
 
     useEffect(() => { inputRef.current?.focus(); }, []);
 
-    // Tutup modal saat tekan Escape
     useEffect(() => {
         const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         window.addEventListener('keydown', handler);
@@ -70,7 +66,7 @@ export default function ProductPickerModal({
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 flex flex-col" style={{ maxHeight: '80vh' }}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b">
-                    <span className="font-semibold text-gray-800">Pilih Produk</span>
+                    <span className="font-semibold text-gray-800">Select Product</span>
                     <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
                 </div>
 
@@ -78,8 +74,8 @@ export default function ProductPickerModal({
                 <div className="px-4 py-3 border-b">
                     <input
                         ref={inputRef}
-                        className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                        placeholder="Cari nama atau kode produk..."
+                        className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                        placeholder="Search by product name or code..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                     />
@@ -88,14 +84,14 @@ export default function ProductPickerModal({
                 {/* List */}
                 <div className="overflow-y-auto flex-1">
                     {filtered.length === 0 ? (
-                        <p className="px-4 py-8 text-center text-sm text-gray-400">Produk tidak ditemukan.</p>
+                        <p className="px-4 py-8 text-center text-sm text-gray-400">No products found.</p>
                     ) : (
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 sticky top-0 border-b">
                                 <tr className="text-left text-gray-500 text-xs">
-                                    <th className="px-4 py-2">Nama Produk</th>
-                                    {hasUnit  && <th className="px-3 py-2 w-16">Satuan</th>}
-                                    {hasType  && <th className="px-3 py-2 w-20">Tipe</th>}
+                                    <th className="px-4 py-2">Product Name</th>
+                                    {hasUnit  && <th className="px-3 py-2 w-16">Unit</th>}
+                                    {hasType  && <th className="px-3 py-2 w-20">Type</th>}
                                     {hasExtra && <th className="px-3 py-2 w-28 text-right">{extraLabel ?? extraKey}</th>}
                                 </tr>
                             </thead>
@@ -103,7 +99,7 @@ export default function ProductPickerModal({
                                 {filtered.map((p: any) => (
                                     <tr
                                         key={p.id}
-                                        className="hover:bg-emerald-50 cursor-pointer"
+                                        className="hover:bg-red-50 cursor-pointer"
                                         onClick={() => { onSelect(p); onClose(); }}
                                     >
                                         <td className="px-4 py-2">
@@ -138,8 +134,8 @@ export default function ProductPickerModal({
 
                 {/* Footer */}
                 <div className="px-4 py-2 border-t flex items-center justify-between text-xs text-gray-400">
-                    <span>{filtered.length} produk ditemukan</span>
-                    <span>Tekan <kbd className="px-1 py-0.5 border rounded text-gray-500">Esc</kbd> untuk tutup</span>
+                    <span>{filtered.length} products found</span>
+                    <span>Press <kbd className="px-1 py-0.5 border rounded text-gray-500">Esc</kbd> to close</span>
                 </div>
             </div>
         </div>

@@ -17,26 +17,26 @@ export default function Index({ cashTransactions, filters }: any) {
     };
 
     return (
-        <AppLayout header="Kas">
-            <Head title="Transaksi Kas" />
-            <PageHeader title="Transaksi Kas" createHref="/cash-transactions/create" />
+        <AppLayout header="Cash">
+            <Head title="Cash Transactions" />
+            <PageHeader title="Cash Transactions" createHref="/cash-transactions/create" />
             <SearchFilter routeName="cash-transactions.index" filters={filters}
-                filterOptions={[{ key: 'type', label: 'Semua Tipe', options: [
-                    { label: 'Masuk', value: 'in' },
-                    { label: 'Keluar', value: 'out' },
+                filterOptions={[{ key: 'type', label: 'All Types', options: [
+                    { label: 'In', value: 'in' },
+                    { label: 'Out', value: 'out' },
                 ]}]}
             />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="transaction_date" label="Tanggal" {...sortProps} />
-                            <SortableColumn sortKey="type" label="Tipe" {...sortProps} />
-                            <SortableColumn sortKey="category" label="Kategori" {...sortProps} />
-                            <th className="px-4 py-3">Deskripsi</th>
-                            <th className="px-4 py-3">Referensi</th>
-                            <SortableColumn sortKey="amount" label="Jumlah" className="text-right" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <SortableColumn sortKey="transaction_date" label="Date" {...sortProps} />
+                            <SortableColumn sortKey="type" label="Type" {...sortProps} />
+                            <SortableColumn sortKey="category" label="Category" {...sortProps} />
+                            <th className="px-4 py-3">Description</th>
+                            <th className="px-4 py-3">Reference</th>
+                            <SortableColumn sortKey="amount" label="Amount" className="text-right" {...sortProps} />
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -45,7 +45,7 @@ export default function Index({ cashTransactions, filters }: any) {
                                 <td className="px-4 py-3">{tx.transaction_date}</td>
                                 <td className="px-4 py-3">
                                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tx.type === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                        {tx.type === 'in' ? 'Masuk' : 'Keluar'}
+                                        {tx.type === 'in' ? 'In' : 'Out'}
                                     </span>
                                 </td>
                                 <td className="px-4 py-3">{tx.category}</td>

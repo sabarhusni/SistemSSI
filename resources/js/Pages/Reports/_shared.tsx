@@ -12,7 +12,7 @@ export const fmtDate = (d: string) =>
 export const fmtMonth = (m: string) => {
     if (!m) return '—';
     const [y, mon] = m.split('-');
-    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return `${names[parseInt(mon) - 1]} ${y}`;
 };
 
@@ -40,16 +40,16 @@ export function FilterBar({ children, onApply }: { children: React.ReactNode; on
             <button
                 type="button"
                 onClick={onApply}
-                className="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700"
+                className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700"
             >
-                Tampilkan
+                Show
             </button>
             <button
                 type="button"
                 onClick={() => window.print()}
                 className="px-4 py-2 bg-gray-100 text-gray-700 text-sm rounded-md hover:bg-gray-200"
             >
-                🖨 Cetak
+                🖨 Print
             </button>
         </div>
     );
@@ -61,7 +61,7 @@ export function FilterDate({ label, value, onChange }: { label: string; value: s
             <label className="text-xs font-medium text-gray-500">{label}</label>
             <input
                 type="date"
-                className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
                 value={value}
                 onChange={e => onChange(e.target.value)}
             />
@@ -76,7 +76,7 @@ export function FilterSelect({ label, value, onChange, children }: {
         <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-gray-500">{label}</label>
             <select
-                className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
                 value={value}
                 onChange={e => onChange(e.target.value)}
             >
@@ -103,7 +103,7 @@ export function ReportTable({ headers, children, empty }: {
                     {empty ? (
                         <tr>
                             <td colSpan={headers.length} className="px-4 py-8 text-center text-gray-400">
-                                Tidak ada data untuk filter yang dipilih.
+                                No data for the selected filters.
                             </td>
                         </tr>
                     ) : children}
@@ -128,10 +128,10 @@ export const statusBadge = (status: string) => {
         normal:     'bg-emerald-100 text-emerald-700',
     };
     const labels: Record<string, string> = {
-        draft: 'Draft', confirmed: 'Dikonfirmasi', completed: 'Selesai',
-        cancelled: 'Dibatalkan', active: 'Aktif', sent: 'Terkirim',
-        received: 'Diterima', pending: 'Menunggu', in_progress: 'Dikerjakan',
-        low: 'Stok Rendah', normal: 'Normal',
+        draft: 'Draft', confirmed: 'Confirmed', completed: 'Completed',
+        cancelled: 'Cancelled', active: 'Active', sent: 'Sent',
+        received: 'Received', pending: 'Pending', in_progress: 'In Progress',
+        low: 'Low Stock', normal: 'Normal',
     };
     return (
         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[status] ?? 'bg-gray-100 text-gray-500'}`}>

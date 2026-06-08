@@ -7,37 +7,37 @@ export default function Stock({ stocks, summary, categories, filters }: any) {
     const [f, setF] = useState({ product_type: filters?.product_type ?? '', category_id: filters?.category_id ?? '', search: filters?.search ?? '' });
 
     return (
-        <AppLayout header="Laporan Stok">
-            <Head title="Laporan Stok" />
+        <AppLayout header="Stock Report">
+            <Head title="Stock Report" />
             <FilterBar onApply={() => applyFilters('/reports/stock', f)}>
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-gray-500">Cari Produk</label>
+                    <label className="text-xs font-medium text-gray-500">Search Product</label>
                     <input
-                        className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 w-48"
-                        placeholder="Nama produk..."
+                        className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 w-48"
+                        placeholder="Product name..."
                         value={f.search}
                         onChange={e => setF({ ...f, search: e.target.value })}
                     />
                 </div>
-                <FilterSelect label="Tipe Produk" value={f.product_type} onChange={v => setF({ ...f, product_type: v })}>
-                    <option value="">Semua Tipe</option>
+                <FilterSelect label="Product Type" value={f.product_type} onChange={v => setF({ ...f, product_type: v })}>
+                    <option value="">All Types</option>
                     <option value="goods">Goods</option>
                     <option value="service">Service</option>
                 </FilterSelect>
-                <FilterSelect label="Kategori" value={f.category_id} onChange={v => setF({ ...f, category_id: v })}>
-                    <option value="">Semua Kategori</option>
+                <FilterSelect label="Category" value={f.category_id} onChange={v => setF({ ...f, category_id: v })}>
+                    <option value="">All Categories</option>
                     {categories?.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </FilterSelect>
             </FilterBar>
 
             <div className="grid grid-cols-3 gap-4 mb-4">
-                <SummaryCard label="Total Produk" value={fmtNum(summary?.total_products)} color="gray" />
-                <SummaryCard label="Stok Rendah" value={fmtNum(summary?.low_stock)} color="red" sub="Di bawah minimum stok" />
-                <SummaryCard label="Nilai Stok" value={fmt(summary?.total_value)} color="emerald" sub="Berdasarkan harga pokok" />
+                <SummaryCard label="Total Products" value={fmtNum(summary?.total_products)} color="gray" />
+                <SummaryCard label="Low Stock" value={fmtNum(summary?.low_stock)} color="red" sub="Below minimum stock" />
+                <SummaryCard label="Stock Value" value={fmt(summary?.total_value)} color="emerald" sub="Based on cost price" />
             </div>
 
             <ReportTable
-                headers={['Produk', 'Kategori', 'Satuan', 'Stok Saat Ini', 'Stok Minimum', 'Lokasi', 'Nilai Stok', 'Status']}
+                headers={['Product', 'Category', 'Unit', 'Current Stock', 'Minimum Stock', 'Location', 'Stock Value', 'Status']}
                 empty={!stocks?.length}
             >
                 {stocks?.map((s: any) => (
@@ -54,7 +54,7 @@ export default function Stock({ stocks, summary, categories, filters }: any) {
                 ))}
                 {stocks?.length > 0 && (
                     <tr className="bg-gray-50 font-semibold border-t">
-                        <td colSpan={6} className="px-4 py-2 text-right">Total Nilai</td>
+                        <td colSpan={6} className="px-4 py-2 text-right">Total Value</td>
                         <td className="px-4 py-2 text-right text-emerald-700">{fmt(summary?.total_value)}</td>
                         <td></td>
                     </tr>

@@ -10,32 +10,32 @@ export default function Purchase({ orders, summary, suppliers, filters }: any) {
     const [f, setF] = useState({ from: filters?.from ?? firstDay, to: filters?.to ?? today, supplier_id: filters?.supplier_id ?? '', status: filters?.status ?? '' });
 
     return (
-        <AppLayout header="Laporan Purchase">
-            <Head title="Laporan Purchase" />
+        <AppLayout header="Purchase Report">
+            <Head title="Purchase Report" />
             <FilterBar onApply={() => applyFilters('/reports/purchase', f)}>
-                <FilterDate label="Dari" value={f.from} onChange={v => setF({ ...f, from: v })} />
-                <FilterDate label="Sampai" value={f.to} onChange={v => setF({ ...f, to: v })} />
+                <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
+                <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
                 <FilterSelect label="Supplier" value={f.supplier_id} onChange={v => setF({ ...f, supplier_id: v })}>
-                    <option value="">Semua Supplier</option>
+                    <option value="">All Suppliers</option>
                     {suppliers?.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </FilterSelect>
                 <FilterSelect label="Status" value={f.status} onChange={v => setF({ ...f, status: v })}>
-                    <option value="">Semua Status</option>
+                    <option value="">All Statuses</option>
                     <option value="draft">Draft</option>
-                    <option value="sent">Terkirim</option>
-                    <option value="received">Diterima</option>
-                    <option value="cancelled">Dibatalkan</option>
+                    <option value="sent">Sent</option>
+                    <option value="received">Received</option>
+                    <option value="cancelled">Cancelled</option>
                 </FilterSelect>
             </FilterBar>
 
             <div className="grid grid-cols-3 gap-4 mb-4">
                 <SummaryCard label="Total PO" value={summary?.total_orders?.toString() ?? '0'} color="gray" />
-                <SummaryCard label="Total Pembelian" value={fmt(summary?.total_amount)} color="blue" />
-                <SummaryCard label="Rata-rata per PO" value={summary?.total_orders ? fmt((summary.total_amount ?? 0) / summary.total_orders) : '—'} color="amber" />
+                <SummaryCard label="Total Purchases" value={fmt(summary?.total_amount)} color="blue" />
+                <SummaryCard label="Average per PO" value={summary?.total_orders ? fmt((summary.total_amount ?? 0) / summary.total_orders) : '—'} color="amber" />
             </div>
 
             <ReportTable
-                headers={['Tgl PO', 'No. PO', 'Supplier', 'Items', 'Total', 'Status']}
+                headers={['PO Date', 'PO No.', 'Supplier', 'Items', 'Total', 'Status']}
                 empty={!orders?.length}
             >
                 {orders?.map((o: any) => (

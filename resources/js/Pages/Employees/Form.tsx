@@ -22,13 +22,13 @@ export default function Form({ employee, nextNumber }: any) {
     };
 
     return (
-        <AppLayout header={editing ? 'Edit Karyawan' : 'Tambah Karyawan'}>
-            <Head title={editing ? 'Edit Karyawan' : 'Tambah Karyawan'} />
+        <AppLayout header={editing ? 'Edit Employee' : 'Add Employee'}>
+            <Head title={editing ? 'Edit Employee' : 'Add Employee'} />
             <div className="max-w-2xl bg-white rounded-xl shadow p-6">
                 <form onSubmit={submit} className="space-y-4">
 
                     <div className="grid grid-cols-2 gap-4">
-                        <FormField label="No. Karyawan" error={errors.employee_number} required>
+                        <FormField label="Employee No." error={errors.employee_number} required>
                             <input
                                 className={inputCls + ' bg-gray-50'}
                                 value={data.employee_number}
@@ -42,14 +42,14 @@ export default function Form({ employee, nextNumber }: any) {
                                     type="checkbox"
                                     checked={data.status === 'active'}
                                     onChange={e => setData('status', e.target.checked ? 'active' : 'inactive')}
-                                    className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                    className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                                 />
-                                <span className="text-sm text-gray-700">Aktif</span>
+                                <span className="text-sm text-gray-700">Active</span>
                             </label>
                         </FormField>
                     </div>
 
-                    <FormField label="Nama Lengkap" error={errors.name} required>
+                    <FormField label="Full Name" error={errors.name} required>
                         <input
                             className={inputCls}
                             value={data.name}
@@ -58,26 +58,26 @@ export default function Form({ employee, nextNumber }: any) {
                     </FormField>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Jabatan" error={errors.position}>
+                        <FormField label="Position" error={errors.position}>
                             <input
                                 className={inputCls}
                                 value={data.position}
                                 onChange={e => setData('position', e.target.value)}
-                                placeholder="cth: Sales Manager"
+                                placeholder="e.g. Sales Manager"
                             />
                         </FormField>
-                        <FormField label="Divisi / Departemen" error={errors.department}>
+                        <FormField label="Department" error={errors.department}>
                             <input
                                 className={inputCls}
                                 value={data.department}
                                 onChange={e => setData('department', e.target.value)}
-                                placeholder="cth: Marketing"
+                                placeholder="e.g. Marketing"
                             />
                         </FormField>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Telepon" error={errors.phone}>
+                        <FormField label="Phone" error={errors.phone}>
                             <input
                                 className={inputCls}
                                 value={data.phone}
@@ -95,7 +95,7 @@ export default function Form({ employee, nextNumber }: any) {
                         </FormField>
                     </div>
 
-                    <FormField label="Tanggal Bergabung" error={errors.join_date}>
+                    <FormField label="Join Date" error={errors.join_date}>
                         <input
                             type="date"
                             className={inputCls}
@@ -104,7 +104,7 @@ export default function Form({ employee, nextNumber }: any) {
                         />
                     </FormField>
 
-                    <FormField label="Catatan">
+                    <FormField label="Notes">
                         <textarea
                             rows={3}
                             className={inputCls}
@@ -117,15 +117,15 @@ export default function Form({ employee, nextNumber }: any) {
                         <button
                             type="submit"
                             disabled={processing}
-                            className="px-5 py-2 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60"
+                            className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60"
                         >
-                            {processing ? 'Menyimpan...' : 'Simpan'}
+                            {processing ? 'Saving...' : 'Save'}
                         </button>
                         <Link
                             href="/employees"
                             className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
                         >
-                            Batal
+                            Cancel
                         </Link>
                     </div>
                 </form>

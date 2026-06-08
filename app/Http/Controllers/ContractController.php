@@ -6,7 +6,7 @@ use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\Employee;
 use App\Models\Product;
-use App\Models\WorkOrder;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -20,6 +20,7 @@ class ContractController extends Controller
         $sortDir  = $request->sort_dir === 'asc' ? 'asc' : 'desc';
 
         $query = Contract::with('customer')
+            ->withCount(['salesOrders as active_so_count' => fn($q) => $q->whereNotIn('status', ['draft', 'cancelled'])])
             ->when($request->search, fn($q, $s) => $q->where('contract_number', 'ilike', "%$s%")->orWhereHas('customer', fn($cq) => $cq->where('name', 'ilike', "%$s%")))
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->orderBy($sortBy, $sortDir);
@@ -34,21 +35,58 @@ class ContractController extends Controller
     {
         return Inertia::render('Contracts/Form', [
             'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
-            'products'  => Product::where('status', 'active')->orderBy('name')->get(['id', 'name', 'unit', 'price', 'product_type']),
+            'products'  => Product::where('status', 'active')->orderBy('name')
+                ->with('unitOfMeasure:id,name,symbol')
+                ->get(['id', 'name', 'unit_of_measure_id', 'price', 'sales_price', 'product_type']),
             'employees' => Employee::where('status', 'active')->orderBy('name')->get(['id', 'name', 'position', 'department']),
+            'taxType'   => Setting::get('tax_type', 'exclude'),
+            'taxRateSo' => (float) Setting::get('tax_rate_so', 11),
         ]);
     }
 
-    public function store(Request $request)
+    /**
+     * Tax amount for a single line, honoring the global tax type (exclude/include).
+     */
+    private function lineTax(float $sub, float $rate, string $taxType): float
     {
-        $data = $request->validate([
+        if ($rate <= 0) return 0.0;
+        return $taxType === 'exclude'
+            ? $sub * $rate / 100
+            : $sub * $rate / (100 + $rate);
+    }
+
+    /**
+     * Contract value = grand total per month (incl. tax) × duration in months.
+     * Iterates premises → products. Visit frequency is informational only.
+     */
+    private function computeContractValue(array $premises, int $months, string $taxType): float
+    {
+        $subtotal = 0.0;
+        $taxTotal = 0.0;
+        foreach ($premises as $premise) {
+            foreach (($premise['products'] ?? []) as $prod) {
+                if (empty($prod['product_id'])) continue;
+                $sub = (float) $prod['quantity'] * (float) $prod['unit_price'];
+                $subtotal += $sub;
+                $taxTotal += $this->lineTax($sub, (float) ($prod['tax_rate'] ?? 0), $taxType);
+            }
+        }
+        // exclude: tax added on top | include: tax already embedded in subtotal
+        $grandPerMonth = $taxType === 'exclude' ? $subtotal + $taxTotal : $subtotal;
+        return $grandPerMonth * max($months, 1);
+    }
+
+    /**
+     * Validation rules shared by store/update (the unique rule differs per caller).
+     */
+    private function rules(string $contractNumberUnique): array
+    {
+        return [
             'customer_id'            => 'required|uuid|exists:customers,id',
-            'contract_number'        => 'required|string|max:50|unique:contracts,contract_number',
+            'contract_number'        => 'required|string|max:50|' . $contractNumberUnique,
             'start_date'             => 'required|date',
             'end_date'               => 'required|date|after:start_date',
-            'contract_value'         => 'required|numeric|min:0',
-            'service_area'           => 'required|string|max:255',
-            'visit_frequency'        => 'required|integer|min:1',
+            'duration_months'        => 'required|integer|min:1',
             'invoice_frequency'      => 'required|integer|min:1',
             'status'                 => 'required|in:draft,active,completed,cancelled',
             'notes'                  => 'nullable|string',
@@ -57,63 +95,94 @@ class ContractController extends Controller
             'lead_name'              => 'nullable|string|max:100',
             'sales_employee_id'      => 'nullable|uuid|exists:employees,id',
             'lead_employee_id'       => 'nullable|uuid|exists:employees,id',
-            'services'               => 'nullable|array',
-            'services.*.product_id'  => 'required|uuid|exists:products,id',
-            'services.*.quantity'    => 'required|integer|min:1',
-            'services.*.unit_price'  => 'required|numeric|min:0',
-            'services.*.location'    => 'nullable|string|max:255',
-            'services.*.sub_products'               => 'nullable|array',
-            'services.*.sub_products.*.product_id'  => 'required|uuid|exists:products,id',
-            'services.*.sub_products.*.quantity'    => 'required|integer|min:1',
-            'visit_plans'                  => 'nullable|array',
-            'visit_plans.*.visit_number'   => 'required|integer|min:1',
-            'visit_plans.*.planned_date'   => 'nullable|date',
-            'visit_plans.*.notes'          => 'nullable|string|max:255',
-        ]);
+            'premises'                          => 'nullable|array',
+            'premises.*.location'               => 'required|string|max:255',
+            'premises.*.address'                => 'nullable|string',
+            'premises.*.pic'                    => 'nullable|string|max:255',
+            'premises.*.phone'                  => 'nullable|string|max:50',
+            'premises.*.email'                  => 'nullable|email|max:255',
+            'premises.*.visit_frequency'        => 'nullable|integer|min:0',
+            'premises.*.products'                          => 'nullable|array',
+            'premises.*.products.*.product_id'             => 'required|uuid|exists:products,id',
+            'premises.*.products.*.quantity'               => 'required|integer|min:1',
+            'premises.*.products.*.unit_price'             => 'required|numeric|min:0',
+            'premises.*.products.*.tax_rate'               => 'nullable|numeric|min:0|max:100',
+            'premises.*.products.*.location_note'          => 'nullable|string|max:255',
+            'premises.*.products.*.sub_products'                => 'nullable|array',
+            'premises.*.products.*.sub_products.*.product_id'   => 'required|uuid|exists:products,id',
+            'premises.*.products.*.sub_products.*.quantity'     => 'required|integer|min:1',
+        ];
+    }
 
-        // Validasi duplikat product_id di services
-        if (!empty($data['services'])) {
-            $productIds = array_column($data['services'], 'product_id');
-            $uniqueIds = array_unique($productIds);
-            if (count($productIds) !== count($uniqueIds)) {
-                return back()->withErrors(['services' => 'Produk tidak boleh duplikat dalam layanan kontrak.'])->withInput();
-            }
+    /**
+     * Within each premise, the same product may not be selected twice.
+     */
+    private function hasDuplicateProductPerPremise(array $premises): bool
+    {
+        foreach ($premises as $premise) {
+            $ids = array_column($premise['products'] ?? [], 'product_id');
+            if (count($ids) !== count(array_unique($ids))) return true;
         }
+        return false;
+    }
 
-        // Always store visit_frequency_unit as derived/default
-        $data['visit_frequency_unit'] = 'month';
+    /**
+     * Persist premises → products (ContractService) → sub-products for a contract.
+     */
+    private function savePremises(Contract $contract, array $premises, string $taxType): void
+    {
+        foreach (array_values($premises) as $pi => $prem) {
+            $premise = $contract->premises()->create([
+                'location'        => $prem['location'],
+                'address'         => $prem['address'] ?? null,
+                'pic'             => $prem['pic'] ?? null,
+                'phone'           => $prem['phone'] ?? null,
+                'email'           => $prem['email'] ?? null,
+                'visit_frequency' => $prem['visit_frequency'] ?? null,
+                'sort_order'      => $pi,
+            ]);
 
-        DB::transaction(function () use ($data) {
-            $contract = Contract::create(collect($data)->except('services', 'visit_plans')->toArray());
+            foreach (($prem['products'] ?? []) as $prod) {
+                if (empty($prod['product_id'])) continue;
+                $sub  = $prod['quantity'] * $prod['unit_price'];
+                $rate = (float) ($prod['tax_rate'] ?? 0);
+                $service = $contract->services()->create([
+                    'contract_premise_id' => $premise->id,
+                    'product_id'      => $prod['product_id'],
+                    'quantity'        => $prod['quantity'],
+                    'unit_price'      => $prod['unit_price'],
+                    'total_price'     => $sub,
+                    'tax_rate'        => $rate,
+                    'tax_amount'      => $this->lineTax($sub, $rate, $taxType),
+                    'location'        => $prod['location_note'] ?? null,
+                ]);
 
-            foreach (($data['services'] ?? []) as $svc) {
-                if (!empty($svc['product_id'])) {
-                    $service = $contract->services()->create([
-                        'product_id'  => $svc['product_id'],
-                        'quantity'    => $svc['quantity'],
-                        'unit_price'  => $svc['unit_price'],
-                        'total_price' => $svc['quantity'] * $svc['unit_price'],
-                        'location'    => $svc['location'] ?? null,
-                    ]);
-
-                    foreach (($svc['sub_products'] ?? []) as $sub) {
-                        if (!empty($sub['product_id'])) {
-                            $service->subProducts()->create([
-                                'product_id' => $sub['product_id'],
-                                'quantity'   => $sub['quantity'],
-                            ]);
-                        }
+                foreach (($prod['sub_products'] ?? []) as $sp) {
+                    if (!empty($sp['product_id'])) {
+                        $service->subProducts()->create([
+                            'product_id' => $sp['product_id'],
+                            'quantity'   => $sp['quantity'],
+                        ]);
                     }
                 }
             }
+        }
+    }
 
-            foreach (($data['visit_plans'] ?? []) as $vp) {
-                $contract->visitPlans()->create([
-                    'visit_number' => $vp['visit_number'],
-                    'planned_date' => $vp['planned_date'] ?? null,
-                    'notes'        => $vp['notes'] ?? null,
-                ]);
-            }
+    public function store(Request $request)
+    {
+        $data = $request->validate($this->rules('unique:contracts,contract_number'));
+
+        if ($this->hasDuplicateProductPerPremise($data['premises'] ?? [])) {
+            return back()->withErrors(['premises' => 'Produk tidak boleh duplikat dalam satu premis.'])->withInput();
+        }
+
+        $taxType = Setting::get('tax_type', 'exclude');
+        $data['contract_value'] = $this->computeContractValue($data['premises'] ?? [], (int) $data['duration_months'], $taxType);
+
+        DB::transaction(function () use ($data, $taxType) {
+            $contract = Contract::create(collect($data)->except('premises')->toArray());
+            $this->savePremises($contract, $data['premises'] ?? [], $taxType);
         });
 
         return redirect('/contracts')->with('success', 'Kontrak berhasil ditambahkan.');
@@ -122,108 +191,51 @@ class ContractController extends Controller
     public function edit(Contract $contract)
     {
         return Inertia::render('Contracts/Form', [
-            'contract'  => $contract->load(['services.subProducts', 'visitPlans']),
+            'contract'  => $contract->load(['premises.services.subProducts']),
             'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
-            'products'  => Product::where('status', 'active')->orderBy('name')->get(['id', 'name', 'unit', 'price', 'product_type']),
+            'products'  => Product::where('status', 'active')->orderBy('name')
+                ->with('unitOfMeasure:id,name,symbol')
+                ->get(['id', 'name', 'unit_of_measure_id', 'price', 'sales_price', 'product_type']),
             'employees' => Employee::where('status', 'active')->orderBy('name')->get(['id', 'name', 'position', 'department']),
+            'taxType'   => Setting::get('tax_type', 'exclude'),
+            'taxRateSo' => (float) Setting::get('tax_rate_so', 11),
+            'locked'    => $contract->hasActiveSalesOrder(),
         ]);
     }
 
     public function update(Request $request, Contract $contract)
     {
-        $data = $request->validate([
-            'customer_id'            => 'required|uuid|exists:customers,id',
-            'contract_number'        => 'required|string|max:50|unique:contracts,contract_number,' . $contract->id,
-            'start_date'             => 'required|date',
-            'end_date'               => 'required|date|after:start_date',
-            'contract_value'         => 'required|numeric|min:0',
-            'service_area'           => 'required|string|max:255',
-            'visit_frequency'        => 'required|integer|min:1',
-            'invoice_frequency'      => 'required|integer|min:1',
-            'status'                 => 'required|in:draft,active,completed,cancelled',
-            'notes'                  => 'nullable|string',
-            'sales_type'             => 'nullable|in:canvas,lead',
-            'sales_name'             => 'nullable|string|max:100',
-            'lead_name'              => 'nullable|string|max:100',
-            'sales_employee_id'      => 'nullable|uuid|exists:employees,id',
-            'lead_employee_id'       => 'nullable|uuid|exists:employees,id',
-            'services'               => 'nullable|array',
-            'services.*.product_id'  => 'required|uuid|exists:products,id',
-            'services.*.quantity'    => 'required|integer|min:1',
-            'services.*.unit_price'  => 'required|numeric|min:0',
-            'services.*.location'    => 'nullable|string|max:255',
-            'services.*.sub_products'               => 'nullable|array',
-            'services.*.sub_products.*.product_id'  => 'required|uuid|exists:products,id',
-            'services.*.sub_products.*.quantity'    => 'required|integer|min:1',
-            'visit_plans'                  => 'nullable|array',
-            'visit_plans.*.visit_number'   => 'required|integer|min:1',
-            'visit_plans.*.planned_date'   => 'nullable|date',
-            'visit_plans.*.notes'          => 'nullable|string|max:255',
-        ]);
-
-        // Validasi duplikat product_id di services
-        if (!empty($data['services'])) {
-            $productIds = array_column($data['services'], 'product_id');
-            $uniqueIds = array_unique($productIds);
-            if (count($productIds) !== count($uniqueIds)) {
-                return back()->withErrors(['services' => 'Produk tidak boleh duplikat dalam layanan kontrak.'])->withInput();
-            }
+        if ($contract->hasActiveSalesOrder()) {
+            return back()->withErrors([
+                'contract' => 'Kontrak tidak dapat diubah karena memiliki Sales Order yang masih aktif.',
+            ])->withInput();
         }
 
-        $data['visit_frequency_unit'] = 'month';
+        $data = $request->validate($this->rules('unique:contracts,contract_number,' . $contract->id));
 
-        DB::transaction(function () use ($data, $contract) {
-            $oldServiceArea = $contract->service_area;
-            $contract->update(collect($data)->except('services', 'visit_plans')->toArray());
+        if ($this->hasDuplicateProductPerPremise($data['premises'] ?? [])) {
+            return back()->withErrors(['premises' => 'Produk tidak boleh duplikat dalam satu premis.'])->withInput();
+        }
 
-            // Sync services
+        $taxType = Setting::get('tax_type', 'exclude');
+        $data['contract_value'] = $this->computeContractValue($data['premises'] ?? [], (int) $data['duration_months'], $taxType);
+
+        DB::transaction(function () use ($data, $contract, $taxType) {
+            $contract->update(collect($data)->except('premises')->toArray());
+
+            // Replace existing premises/services/sub-products.
             foreach ($contract->services as $oldService) {
                 $oldService->subProducts()->delete();
             }
             $contract->services()->delete();
+            $contract->premises()->delete();
 
-            foreach (($data['services'] ?? []) as $svc) {
-                if (!empty($svc['product_id'])) {
-                    $service = $contract->services()->create([
-                        'product_id'  => $svc['product_id'],
-                        'quantity'    => $svc['quantity'],
-                        'unit_price'  => $svc['unit_price'],
-                        'total_price' => $svc['quantity'] * $svc['unit_price'],
-                        'location'    => $svc['location'] ?? null,
-                    ]);
+            $this->savePremises($contract, $data['premises'] ?? [], $taxType);
 
-                    foreach (($svc['sub_products'] ?? []) as $sub) {
-                        if (!empty($sub['product_id'])) {
-                            $service->subProducts()->create([
-                                'product_id' => $sub['product_id'],
-                                'quantity'   => $sub['quantity'],
-                            ]);
-                        }
-                    }
-                }
-            }
-
-            // Sync visit plans
-            $contract->visitPlans()->delete();
-            foreach (($data['visit_plans'] ?? []) as $vp) {
-                $contract->visitPlans()->create([
-                    'visit_number' => $vp['visit_number'],
-                    'planned_date' => $vp['planned_date'] ?? null,
-                    'notes'        => $vp['notes'] ?? null,
-                ]);
-            }
-
-            // Propagate service_area change to pending/in_progress WOs
-            if ($data['service_area'] !== $oldServiceArea) {
-                $contract->workOrders()
-                    ->whereIn('status', ['pending', 'in_progress'])
-                    ->update(['service_area' => $data['service_area']]);
-            }
-
-            // Propagate service changes to related draft SOs: update SO total from contract_value
+            // Propagate value change to related draft SOs.
             foreach ($contract->salesOrders()->where('status', 'draft')->get() as $so) {
-                $newSubtotal = collect($data['services'] ?? [])->sum(
-                    fn($s) => ($s['quantity'] ?? 0) * ($s['unit_price'] ?? 0)
+                $newSubtotal = collect($data['premises'] ?? [])->flatMap(fn($p) => $p['products'] ?? [])->sum(
+                    fn($prod) => ($prod['quantity'] ?? 0) * ($prod['unit_price'] ?? 0)
                 );
                 $newTaxAmount = $so->items->sum(fn($it) => $it->tax_amount ?? 0);
                 $so->update([
@@ -237,56 +249,32 @@ class ContractController extends Controller
 
     public function destroy(Contract $contract)
     {
+        if ($contract->hasActiveSalesOrder()) {
+            return back()->with('error', 'Kontrak tidak dapat dihapus karena memiliki Sales Order yang masih aktif.');
+        }
+
         $contract->delete();
 
         return redirect('/contracts')->with('success', 'Kontrak berhasil dihapus.');
     }
 
     /**
-     * Auto-generate Work Orders for all visit plans in this contract.
+     * Printable contract document.
      */
-    public function generateWorkOrders(Contract $contract)
+    public function print(Contract $contract)
     {
-        $visitPlans = $contract->visitPlans()->get();
+        $contract->load([
+            'customer',
+            'premises.services.product.unitOfMeasure',
+            'premises.services.subProducts.product.unitOfMeasure',
+            'salesEmployee',
+            'leadEmployee',
+        ]);
 
-        if ($visitPlans->isEmpty()) {
-            return back()->with('error', 'Belum ada rencana kunjungan. Tambahkan rencana kunjungan terlebih dahulu.');
-        }
-
-        // Find first active/confirmed SO for this contract
-        $so = $contract->salesOrders()->whereIn('status', ['confirmed', 'active'])->first();
-
-        DB::transaction(function () use ($contract, $visitPlans, $so) {
-            foreach ($visitPlans as $plan) {
-                // Skip if WO for this plan date already exists
-                $exists = WorkOrder::where('contract_id', $contract->id)
-                    ->where('visit_date', $plan->planned_date)
-                    ->exists();
-
-                if ($exists || !$plan->planned_date) continue;
-
-                $woNumber = 'WO-' . strtoupper(substr($contract->contract_number, -6)) . '-' . str_pad($plan->visit_number, 3, '0', STR_PAD_LEFT);
-
-                // Ensure unique wo_number
-                $base   = $woNumber;
-                $suffix = 1;
-                while (WorkOrder::where('wo_number', $woNumber)->exists()) {
-                    $woNumber = $base . '-' . $suffix++;
-                }
-
-                WorkOrder::create([
-                    'contract_id'    => $contract->id,
-                    'sales_order_id' => $so?->id,
-                    'technician_id'  => null,
-                    'wo_number'      => $woNumber,
-                    'visit_date'     => $plan->planned_date,
-                    'service_area'   => $contract->service_area,
-                    'visit_types'    => ['routine'],
-                    'status'         => 'pending',
-                ]);
-            }
-        });
-
-        return back()->with('success', 'Work Order berhasil di-generate dari rencana kunjungan.');
+        return Inertia::render('Contracts/Print', [
+            'contract'    => $contract,
+            'companyName' => Setting::get('company_name', ''),
+            'taxType'     => Setting::get('tax_type', 'exclude'),
+        ]);
     }
 }

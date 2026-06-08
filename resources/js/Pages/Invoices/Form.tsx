@@ -104,7 +104,7 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
     };
 
     return (
-        <AppLayout header={editing ? 'Edit Invoice' : 'Buat Invoice'}>
+        <AppLayout header={editing ? 'Edit Invoice' : 'Create Invoice'}>
             <Head title="Invoice" />
 
             {contractPickerOpen && (
@@ -120,7 +120,7 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
                     products={products ?? []}
                     onSelect={handleSelectProduct}
                     onClose={() => setPickerIdx(null)}
-                    extraLabel="Harga Jual"
+                    extraLabel="Sales Price"
                     extraKey="sales_price"
                     extraFormat="currency"
                 />
@@ -129,16 +129,15 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
             <div className="max-w-5xl bg-white rounded-xl shadow p-6">
                 <form onSubmit={submit} className="space-y-4">
 
-                    {/* Row 1: No Invoice, Tgl Invoice, Jatuh Tempo, Status */}
                     <div className="grid grid-cols-4 gap-4">
-                        <FormField label="No. Invoice" error={errors.invoice_number} required>
+                        <FormField label="Invoice No." error={errors.invoice_number} required>
                             <input className={inputCls + ' bg-gray-50'} value={data.invoice_number} readOnly tabIndex={-1} />
                         </FormField>
-                        <FormField label="Tgl Invoice" error={errors.invoice_date} required>
+                        <FormField label="Invoice Date" error={errors.invoice_date} required>
                             <input type="date" className={inputCls} value={data.invoice_date}
                                 onChange={e => setData('invoice_date', e.target.value)} />
                         </FormField>
-                        <FormField label="Jatuh Tempo" error={errors.due_date} required>
+                        <FormField label="Due Date" error={errors.due_date} required>
                             <input type="date" className={inputCls} value={data.due_date}
                                 onChange={e => setData('due_date', e.target.value)} />
                         </FormField>
@@ -146,24 +145,23 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
                             <select className={inputCls} value={data.status}
                                 onChange={e => setData('status', e.target.value)}>
                                 <option value="draft">Draft</option>
-                                <option value="sent">Terkirim</option>
-                                <option value="paid">Lunas</option>
-                                <option value="cancelled">Dibatalkan</option>
+                                <option value="sent">Sent</option>
+                                <option value="paid">Paid</option>
+                                <option value="cancelled">Cancelled</option>
                             </select>
                         </FormField>
                     </div>
 
-                    {/* Row 2: Ref Kontrak + Customer + No SO */}
                     <div className="grid grid-cols-3 gap-4">
-                        <FormField label="Ref. Kontrak">
+                        <FormField label="Contract Ref.">
                             <button
                                 type="button"
                                 onClick={() => setContractPickerOpen(true)}
-                                className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 transition"
+                                className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition"
                             >
                                 {selectedContract
                                     ? <span className="text-gray-800">{selectedContract.contract_number}</span>
-                                    : <span className="text-gray-400">— Pilih Kontrak —</span>
+                                    : <span className="text-gray-400">— Select Contract —</span>
                                 }
                             </button>
                         </FormField>
@@ -171,33 +169,32 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
                             <div className={`${inputCls} bg-gray-50 cursor-default`}>
                                 {selectedContract?.customer?.name
                                     ? <span className="text-gray-700">{selectedContract.customer.name}</span>
-                                    : <span className="text-gray-400 italic text-xs">Otomatis dari kontrak</span>
+                                    : <span className="text-gray-400 italic text-xs">Automatic from contract</span>
                                 }
                             </div>
                         </FormField>
-                        <FormField label="No. Sales Order">
+                        <FormField label="Sales Order No.">
                             <div className={`${inputCls} bg-gray-50 cursor-default font-mono text-xs`}>
                                 {latestSO?.so_number
                                     ? <span className="text-gray-700">{latestSO.so_number}</span>
-                                    : <span className="text-gray-400 italic">Otomatis dari kontrak</span>
+                                    : <span className="text-gray-400 italic">Automatic from contract</span>
                                 }
                             </div>
                         </FormField>
                     </div>
 
-                    {/* Item Invoice */}
                     <div>
-                        <h3 className="font-semibold text-gray-700 mb-2">Item Invoice</h3>
+                        <h3 className="font-semibold text-gray-700 mb-2">Invoice Items</h3>
                         <div className="border rounded-lg overflow-x-auto mb-2">
                             <table className="w-full text-sm min-w-[900px]">
                                 <thead className="bg-gray-50 border-b">
                                     <tr className="text-left text-gray-600 text-xs">
-                                        <th className="px-3 py-2">Produk</th>
+                                        <th className="px-3 py-2">Product</th>
                                         <th className="px-3 py-2 w-20">Qty</th>
-                                        <th className="px-3 py-2 w-24">Satuan</th>
-                                        <th className="px-3 py-2 w-20 text-center" title="Konversi ke satuan dasar">Konversi</th>
-                                        <th className="px-3 py-2 w-36">Harga Satuan</th>
-                                        <th className="px-3 py-2 w-20 text-center">PPH %</th>
+                                        <th className="px-3 py-2 w-24">Unit</th>
+                                        <th className="px-3 py-2 w-20 text-center" title="Conversion to base unit">Conversion</th>
+                                        <th className="px-3 py-2 w-36">Unit Price</th>
+                                        <th className="px-3 py-2 w-20 text-center">Tax %</th>
                                         <th className="px-3 py-2 w-36 text-right">Subtotal</th>
                                         <th className="px-3 py-2 w-8"></th>
                                     </tr>
@@ -206,7 +203,7 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
                                     {data.items.length === 0 && (
                                         <tr>
                                             <td colSpan={8} className="px-3 py-4 text-center text-gray-400 text-sm">
-                                                Pilih kontrak untuk mengisi item otomatis, atau tambah manual.
+                                                Select a contract to autofill items, or add manually.
                                             </td>
                                         </tr>
                                     )}
@@ -219,11 +216,11 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
                                                     <button
                                                         type="button"
                                                         onClick={() => setPickerIdx(i)}
-                                                        className="w-full text-left px-3 py-1.5 border rounded-md text-sm bg-white hover:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 transition"
+                                                        className="w-full text-left px-3 py-1.5 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition"
                                                     >
                                                         {displayName
                                                             ? <span className="text-gray-800">{displayName}</span>
-                                                            : <span className="text-gray-400">— Pilih Produk —</span>
+                                                            : <span className="text-gray-400">— Select Product —</span>
                                                         }
                                                     </button>
                                                 </td>
@@ -235,13 +232,13 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
                                                 <td className="px-3 py-2">
                                                     <input className={inputCls} value={item.uom}
                                                         onChange={e => updateItem(i, 'uom', e.target.value)}
-                                                        placeholder={selected?.unit ?? 'Satuan'} />
+                                                        placeholder={selected?.unit ?? 'Unit'} />
                                                 </td>
                                                 <td className="px-3 py-2">
                                                     <input type="number" min={1} step="any" className={inputCls}
                                                         value={item.uom_conversion}
                                                         onChange={e => updateItem(i, 'uom_conversion', +e.target.value)}
-                                                        title="Jumlah satuan dasar per 1 satuan ini" />
+                                                        title="Base units per 1 of this unit" />
                                                 </td>
                                                 <td className="px-3 py-2">
                                                     <input type="number" min={0} className={inputCls}
@@ -276,24 +273,24 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
                             </table>
                         </div>
                         <button type="button" onClick={addItem}
-                            className="text-sm text-emerald-600 hover:underline">
-                            + Tambah Item
+                            className="text-sm text-red-600 hover:underline">
+                            + Add Item
                         </button>
                     </div>
 
-                    <FormField label="Catatan">
+                    <FormField label="Notes">
                         <textarea rows={2} className={inputCls} value={data.notes}
                             onChange={e => setData('notes', e.target.value)} />
                     </FormField>
 
                     <div className="flex gap-3 pt-2">
                         <button type="submit" disabled={processing}
-                            className="px-5 py-2 rounded-md bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60">
-                            {processing ? 'Menyimpan...' : 'Simpan'}
+                            className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60">
+                            {processing ? 'Saving...' : 'Save'}
                         </button>
                         <Link href="/invoices"
                             className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">
-                            Batal
+                            Cancel
                         </Link>
                     </div>
                 </form>

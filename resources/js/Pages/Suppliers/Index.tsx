@@ -18,22 +18,22 @@ export default function Index({ suppliers, filters }: any) {
     return (
         <AppLayout header="Supplier">
             <Head title="Supplier" />
-            <PageHeader title="Daftar Supplier" createHref="/suppliers/create" />
+            <PageHeader title="Supplier List" createHref="/suppliers/create" />
             <SearchFilter
                 routeName="suppliers.index"
                 filters={filters}
-                filterOptions={[{ key: 'status', label: 'Semua Status', options: [{ label: 'Aktif', value: 'active' }, { label: 'Tidak Aktif', value: 'inactive' }] }]}
+                filterOptions={[{ key: 'status', label: 'All Statuses', options: [{ label: 'Active', value: 'active' }, { label: 'Inactive', value: 'inactive' }] }]}
             />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="code" label="Kode" {...sortProps} />
-                            <SortableColumn sortKey="name" label="Nama" {...sortProps} />
+                            <SortableColumn sortKey="code" label="Code" {...sortProps} />
+                            <SortableColumn sortKey="name" label="Name" {...sortProps} />
                             <SortableColumn sortKey="email" label="Email" {...sortProps} />
-                            <th className="px-4 py-3">Telepon</th>
+                            <th className="px-4 py-3">Phone</th>
                             <SortableColumn sortKey="status" label="Status" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">

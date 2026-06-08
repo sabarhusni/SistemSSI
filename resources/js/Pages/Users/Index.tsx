@@ -16,26 +16,26 @@ export default function Index({ users, filters }: any) {
     };
 
     return (
-        <AppLayout header="Pengguna">
-            <Head title="Manajemen Pengguna" />
-            <PageHeader title="Daftar Pengguna" createHref="/users/create" />
+        <AppLayout header="User">
+            <Head title="User Management" />
+            <PageHeader title="User List" createHref="/users/create" />
             <SearchFilter routeName="users.index" filters={filters}
-                filterOptions={[{ key: 'status', label: 'Semua Status', options: [
-                    { label: 'Aktif', value: 'active' },
-                    { label: 'Nonaktif', value: 'inactive' },
+                filterOptions={[{ key: 'status', label: 'All Statuses', options: [
+                    { label: 'Active', value: 'active' },
+                    { label: 'Inactive', value: 'inactive' },
                 ]}]}
             />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="name" label="Nama" {...sortProps} />
+                            <SortableColumn sortKey="name" label="Name" {...sortProps} />
                             <SortableColumn sortKey="username" label="Username" {...sortProps} />
                             <SortableColumn sortKey="email" label="Email" {...sortProps} />
                             <th className="px-4 py-3">Role</th>
                             <SortableColumn sortKey="status" label="Status" {...sortProps} />
-                            <SortableColumn sortKey="created_at" label="Terdaftar" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <SortableColumn sortKey="created_at" label="Registered" {...sortProps} />
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">

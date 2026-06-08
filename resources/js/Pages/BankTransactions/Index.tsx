@@ -19,18 +19,18 @@ export default function Index({ bankTransactions, filters }: any) {
 
     return (
         <AppLayout header="Bank">
-            <Head title="Transaksi Bank" />
-            <PageHeader title="Transaksi Bank" createHref="/bank-transactions/create" />
+            <Head title="Bank Transactions" />
+            <PageHeader title="Bank Transactions" createHref="/bank-transactions/create" />
             <SearchFilter routeName="bank-transactions.index" filters={filters}
                 filterOptions={[
-                    { key: 'type', label: 'Semua Tipe', options: [
-                        { label: 'Kredit (Masuk)', value: 'credit' },
-                        { label: 'Debit (Keluar)', value: 'debit' },
+                    { key: 'type', label: 'All Types', options: [
+                        { label: 'Credit (In)', value: 'credit' },
+                        { label: 'Debit (Out)', value: 'debit' },
                     ]},
-                    { key: 'reconciliation_status', label: 'Rekonsiliasi', options: [
-                        { label: 'Cocok', value: 'matched' },
-                        { label: 'Belum Cocok', value: 'unmatched' },
-                        { label: 'Rekonsiliasi', value: 'reconciled' },
+                    { key: 'reconciliation_status', label: 'Reconciliation', options: [
+                        { label: 'Matched', value: 'matched' },
+                        { label: 'Unmatched', value: 'unmatched' },
+                        { label: 'Reconciled', value: 'reconciled' },
                     ]},
                 ]}
             />
@@ -38,14 +38,14 @@ export default function Index({ bankTransactions, filters }: any) {
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="transaction_date" label="Tanggal" {...sortProps} />
-                            <th className="px-4 py-3">Rekening</th>
-                            <SortableColumn sortKey="type" label="Tipe" {...sortProps} />
-                            <th className="px-4 py-3">Deskripsi</th>
-                            <th className="px-4 py-3">Referensi</th>
-                            <SortableColumn sortKey="amount" label="Jumlah" className="text-right" {...sortProps} />
-                            <SortableColumn sortKey="reconciliation_status" label="Rekonsiliasi" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <SortableColumn sortKey="transaction_date" label="Date" {...sortProps} />
+                            <th className="px-4 py-3">Account</th>
+                            <SortableColumn sortKey="type" label="Type" {...sortProps} />
+                            <th className="px-4 py-3">Description</th>
+                            <th className="px-4 py-3">Reference</th>
+                            <SortableColumn sortKey="amount" label="Amount" className="text-right" {...sortProps} />
+                            <SortableColumn sortKey="reconciliation_status" label="Reconciliation" {...sortProps} />
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -58,7 +58,7 @@ export default function Index({ bankTransactions, filters }: any) {
                                 </td>
                                 <td className="px-4 py-3">
                                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tx.type === 'credit' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                        {tx.type === 'credit' ? 'Kredit' : 'Debit'}
+                                        {tx.type === 'credit' ? 'Credit' : 'Debit'}
                                     </span>
                                 </td>
                                 <td className="px-4 py-3">{tx.description}</td>

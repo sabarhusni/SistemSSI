@@ -13,21 +13,21 @@ export default function Index({ stocks, filters }: any) {
     };
 
     return (
-        <AppLayout header="Stok">
-            <Head title="Stok Barang" />
+        <AppLayout header="Stock">
+            <Head title="Stock" />
             <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-800">Kartu Stok Barang</h2>
+                <h2 className="text-lg font-semibold text-gray-800">Stock Card</h2>
             </div>
             <SearchFilter routeName="stocks.index" filters={filters} filterOptions={[]} />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <th className="px-4 py-3">Kode</th>
-                            <th className="px-4 py-3">Produk</th>
-                            <th className="px-4 py-3">Kategori</th>
-                            <th className="px-4 py-3">Satuan</th>
-                            <SortableColumn sortKey="quantity" label="Stok" className="text-right" {...sortProps} />
+                            <th className="px-4 py-3">Code</th>
+                            <th className="px-4 py-3">Product</th>
+                            <th className="px-4 py-3">Category</th>
+                            <th className="px-4 py-3">Unit</th>
+                            <SortableColumn sortKey="quantity" label="Stock" className="text-right" {...sortProps} />
                             <SortableColumn sortKey="minimum_stock" label="Minimum" className="text-right" {...sortProps} />
                             <th className="px-4 py-3">Status</th>
                         </tr>
@@ -47,7 +47,7 @@ export default function Index({ stocks, filters }: any) {
                                     <td className="px-4 py-3 text-right text-gray-500">{stock.minimum_stock}</td>
                                     <td className="px-4 py-3">
                                         {isLow
-                                            ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Stok Rendah</span>
+                                            ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Low Stock</span>
                                             : <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Normal</span>
                                         }
                                     </td>

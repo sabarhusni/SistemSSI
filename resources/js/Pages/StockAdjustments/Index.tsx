@@ -15,27 +15,27 @@ export default function Index({ stockAdjustments, filters }: any) {
     };
 
     return (
-        <AppLayout header="Penyesuaian Stok">
-            <Head title="Penyesuaian Stok" />
-            <PageHeader title="Penyesuaian Stok" createHref="/stock-adjustments/create" />
+        <AppLayout header="Stock Adjustment">
+            <Head title="Stock Adjustment" />
+            <PageHeader title="Stock Adjustment" createHref="/stock-adjustments/create" />
             <SearchFilter routeName="stock-adjustments.index" filters={filters}
-                filterOptions={[{ key: 'type', label: 'Semua Tipe', options: [
-                    { label: 'Penambahan', value: 'addition' },
-                    { label: 'Pengurangan', value: 'subtraction' },
+                filterOptions={[{ key: 'type', label: 'All Types', options: [
+                    { label: 'Addition', value: 'addition' },
+                    { label: 'Subtraction', value: 'subtraction' },
                 ]}]}
             />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="adjustment_number" label="No. Penyesuaian" {...sortProps} />
-                            <th className="px-4 py-3">Produk</th>
-                            <SortableColumn sortKey="type" label="Tipe" {...sortProps} />
-                            <SortableColumn sortKey="adjustment_date" label="Tgl Penyesuaian" {...sortProps} />
-                            <SortableColumn sortKey="quantity_before" label="Qty Sebelum" className="text-right" {...sortProps} />
-                            <SortableColumn sortKey="quantity_after" label="Qty Setelah" className="text-right" {...sortProps} />
-                            <th className="px-4 py-3">Alasan</th>
-                            <th className="px-4 py-3">Aksi</th>
+                            <SortableColumn sortKey="adjustment_number" label="Adjustment No." {...sortProps} />
+                            <th className="px-4 py-3">Product</th>
+                            <SortableColumn sortKey="type" label="Type" {...sortProps} />
+                            <SortableColumn sortKey="adjustment_date" label="Adjustment Date" {...sortProps} />
+                            <SortableColumn sortKey="quantity_before" label="Qty Before" className="text-right" {...sortProps} />
+                            <SortableColumn sortKey="quantity_after" label="Qty After" className="text-right" {...sortProps} />
+                            <th className="px-4 py-3">Reason</th>
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
@@ -45,7 +45,7 @@ export default function Index({ stockAdjustments, filters }: any) {
                                 <td className="px-4 py-3">{adj.product?.name}</td>
                                 <td className="px-4 py-3">
                                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${adj.type === 'addition' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                                        {adj.type === 'addition' ? 'Penambahan' : 'Pengurangan'}
+                                        {adj.type === 'addition' ? 'Addition' : 'Subtraction'}
                                     </span>
                                 </td>
                                 <td className="px-4 py-3">{adj.adjustment_date}</td>

@@ -23,7 +23,7 @@ export default function Index({ uoms, filters }: any) {
     };
 
     const handleDelete = (id: string) => {
-        if (confirm('Yakin ingin menghapus satuan ini?')) {
+        if (confirm('Are you sure you want to delete this unit?')) {
             router.delete(`/unit-of-measures/${id}`);
         }
     };
@@ -40,24 +40,24 @@ export default function Index({ uoms, filters }: any) {
                 <div className="flex items-center justify-between mb-4 gap-3">
                     <form onSubmit={doSearch} className="flex gap-2">
                         <input
-                            className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 w-64"
-                            placeholder="Cari nama / simbol..."
+                            className="border rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 w-64"
+                            placeholder="Search name / symbol..."
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                         />
-                        <button type="submit" className="px-3 py-1.5 bg-gray-100 rounded-md text-sm hover:bg-gray-200">Cari</button>
+                        <button type="submit" className="px-3 py-1.5 bg-gray-100 rounded-md text-sm hover:bg-gray-200">Search</button>
                     </form>
-                    <Link href="/unit-of-measures/create" className="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700">
-                        + Tambah Satuan
+                    <Link href="/unit-of-measures/create" className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700">
+                        + Add Unit
                     </Link>
                 </div>
 
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="name" label="Nama Satuan" {...sortProps} />
-                            <SortableColumn sortKey="symbol" label="Simbol" {...sortProps} />
-                            <th className="px-4 py-2">Konversi ke Satuan Terkecil</th>
+                            <SortableColumn sortKey="name" label="Unit Name" {...sortProps} />
+                            <SortableColumn sortKey="symbol" label="Symbol" {...sortProps} />
+                            <th className="px-4 py-2">Conversion to Base Unit</th>
                             <SortableColumn sortKey="status" label="Status" {...sortProps} />
                             <th className="px-4 py-2 w-28"></th>
                         </tr>
@@ -66,7 +66,7 @@ export default function Index({ uoms, filters }: any) {
                         {uoms.data?.length === 0 && (
                             <tr>
                                 <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
-                                    Belum ada data satuan.
+                                    No units yet.
                                 </td>
                             </tr>
                         )}
@@ -80,7 +80,7 @@ export default function Index({ uoms, filters }: any) {
                                             1 <strong>{uom.symbol}</strong> = <strong>{fmtFactor(uom.conversion_factor)}</strong> {uom.base_unit?.name ?? ''} <span className="text-gray-400">({uom.base_unit?.symbol ?? ''})</span>
                                         </span>
                                     ) : (
-                                        <span className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">Satuan Terkecil</span>
+                                        <span className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">Base Unit</span>
                                     )}
                                 </td>
                                 <td className="px-4 py-2">
@@ -89,12 +89,12 @@ export default function Index({ uoms, filters }: any) {
                                             ? 'bg-emerald-100 text-emerald-700'
                                             : 'bg-gray-100 text-gray-500'
                                     }`}>
-                                        {uom.status === 'active' ? 'Aktif' : 'Nonaktif'}
+                                        {uom.status === 'active' ? 'Active' : 'Inactive'}
                                     </span>
                                 </td>
                                 <td className="px-4 py-2 flex gap-2">
                                     <Link href={`/unit-of-measures/${uom.id}/edit`} className="text-blue-600 hover:underline text-xs">Edit</Link>
-                                    <button onClick={() => handleDelete(uom.id)} className="text-red-500 hover:underline text-xs">Hapus</button>
+                                    <button onClick={() => handleDelete(uom.id)} className="text-red-500 hover:underline text-xs">Delete</button>
                                 </td>
                             </tr>
                         ))}
@@ -109,7 +109,7 @@ export default function Index({ uoms, filters }: any) {
                                 href={link.url ?? '#'}
                                 className={`px-3 py-1 rounded text-sm border ${
                                     link.active
-                                        ? 'bg-emerald-600 text-white border-emerald-600'
+                                        ? 'bg-red-600 text-white border-red-600'
                                         : 'text-gray-600 hover:bg-gray-50'
                                 } ${!link.url ? 'opacity-40 pointer-events-none' : ''}`}
                                 dangerouslySetInnerHTML={{ __html: link.label }}

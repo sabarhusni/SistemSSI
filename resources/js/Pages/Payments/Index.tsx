@@ -18,14 +18,14 @@ export default function Index({ payments, filters }: any) {
     };
 
     return (
-        <AppLayout header="Pembayaran">
-            <Head title="Pembayaran" />
-            <PageHeader title="Daftar Pembayaran" createHref="/payments/create" />
+        <AppLayout header="Payment">
+            <Head title="Payment" />
+            <PageHeader title="Payment List" createHref="/payments/create" />
             <SearchFilter routeName="payments.index" filters={filters}
-                filterOptions={[{ key: 'payment_method', label: 'Semua Metode', options: [
-                    { label: 'Transfer Bank', value: 'bank_transfer' },
-                    { label: 'Tunai', value: 'cash' },
-                    { label: 'Cek', value: 'cheque' },
+                filterOptions={[{ key: 'payment_method', label: 'All Methods', options: [
+                    { label: 'Bank Transfer', value: 'bank_transfer' },
+                    { label: 'Cash', value: 'cash' },
+                    { label: 'Cheque', value: 'cheque' },
                     { label: 'Giro', value: 'giro' },
                 ]}]}
             />
@@ -33,14 +33,14 @@ export default function Index({ payments, filters }: any) {
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
-                            <SortableColumn sortKey="payment_number" label="No. Pembayaran" {...sortProps} />
-                            <th className="px-4 py-3">No. Invoice</th>
+                            <SortableColumn sortKey="payment_number" label="Payment No." {...sortProps} />
+                            <th className="px-4 py-3">Invoice No.</th>
                             <th className="px-4 py-3">Customer</th>
-                            <SortableColumn sortKey="payment_date" label="Tgl Bayar" {...sortProps} />
-                            <SortableColumn sortKey="payment_method" label="Metode" {...sortProps} />
-                            <SortableColumn sortKey="amount" label="Jumlah" className="text-right" {...sortProps} />
+                            <SortableColumn sortKey="payment_date" label="Payment Date" {...sortProps} />
+                            <SortableColumn sortKey="payment_method" label="Method" {...sortProps} />
+                            <SortableColumn sortKey="amount" label="Amount" className="text-right" {...sortProps} />
                             <SortableColumn sortKey="status" label="Status" {...sortProps} />
-                            <th className="px-4 py-3">Aksi</th>
+                            <th className="px-4 py-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
