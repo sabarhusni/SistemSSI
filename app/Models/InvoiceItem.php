@@ -12,7 +12,7 @@ class InvoiceItem extends Model
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'invoice_id', 'product_id', 'description',
+        'invoice_id', 'product_id', 'description', 'month',
         'quantity', 'uom', 'uom_conversion',
         'unit_price', 'tax_rate', 'tax_amount', 'subtotal',
     ];

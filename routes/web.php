@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('sales-orders', SalesOrderController::class);
     Route::get('work-orders/{workOrder}/print', [WorkOrderController::class, 'print'])->name('work-orders.print');
     Route::resource('work-orders', WorkOrderController::class);
+    Route::get('invoices/{invoice}/print', [InvoiceController::class, 'print'])->name('invoices.print');
     Route::resource('invoices', InvoiceController::class);
 
     // Financial (Modul 9, 15-16)
@@ -63,6 +64,9 @@ Route::middleware('auth')->group(function () {
 
     // Laporan
     Route::prefix('reports')->name('reports.')->group(function () {
+        Route::get('/contract',         [ReportController::class, 'contract'])->name('contract');
+        Route::get('/work-order',       [ReportController::class, 'workOrder'])->name('work-order');
+        Route::get('/tax',              [ReportController::class, 'tax'])->name('tax');
         Route::get('/sales',            [ReportController::class, 'sales'])->name('sales');
         Route::get('/purchase',         [ReportController::class, 'purchase'])->name('purchase');
         Route::get('/stock',            [ReportController::class, 'stock'])->name('stock');

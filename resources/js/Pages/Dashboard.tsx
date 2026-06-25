@@ -1,6 +1,8 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head, Link } from '@inertiajs/react';
 import StatusBadge from '@/Components/StatusBadge';
+import VisitCalendar, { VisitEvent } from '@/Components/VisitCalendar';
+import VisitVsWoChart, { VisitVsWoData } from '@/Components/VisitVsWoChart';
 
 interface Stats {
     total_customers: number;
@@ -37,10 +39,14 @@ export default function Dashboard({
     stats,
     activeServiceOrders = [],
     overdueInvoices = [],
+    visitEvents = [],
+    visitVsWoChart,
 }: {
     stats: Stats;
     activeServiceOrders: WorkOrder[];
     overdueInvoices: Invoice[];
+    visitEvents: VisitEvent[];
+    visitVsWoChart: VisitVsWoData;
 }) {
     return (
         <AppLayout header="Dashboard">
@@ -55,6 +61,18 @@ export default function Dashboard({
                 <StatCard label="Revenue This Month"  value={fmt(stats.revenue_this_month)} color="bg-teal-500" />
                 <StatCard label="Overdue Invoices"    value={stats.overdue_invoices}        color="bg-red-500" />
             </div>
+
+            {/* Kalender Jadwal Visit Plan */}
+            <div className="mb-6">
+                <VisitCalendar events={visitEvents} />
+            </div>
+
+            {/* Grafik Visit Plan vs Work Order */}
+            {visitVsWoChart && (
+                <div className="mb-6">
+                    <VisitVsWoChart data={visitVsWoChart} />
+                </div>
+            )}
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 {/* Active Service Orders */}

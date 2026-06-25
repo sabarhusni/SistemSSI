@@ -1,16 +1,17 @@
 import AppLayout from '@/Layouts/AppLayout';
 import FormField, { inputCls } from '@/Components/FormField';
 import ContractPickerModal from '@/Components/ContractPickerModal';
-import ProductPickerModal from '@/Components/ProductPickerModal';
+import SalesOrderRefPickerModal from '@/Components/SalesOrderRefPickerModal';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
 const fmt = (n: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
-const emptyItem = () => ({
+const emptyItem = (month = 1) => ({
     product_id:     '',
     description:    '',
+    month,
     quantity:       1,
     uom:            '',
     uom_conversion: 1,
@@ -20,20 +21,51 @@ const emptyItem = () => ({
     subtotal:       0,
 });
 
-const itemFromSO = (it: any) => ({
+const recalcItem = (item: any) => {
+    const sub = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
+    return { ...item, subtotal: sub, tax_amount: sub * ((Number(item.tax_rate) || 0) / 100) };
+};
+
+const itemFromSO = (it: any) => recalcItem({
     product_id:     it.product_id     ?? '',
     description:    it.product?.name  ?? it.description ?? '',
-    quantity:       it.quantity       ?? 1,
+    month:          Number(it.month) || 1,
+    quantity:       Number(it.quantity ?? 1),
     uom:            it.uom            ?? '',
     uom_conversion: it.uom_conversion ?? 1,
-    unit_price:     it.unit_price     ?? '',
-    tax_rate:       it.tax_rate       ?? 0,
-    tax_amount:     it.tax_amount     ?? 0,
-    subtotal:       it.subtotal       ?? 0,
+    unit_price:     Number(it.unit_price ?? 0),
+    tax_rate:       Number(it.tax_rate ?? 0),
 });
 
-export default function Form({ invoice, contracts, products, nextNumber }: any) {
+// Bangun item invoice dari item INDUK (jasa) SO untuk tiap bulan yang sudah
+// memiliki Work Order berstatus Completed. Qty mengikuti SO (tidak dijumlah antar-visit).
+// Produk SO-bulan yang sudah pernah ditagih (invoicedKeys) tidak ditampilkan lagi.
+function itemsFromCompletedWOs(so: any, invoicedKeys: string[] = []): any[] {
+    const wos = (so.work_orders ?? []).filter((w: any) => w.status === 'completed');
+
+    // Bulan yang sudah punya WO Completed (diambil dari material WO tsb).
+    const completedMonths = new Set<number>();
+    for (const wo of wos) {
+        for (const mat of (wo.materials ?? [])) {
+            completedMonths.add(Number(mat.month) || 1);
+        }
+    }
+
+    const invoiced = new Set(invoicedKeys);
+    const rows = (so.items ?? [])
+        .filter((it: any) => !it.parent_product_id && completedMonths.has(Number(it.month) || 1))
+        .filter((it: any) => !invoiced.has(`${it.product_id}|${Number(it.month) || 1}`))
+        .map(itemFromSO)
+        .sort((a: any, b: any) => a.month - b.month);
+
+    return rows;
+}
+
+export default function Form({ invoice, contracts, products, nextNumber, invoicedKeys = {} }: any) {
     const editing = !!invoice;
+    // Invoice yang sudah lunas (paid) hanya bisa dilihat, tidak dapat diubah.
+    const locked = editing && invoice?.status === 'paid';
+    const lockCls = locked ? ' bg-gray-100 cursor-not-allowed' : '';
 
     const { data, setData, post, put, processing, errors } = useForm<any>({
         contract_id:    invoice?.contract_id    ?? '',
@@ -48,51 +80,35 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
     });
 
     const [contractPickerOpen, setContractPickerOpen] = useState(false);
-    const [pickerIdx, setPickerIdx] = useState<number | null>(null);
+    const [soPickerOpen, setSoPickerOpen] = useState(false);
 
     const selectedContract = contracts?.find((c: any) => String(c.id) === String(data.contract_id));
-    const latestSO         = selectedContract?.sales_orders?.[0];
+    // SO layak tagih (confirmed + ada WO completed) pada kontrak terpilih.
+    const invoiceableSOs   = selectedContract?.sales_orders ?? [];
+    const linkedSO         = invoiceableSOs.find((s: any) => String(s.id) === String(data.sales_order_id)) ?? null;
+    const selectedPremise  = linkedSO?.premise ?? null;
     const getProduct       = (id: string) => products?.find((p: any) => p.id === id);
 
+    // Pilih kontrak: reset SO & item — item terisi setelah SO dipilih.
     const handleSelectContract = (contract: any) => {
-        const so    = contract.sales_orders?.[0];
-        const items = so?.items?.length ? so.items.map(itemFromSO) : [emptyItem()];
         setData({
             ...data,
             contract_id:    contract.id,
             customer_id:    contract.customer_id ?? '',
-            sales_order_id: so?.id ?? '',
-            items,
+            sales_order_id: '',
+            items:          [],
         });
     };
 
-    const recalc = (item: any) => {
-        const sub = (item.quantity || 0) * (item.unit_price || 0);
-        return { ...item, subtotal: sub, tax_amount: sub * ((item.tax_rate || 0) / 100) };
-    };
-
-    const updateItem = (i: number, field: string, value: any) => {
-        const items = [...data.items];
-        items[i] = recalc({ ...items[i], [field]: value });
-        setData('items', items);
-    };
-
-    const handleSelectProduct = (product: any) => {
-        if (pickerIdx === null) return;
-        const items = [...data.items];
-        items[pickerIdx] = recalc({
-            ...items[pickerIdx],
-            product_id:  product.id,
-            description: product.name,
-            uom:         items[pickerIdx].uom || product.unit || '',
-            unit_price:  items[pickerIdx].unit_price || product.sales_price || '',
+    // Pilih SO referensi: item invoice terisi dari item induk (jasa) SO untuk bulan ber-WO Completed.
+    const handleSelectSO = (so: any) => {
+        setData({
+            ...data,
+            sales_order_id: so.id,
+            items:          itemsFromCompletedWOs(so, invoicedKeys?.[so.id] ?? []),
         });
-        setData('items', items);
+        setSoPickerOpen(false);
     };
-
-    const addItem    = () => setData('items', [...data.items, emptyItem()]);
-    const removeItem = (i: number) =>
-        setData('items', data.items.filter((_: any, idx: number) => idx !== i));
 
     const subtotalAll = data.items.reduce((s: number, it: any) => s + (it.subtotal   || 0), 0);
     const taxAll      = data.items.reduce((s: number, it: any) => s + (it.tax_amount || 0), 0);
@@ -100,11 +116,12 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (locked) return;
         editing ? put(`/invoices/${invoice.id}`) : post('/invoices');
     };
 
     return (
-        <AppLayout header={editing ? 'Edit Invoice' : 'Create Invoice'}>
+        <AppLayout header={locked ? 'View Invoice' : editing ? 'Edit Invoice' : 'Create Invoice'}>
             <Head title="Invoice" />
 
             {contractPickerOpen && (
@@ -115,38 +132,50 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
                 />
             )}
 
-            {pickerIdx !== null && (
-                <ProductPickerModal
-                    products={products ?? []}
-                    onSelect={handleSelectProduct}
-                    onClose={() => setPickerIdx(null)}
-                    extraLabel="Sales Price"
-                    extraKey="sales_price"
-                    extraFormat="currency"
+            {soPickerOpen && (
+                <SalesOrderRefPickerModal
+                    salesOrders={invoiceableSOs}
+                    customerName={selectedContract?.customer?.name}
+                    onSelect={handleSelectSO}
+                    onClose={() => setSoPickerOpen(false)}
                 />
             )}
 
             <div className="max-w-5xl bg-white rounded-xl shadow p-6">
                 <form onSubmit={submit} className="space-y-4">
 
+                    {locked && (
+                        <div className="rounded-md bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
+                            Invoice ini sudah <span className="font-semibold">Paid</span> sehingga hanya dapat dilihat dan tidak dapat diubah.
+                        </div>
+                    )}
+
+                    {errors.items && (
+                        <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                            {errors.items}
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-4 gap-4">
                         <FormField label="Invoice No." error={errors.invoice_number} required>
                             <input className={inputCls + ' bg-gray-50'} value={data.invoice_number} readOnly tabIndex={-1} />
                         </FormField>
                         <FormField label="Invoice Date" error={errors.invoice_date} required>
-                            <input type="date" className={inputCls} value={data.invoice_date}
+                            <input type="date" className={inputCls + lockCls} value={data.invoice_date} disabled={locked}
                                 onChange={e => setData('invoice_date', e.target.value)} />
                         </FormField>
                         <FormField label="Due Date" error={errors.due_date} required>
-                            <input type="date" className={inputCls} value={data.due_date}
+                            <input type="date" className={inputCls + lockCls} value={data.due_date} disabled={locked}
                                 onChange={e => setData('due_date', e.target.value)} />
                         </FormField>
                         <FormField label="Status">
-                            <select className={inputCls} value={data.status}
+                            <select className={inputCls + lockCls} value={data.status} disabled={locked}
                                 onChange={e => setData('status', e.target.value)}>
                                 <option value="draft">Draft</option>
                                 <option value="sent">Sent</option>
-                                <option value="paid">Paid</option>
+                                {/* Paid hanya diset otomatis dari modul Payment, tidak bisa dipilih manual.
+                                    Tetap tampil (disabled) bila invoice sudah berstatus paid agar nilai tidak hilang saat edit. */}
+                                {data.status === 'paid' && <option value="paid" disabled>Paid (otomatis dari pembayaran)</option>}
                                 <option value="cancelled">Cancelled</option>
                             </select>
                         </FormField>
@@ -156,8 +185,9 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
                         <FormField label="Contract Ref.">
                             <button
                                 type="button"
+                                disabled={locked}
                                 onClick={() => setContractPickerOpen(true)}
-                                className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition"
+                                className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition disabled:bg-gray-100 disabled:cursor-not-allowed"
                             >
                                 {selectedContract
                                     ? <span className="text-gray-800">{selectedContract.contract_number}</span>
@@ -173,37 +203,54 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
                                 }
                             </div>
                         </FormField>
-                        <FormField label="Sales Order No.">
-                            <div className={`${inputCls} bg-gray-50 cursor-default font-mono text-xs`}>
-                                {latestSO?.so_number
-                                    ? <span className="text-gray-700">{latestSO.so_number}</span>
-                                    : <span className="text-gray-400 italic">Automatic from contract</span>
+                        <FormField label="Referensi SO (Confirmed)" error={errors.sales_order_id}>
+                            <button
+                                type="button"
+                                disabled={!selectedContract || locked}
+                                onClick={() => setSoPickerOpen(true)}
+                                className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition disabled:bg-gray-50 disabled:cursor-not-allowed"
+                            >
+                                {linkedSO
+                                    ? <span className="text-gray-800 font-mono text-xs">{linkedSO.so_number}</span>
+                                    : <span className="text-gray-400">{selectedContract ? '— Pilih SO —' : 'Pilih kontrak terlebih dahulu'}</span>
                                 }
-                            </div>
+                            </button>
                         </FormField>
                     </div>
 
+                    {selectedPremise && (
+                        <div className="grid grid-cols-3 gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs">
+                            <div><span className="text-gray-500 block">Premis Lokasi</span><span className="text-gray-800 font-medium">{selectedPremise.location ?? '—'}</span></div>
+                            <div><span className="text-gray-500 block">Premis Alamat</span><span className="text-gray-800 font-medium">{selectedPremise.address ?? '—'}</span></div>
+                            <div><span className="text-gray-500 block">Premis PIC</span><span className="text-gray-800 font-medium">{selectedPremise.pic ?? '—'}</span></div>
+                        </div>
+                    )}
+
                     <div>
-                        <h3 className="font-semibold text-gray-700 mb-2">Invoice Items</h3>
+                        <div className="flex items-center justify-between mb-2">
+                            <h3 className="font-semibold text-gray-700">Invoice Items</h3>
+                            <span className="text-xs text-gray-400">Item diambil otomatis dari Sales Order — tidak dapat diubah.</span>
+                        </div>
                         <div className="border rounded-lg overflow-x-auto mb-2">
-                            <table className="w-full text-sm min-w-[900px]">
+                            <table className="w-full text-sm min-w-[820px]">
                                 <thead className="bg-gray-50 border-b">
                                     <tr className="text-left text-gray-600 text-xs">
                                         <th className="px-3 py-2">Product</th>
+                                        <th className="px-3 py-2 w-20 text-center">Bulan</th>
                                         <th className="px-3 py-2 w-20">Qty</th>
                                         <th className="px-3 py-2 w-24">Unit</th>
-                                        <th className="px-3 py-2 w-20 text-center" title="Conversion to base unit">Conversion</th>
                                         <th className="px-3 py-2 w-36">Unit Price</th>
                                         <th className="px-3 py-2 w-20 text-center">Tax %</th>
                                         <th className="px-3 py-2 w-36 text-right">Subtotal</th>
-                                        <th className="px-3 py-2 w-8"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
                                     {data.items.length === 0 && (
                                         <tr>
-                                            <td colSpan={8} className="px-3 py-4 text-center text-gray-400 text-sm">
-                                                Select a contract to autofill items, or add manually.
+                                            <td colSpan={7} className="px-3 py-4 text-center text-gray-400 text-sm">
+                                                {data.sales_order_id
+                                                    ? 'Tidak ada produk service yang dapat ditagih — semua bulan sudah ditagih atau belum ada Work Order Completed.'
+                                                    : 'Pilih Kontrak lalu Referensi SO untuk mengisi item otomatis.'}
                                             </td>
                                         </tr>
                                     )}
@@ -215,49 +262,42 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
                                                 <td className="px-3 py-2">
                                                     <button
                                                         type="button"
-                                                        onClick={() => setPickerIdx(i)}
-                                                        className="w-full text-left px-3 py-1.5 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition"
+                                                        disabled
+                                                        className="w-full text-left px-3 py-1.5 border rounded-md text-sm bg-gray-100 cursor-not-allowed transition"
                                                     >
                                                         {displayName
                                                             ? <span className="text-gray-800">{displayName}</span>
-                                                            : <span className="text-gray-400">— Select Product —</span>
+                                                            : <span className="text-gray-400">—</span>
                                                         }
                                                     </button>
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                    <input type="number" min={1} className={inputCls}
-                                                        value={item.quantity}
-                                                        onChange={e => updateItem(i, 'quantity', +e.target.value)} />
+                                                    <input type="number" disabled readOnly
+                                                        className={inputCls + ' text-center bg-gray-100 cursor-not-allowed'}
+                                                        value={item.month ?? 1} />
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                    <input className={inputCls} value={item.uom}
-                                                        onChange={e => updateItem(i, 'uom', e.target.value)}
-                                                        placeholder={selected?.unit ?? 'Unit'} />
+                                                    <input type="number" disabled readOnly
+                                                        className={inputCls + ' bg-gray-100 cursor-not-allowed'}
+                                                        value={item.quantity} />
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                    <input type="number" min={1} step="any" className={inputCls}
-                                                        value={item.uom_conversion}
-                                                        onChange={e => updateItem(i, 'uom_conversion', +e.target.value)}
-                                                        title="Base units per 1 of this unit" />
+                                                    <input disabled readOnly
+                                                        className={inputCls + ' bg-gray-100 cursor-not-allowed'}
+                                                        value={item.uom} />
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                    <input type="number" min={0} className={inputCls}
-                                                        value={item.unit_price}
-                                                        onChange={e => updateItem(i, 'unit_price', +e.target.value)}
-                                                        placeholder="0" />
+                                                    <input type="number" disabled readOnly
+                                                        className={inputCls + ' bg-gray-100 cursor-not-allowed'}
+                                                        value={item.unit_price} />
                                                 </td>
                                                 <td className="px-3 py-2">
-                                                    <input type="number" min={0} max={100} step="0.1" className={inputCls}
-                                                        value={item.tax_rate}
-                                                        onChange={e => updateItem(i, 'tax_rate', +e.target.value)}
-                                                        placeholder="0" />
+                                                    <input type="number" disabled readOnly
+                                                        className={inputCls + ' bg-gray-100 cursor-not-allowed'}
+                                                        value={item.tax_rate} />
                                                 </td>
                                                 <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
                                                     {fmt(item.subtotal || 0)}
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <button type="button" onClick={() => removeItem(i)}
-                                                        className="text-red-500 hover:text-red-700 text-lg leading-none">×</button>
                                                 </td>
                                             </tr>
                                         );
@@ -265,32 +305,37 @@ export default function Form({ invoice, contracts, products, nextNumber }: any) 
                                 </tbody>
                                 <tfoot className="bg-gray-50 border-t text-sm">
                                     <tr>
+                                        <td colSpan={6} className="px-3 py-2 text-right text-gray-600">Pre-Tax Amount</td>
+                                        <td className="px-3 py-2 text-right text-gray-700 whitespace-nowrap">{fmt(subtotalAll)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td colSpan={6} className="px-3 py-2 text-right text-gray-600">Tax Amount</td>
+                                        <td className="px-3 py-2 text-right text-amber-600 whitespace-nowrap">{fmt(taxAll)}</td>
+                                    </tr>
+                                    <tr>
                                         <td colSpan={6} className="px-3 py-2 text-right font-semibold text-gray-700">Total</td>
                                         <td className="px-3 py-2 text-right font-bold text-emerald-700 whitespace-nowrap">{fmt(grandTotal)}</td>
-                                        <td></td>
                                     </tr>
                                 </tfoot>
                             </table>
                         </div>
-                        <button type="button" onClick={addItem}
-                            className="text-sm text-red-600 hover:underline">
-                            + Add Item
-                        </button>
                     </div>
 
                     <FormField label="Notes">
-                        <textarea rows={2} className={inputCls} value={data.notes}
+                        <textarea rows={2} className={inputCls + lockCls} value={data.notes} disabled={locked}
                             onChange={e => setData('notes', e.target.value)} />
                     </FormField>
 
                     <div className="flex gap-3 pt-2">
-                        <button type="submit" disabled={processing}
-                            className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60">
-                            {processing ? 'Saving...' : 'Save'}
-                        </button>
+                        {!locked && (
+                            <button type="submit" disabled={processing}
+                                className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60">
+                                {processing ? 'Saving...' : 'Save'}
+                            </button>
+                        )}
                         <Link href="/invoices"
                             className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">
-                            Cancel
+                            {locked ? 'Back' : 'Cancel'}
                         </Link>
                     </div>
                 </form>

@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Contract;
+use App\Models\Invoice;
+use App\Models\WorkOrder;
 use App\Models\SalesOrder;
 use App\Models\PurchaseOrder;
 use App\Models\Stock;
@@ -21,6 +24,134 @@ use Inertia\Inertia;
 
 class ReportController extends Controller
 {
+    /* ── Contract ── */
+    public function contract(Request $request)
+    {
+        $from = $request->from ?? now()->startOfYear()->toDateString();
+        $to   = $request->to   ?? now()->endOfYear()->toDateString();
+
+        // Kontrak yang aktif/berlaku pada rentang tanggal: mulai sebelum/saat $to dan
+        // berakhir setelah/saat $from (atau tanpa tanggal berakhir).
+        $contracts = Contract::with(['customer', 'salesEmployee'])
+            ->withCount(['salesOrders', 'workOrders', 'invoices'])
+            ->withSum('invoices', 'total_amount')
+            ->where('start_date', '<=', $to)
+            ->where(fn($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $from))
+            ->when($request->customer_id, fn($q, $v) => $q->where('customer_id', $v))
+            ->when($request->status,      fn($q, $v) => $q->where('status', $v))
+            ->orderBy('start_date')
+            ->get();
+
+        $summary = [
+            'total_contracts' => $contracts->count(),
+            'total_value'     => $contracts->sum('contract_value'),
+            'total_invoiced'  => $contracts->sum('invoices_sum_total_amount'),
+            'by_status'       => $contracts->groupBy('status')->map->count(),
+        ];
+
+        return Inertia::render('Reports/Contract', [
+            'contracts' => $contracts,
+            'summary'   => $summary,
+            'customers' => Customer::where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'filters'   => $request->only('from', 'to', 'customer_id', 'status'),
+        ]);
+    }
+
+    /* ── Work Order ── */
+    public function workOrder(Request $request)
+    {
+        $from = $request->from ?? now()->startOfMonth()->toDateString();
+        $to   = $request->to   ?? now()->toDateString();
+
+        $orders = WorkOrder::with(['technician', 'contract', 'salesOrder', 'materials.product'])
+            ->whereBetween('visit_date', [$from, $to])
+            ->when($request->technician_id, fn($q, $v) => $q->where('technician_id', $v))
+            ->when($request->status,        fn($q, $v) => $q->where('status', $v))
+            ->orderBy('visit_date')
+            ->get()
+            ->map(fn($wo) => [
+                'id'              => $wo->id,
+                'wo_number'       => $wo->wo_number,
+                'visit_date'      => $wo->visit_date?->format('Y-m-d'),
+                'status'          => $wo->status,
+                'service_area'    => $wo->service_area,
+                'time_in'         => $wo->time_in ? substr($wo->time_in, 0, 5) : null,
+                'time_out'        => $wo->time_out ? substr($wo->time_out, 0, 5) : null,
+                'technician'      => $wo->technician?->name,
+                'contract_number' => $wo->contract?->contract_number,
+                'so_number'       => $wo->salesOrder?->so_number,
+                'material_count'  => $wo->materials->count(),
+                'material_cost'   => $wo->materials->sum(fn($m) => $m->quantity_used * ($m->product?->cost ?? 0)),
+            ]);
+
+        $summary = [
+            'total_orders'        => $orders->count(),
+            'by_status'           => $orders->groupBy('status')->map->count(),
+            'total_material_cost' => $orders->sum('material_cost'),
+        ];
+
+        return Inertia::render('Reports/WorkOrder', [
+            'orders'      => $orders,
+            'summary'     => $summary,
+            'technicians' => User::where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'filters'     => $request->only('from', 'to', 'technician_id', 'status'),
+        ]);
+    }
+
+    /* ── Pajak (PPN dari Invoice) ── */
+    public function tax(Request $request)
+    {
+        $from = $request->from ?? now()->startOfYear()->toDateString();
+        $to   = $request->to   ?? now()->endOfYear()->toDateString();
+
+        // Laporan pajak keluaran: faktur (invoice) selain yang dibatalkan.
+        $invoices = Invoice::with('customer')
+            ->whereBetween('invoice_date', [$from, $to])
+            ->where('status', '!=', 'cancelled')
+            ->when($request->status,      fn($q, $v) => $q->where('status', $v))
+            ->when($request->customer_id, fn($q, $v) => $q->where('customer_id', $v))
+            ->orderBy('invoice_date')
+            ->get()
+            ->map(fn($inv) => [
+                'id'             => $inv->id,
+                'invoice_number' => $inv->invoice_number,
+                'invoice_date'   => $inv->invoice_date,
+                'customer'       => $inv->customer?->name,
+                'dpp'            => (float) $inv->subtotal,
+                'tax_rate'       => (float) $inv->tax_rate,
+                'tax'            => (float) $inv->tax,
+                'total'          => (float) $inv->total_amount,
+                'status'         => $inv->status,
+            ]);
+
+        $byMonth = collect($invoices)
+            ->groupBy(fn($i) => substr((string) $i['invoice_date'], 0, 7))
+            ->map(fn($g, $month) => [
+                'month' => $month,
+                'count' => $g->count(),
+                'dpp'   => $g->sum('dpp'),
+                'tax'   => $g->sum('tax'),
+                'total' => $g->sum('total'),
+            ])
+            ->sortKeys()
+            ->values();
+
+        $summary = [
+            'total_invoices' => $invoices->count(),
+            'total_dpp'      => $invoices->sum('dpp'),
+            'total_tax'      => $invoices->sum('tax'),
+            'total'          => $invoices->sum('total'),
+        ];
+
+        return Inertia::render('Reports/Tax', [
+            'invoices'  => $invoices,
+            'byMonth'   => $byMonth,
+            'summary'   => $summary,
+            'customers' => Customer::where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'filters'   => $request->only('from', 'to', 'status', 'customer_id'),
+        ]);
+    }
+
     /* ── Sales ── */
     public function sales(Request $request)
     {
@@ -145,22 +276,22 @@ class ReportController extends Controller
         $from = $request->from ?? now()->startOfMonth()->toDateString();
         $to   = $request->to   ?? now()->toDateString();
 
-        $cashIn  = CashTransaction::where('type', 'income')
+        $cashIn  = CashTransaction::where('type', 'in')
             ->whereBetween('transaction_date', [$from, $to])
             ->selectRaw("TO_CHAR(transaction_date, 'YYYY-MM') as month, SUM(amount) as total")
             ->groupBy('month')->orderBy('month')->pluck('total', 'month');
 
-        $cashOut = CashTransaction::where('type', 'expense')
+        $cashOut = CashTransaction::where('type', 'out')
             ->whereBetween('transaction_date', [$from, $to])
             ->selectRaw("TO_CHAR(transaction_date, 'YYYY-MM') as month, SUM(amount) as total")
             ->groupBy('month')->orderBy('month')->pluck('total', 'month');
 
-        $bankIn  = BankTransaction::where('type', 'credit')
+        $bankIn  = BankTransaction::where('type', 'in')
             ->whereBetween('transaction_date', [$from, $to])
             ->selectRaw("TO_CHAR(transaction_date, 'YYYY-MM') as month, SUM(amount) as total")
             ->groupBy('month')->orderBy('month')->pluck('total', 'month');
 
-        $bankOut = BankTransaction::where('type', 'debit')
+        $bankOut = BankTransaction::where('type', 'out')
             ->whereBetween('transaction_date', [$from, $to])
             ->selectRaw("TO_CHAR(transaction_date, 'YYYY-MM') as month, SUM(amount) as total")
             ->groupBy('month')->orderBy('month')->pluck('total', 'month');
@@ -206,8 +337,8 @@ class ReportController extends Controller
                 'source_name' => 'Kas',
                 'reference'   => $t->transaction_number,
                 'description' => $t->description,
-                'debit'       => $t->type === 'income'  ? $t->amount : 0,
-                'credit'      => $t->type === 'expense' ? $t->amount : 0,
+                'debit'       => $t->type === 'in'  ? $t->amount : 0,
+                'credit'      => $t->type === 'out' ? $t->amount : 0,
             ]);
 
         $bankRows = BankTransaction::with('bankAccount')
@@ -222,11 +353,11 @@ class ReportController extends Controller
                 'source_name' => $t->bankAccount?->bank_name . ' - ' . $t->bankAccount?->account_number,
                 'reference'   => $t->transaction_number,
                 'description' => $t->description,
-                'debit'       => $t->type === 'credit' ? $t->amount : 0,
-                'credit'      => $t->type === 'debit'  ? $t->amount : 0,
+                'debit'       => $t->type === 'in'  ? $t->amount : 0,
+                'credit'      => $t->type === 'out' ? $t->amount : 0,
             ]);
 
-        $rows = $cashRows->merge($bankRows)->sortBy('date')->values();
+        $rows = collect($cashRows)->merge($bankRows)->sortBy('date')->values();
 
         $runningBalance = 0;
         $rows = $rows->map(function ($row) use (&$runningBalance) {
@@ -236,7 +367,7 @@ class ReportController extends Controller
 
         return Inertia::render('Reports/CashBankLedger', [
             'rows'         => $rows,
-            'bankAccounts' => BankAccount::where('is_active', true)->orderBy('bank_name')->get(['id', 'bank_name', 'account_number']),
+            'bankAccounts' => BankAccount::where('status', 'active')->orderBy('bank_name')->get(['id', 'bank_name', 'account_number']),
             'filters'      => $request->only('from', 'to', 'source', 'bank_account_id'),
             'summary'      => [
                 'total_debit'  => $rows->sum('debit'),
@@ -252,14 +383,14 @@ class ReportController extends Controller
         $from = $request->from ?? now()->startOfMonth()->toDateString();
         $to   = $request->to   ?? now()->toDateString();
 
-        // 1. Cash expense transactions
-        $cashCosts = CashTransaction::where('type', 'expense')
+        // 1. Cash expense transactions (pengeluaran kas, type = 'out')
+        $cashCosts = CashTransaction::where('type', 'out')
             ->whereBetween('transaction_date', [$from, $to])
             ->orderBy('transaction_date')
             ->get()
             ->map(fn($t) => [
                 'date'     => $t->transaction_date,
-                'category' => $t->category ?? 'Operasional',
+                'category' => $t->category ?: 'Operasional',
                 'source'   => 'Kas',
                 'description' => $t->description,
                 'amount'   => $t->amount,
@@ -290,7 +421,9 @@ class ReportController extends Controller
                 'amount'      => $m->quantity_used * ($m->product?->cost ?? 0),
             ]);
 
-        $rows = $cashCosts->merge($poCosts)->merge($woCosts)
+        // Pakai base collection (collect) sebagai basis merge. Bila $cashCosts kosong ia tetap
+        // berupa Eloquent Collection, dan merge-nya akan memanggil getKey() pada array → error.
+        $rows = collect($cashCosts)->merge($poCosts)->merge($woCosts)
             ->sortBy('date')->values();
 
         $byCategory = $rows->groupBy('category')->map->sum('amount');

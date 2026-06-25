@@ -8,6 +8,7 @@ use App\Models\ContractPremise;
 use App\Models\Product;
 use App\Models\Setting;
 use App\Models\UnitOfMeasure;
+use App\Models\WorkOrderMaterial;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -60,6 +61,8 @@ class SalesOrderController extends Controller
                     'premises.services.product',
                     'premises.services.subProducts.product',
                 ])
+                // Settlement Amount: akumulasi nilai invoice kontrak yang sudah dibayar.
+                ->withSum('invoices as settlement_amount', 'paid_amount')
                 ->where('status', 'active')
                 ->orderBy('contract_number')
                 ->get(),
@@ -68,12 +71,22 @@ class SalesOrderController extends Controller
             'nextNumber' => $this->generateNextNumber(),
             'taxType'    => Setting::get('tax_type', 'exclude'),
             'taxRateSo'  => (float) Setting::get('tax_rate_so', 11),
+            // Premis yang sudah tersimpan di Sales Order lain tidak boleh dipilih lagi.
+            'usedPremiseIds' => SalesOrder::whereNotNull('contract_premise_id')->distinct()->pluck('contract_premise_id'),
         ]);
     }
 
     public function store(Request $request)
     {
         $data = $this->validateData($request);
+
+        // Premis dengan kontrak yang sama tidak boleh dipakai lebih dari satu Sales Order.
+        if (!empty($data['contract_premise_id'])
+            && SalesOrder::where('contract_premise_id', $data['contract_premise_id'])->exists()) {
+            return back()->withErrors([
+                'contract_premise_id' => 'Premis ini sudah digunakan pada Sales Order lain dan tidak dapat dipilih lagi.',
+            ])->withInput();
+        }
 
         if (empty($data['customer_id']) && !empty($data['contract_id'])) {
             $data['customer_id'] = Contract::find($data['contract_id'])?->customer_id;
@@ -112,14 +125,29 @@ class SalesOrderController extends Controller
             'visit_date' => optional($wo->visit_date)->format('Y-m-d'),
         ])->values();
 
+        // Pemakaian qty sub-produk pada Work Order untuk SO ini, dikelompokkan per
+        // (parent_product_id, product_id, month) → ditampilkan pada kolom "Qty WO".
+        $woUsage = WorkOrderMaterial::query()
+            ->whereHas('workOrder', fn($q) => $q->where('sales_order_id', $salesOrder->id))
+            ->whereNotNull('parent_product_id')
+            ->selectRaw('parent_product_id, product_id, month, SUM(quantity_used) as qty')
+            ->groupBy('parent_product_id', 'product_id', 'month')
+            ->get()
+            ->mapWithKeys(fn($r) => [
+                $r->parent_product_id . '-' . $r->product_id . '-' . (int) ($r->month ?? 1) => (float) $r->qty,
+            ]);
+
         return Inertia::render('SalesOrders/Form', [
             'salesOrder'      => $salesOrder,
             'workOrders'      => $workOrders,
+            'woUsage'         => $woUsage,
             'contracts'  => Contract::with([
                     'customer',
                     'premises.services.product',
                     'premises.services.subProducts.product',
                 ])
+                // Settlement Amount: akumulasi nilai invoice kontrak yang sudah dibayar.
+                ->withSum('invoices as settlement_amount', 'paid_amount')
                 // Sertakan kontrak SO ini walau tidak lagi aktif, agar data periode/premis tetap termuat.
                 ->where(fn($q) => $q->where('status', 'active')->orWhere('id', $salesOrder->contract_id))
                 ->orderBy('contract_number')
@@ -196,6 +224,10 @@ class SalesOrderController extends Controller
 
     public function destroy(SalesOrder $salesOrder)
     {
+        if (in_array($salesOrder->status, ['completed', 'cancelled'], true)) {
+            return redirect('/sales-orders')->with('error', 'Sales Order dengan status Completed atau Cancelled tidak bisa dihapus.');
+        }
+
         $salesOrder->delete();
 
         return redirect('/sales-orders')->with('success', 'Sales Order berhasil dihapus.');

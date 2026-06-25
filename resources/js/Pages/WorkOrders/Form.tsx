@@ -25,6 +25,34 @@ const emptyMaterial = (month = 1) => ({
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+// Ubah "HH:MM" / "HH:MM:SS" menjadi menit sejak 00:00, atau null bila kosong/tidak valid.
+const timeToMin = (t: any): number | null => {
+    if (!t) return null;
+    const p = String(t).split(':');
+    if (p.length < 2) return null;
+    const h = Number(p[0]), m = Number(p[1]);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    return h * 60 + m;
+};
+
+// Dua rentang waktu beririsan hanya bila keduanya lengkap, valid (akhir > awal), dan tumpang tindih.
+// Batas yang bersentuhan (10:00–11:00 vs 11:00–12:00) tidak dianggap bentrok.
+const rangesOverlap = (a1: number | null, a2: number | null, b1: number | null, b2: number | null): boolean => {
+    if (a1 === null || a2 === null || b1 === null || b2 === null) return false;
+    if (a2 <= a1 || b2 <= b1) return false;
+    return a1 < b2 && b1 < a2;
+};
+
+// Paksa input waktu ke format 24 jam (HH:MM), tanpa AM/PM. Jam dibatasi 0–23, menit 0–59.
+const formatTime24 = (raw: string) => {
+    const d = String(raw).replace(/\D/g, '').slice(0, 4);
+    let hh = d.slice(0, 2);
+    let mm = d.slice(2, 4);
+    if (hh.length === 2 && +hh > 23) hh = '23';
+    if (mm.length === 2 && +mm > 59) mm = '59';
+    return mm.length ? `${hh}:${mm}` : hh;
+};
+
 // Tanggal visit plan SO yang jatuh pada bulan kontrak tertentu (bulan 1 = bulan start_date).
 function visitDatesForMonth(visitPlans: any[], contract: any, month: number): any[] {
     const dated = (visitPlans ?? []).filter((v: any) => v.visit_date);
@@ -35,26 +63,28 @@ function visitDatesForMonth(visitPlans: any[], contract: any, month: number): an
 }
 
 // Susun material used dari satu item service SO (parent) untuk bulan item tersebut.
-// Qty tiap sub-produk dibagi jumlah tanggal visit plan SO pada bulan itu.
-function materialsFromSoItem(item: any, soItems: any[], visitPlans: any[], contract: any): any[] {
+// Qty default tiap sub-produk = qty sub-produk SO − total pemakaian WO pada bulan yang sama.
+function materialsFromSoItem(item: any, soItems: any[], subUsage: (parentId: string, subId: string, month: number) => number): any[] {
     if (!item) return [];
-    const month   = Number(item.month) || 1;
-    const subs    = (soItems ?? []).filter(
+    const month = Number(item.month) || 1;
+    const subs  = (soItems ?? []).filter(
         (it: any) => it.parent_product_id === item.product_id && (Number(it.month) || 1) === month
     );
-    const visits  = visitDatesForMonth(visitPlans, contract, month).length;
-    const divisor = visits > 0 ? visits : 1;
 
     return [{
         product_id:    item.product_id,
         month,
         uom:           item.uom ?? item.product?.unit ?? '',
         quantity_used: Number(item.quantity) || 1,
-        sub_products: subs.map((sp: any) => ({
-            product_id:    sp.product_id,
-            uom:           sp.uom ?? sp.product?.unit ?? '',
-            quantity_used: round2((Number(sp.quantity) || 0) / divisor),
-        })),
+        sub_products: subs.map((sp: any) => {
+            const soQty = Number(sp.quantity) || 0;
+            const used  = subUsage(item.product_id, sp.product_id, month);
+            return {
+                product_id:    sp.product_id,
+                uom:           sp.uom ?? sp.product?.unit ?? '',
+                quantity_used: round2(Math.max(0, soQty - used)),
+            };
+        }),
     }];
 }
 
@@ -123,13 +153,14 @@ function contractMonthOf(start: string, date: string, duration: number): number 
     return diff;
 }
 
-export default function Form({ workOrder, technicians, products, contracts, nextNumber, locked = false }: any) {
+export default function Form({ workOrder, technicians, products, contracts, nextNumber, technicianBookings = [], locked = false }: any) {
     const editing = !!workOrder;
 
     const { data, setData, post, put, transform, processing, errors } = useForm<any>({
-        contract_id:         workOrder?.contract_id         ?? '',
-        sales_order_id:      workOrder?.sales_order_id      ?? '',
-        sales_order_item_id: workOrder?.sales_order_item_id ?? '',
+        contract_id:               workOrder?.contract_id               ?? '',
+        sales_order_id:            workOrder?.sales_order_id            ?? '',
+        sales_order_item_id:       workOrder?.sales_order_item_id       ?? '',
+        sales_order_visit_plan_id: workOrder?.sales_order_visit_plan_id ?? '',
         technician_id:    workOrder?.technician_id    ?? '',
         wo_number:        workOrder?.wo_number        ?? nextNumber ?? '',
         visit_date:       workOrder?.visit_date        ?? '',
@@ -160,10 +191,6 @@ export default function Form({ workOrder, technicians, products, contracts, next
         setMaterials(m);
     };
     const addMaterialToMonth = (month: number) => setMaterials([...data.materials, emptyMaterial(month)]);
-    const addPeriod = () => {
-        const maxMonth = data.materials.reduce((mx: number, m: any) => Math.max(mx, Number(m.month) || 0), 0);
-        addMaterialToMonth(maxMonth + 1);
-    };
     const removeMaterial = (i: number) => setMaterials(data.materials.filter((_: any, idx: number) => idx !== i));
 
     const addSubProduct = (matIdx: number) => {
@@ -232,27 +259,39 @@ export default function Form({ workOrder, technicians, products, contracts, next
         return new Set(others.map((w: any) => dkey(w.visit_date)).filter(Boolean));
     }, [linkedSO, workOrder]);
 
-    // Opsi dropdown Visit Date: tanggal terpakai dinonaktifkan, dan hanya tanggal
-    // bebas TERKECIL yang dapat dipilih (pemilihan berurutan dari yang terkecil).
-    const visitDateOptions = useMemo(() => {
-        const sorted = [...refVisitDates].sort((a: any, b: any) => dkey(a.visit_date).localeCompare(dkey(b.visit_date)));
-        const earliestFree = sorted.find((v: any) => !usedVisitDates.has(dkey(v.visit_date)))?.visit_date ?? null;
+    // Opsi dropdown "Visit ke-": daftar visit plan SO untuk bulan item terpilih.
+    // Visit yang sudah dipakai WO lain dinonaktifkan (cocok per visit plan atau per tanggal).
+    const visitPlanOptions = useMemo(() => {
+        const others      = (linkedSO?.work_orders ?? []).filter((w: any) => String(w.id) !== String(workOrder?.id));
+        const usedPlanIds = new Set(others.map((w: any) => w.sales_order_visit_plan_id).filter(Boolean));
+        return [...refVisitDates]
+            .sort((a: any, b: any) => dkey(a.visit_date).localeCompare(dkey(b.visit_date)))
+            .map((v: any) => {
+                const isCurrent = String(data.sales_order_visit_plan_id) === String(v.id);
+                const used      = usedPlanIds.has(v.id) || usedVisitDates.has(dkey(v.visit_date));
+                return { id: v.id, visit_number: v.visit_number, visit_date: v.visit_date, disabled: !isCurrent && used };
+            });
+    }, [refVisitDates, usedVisitDates, linkedSO, workOrder, data.sales_order_visit_plan_id]);
 
-        const opts = sorted.map((v: any) => {
-            const used       = usedVisitDates.has(dkey(v.visit_date));
-            const isCurrent  = !!data.visit_date && dkey(data.visit_date) === dkey(v.visit_date);
-            const selectable = isCurrent || (!used && earliestFree != null && dkey(v.visit_date) === dkey(earliestFree));
-            const suffix = used && !isCurrent ? ' — sudah digunakan'
-                : (!used && !selectable ? ' — menunggu giliran' : '');
-            return { value: v.visit_date, label: `Visit ${v.visit_number}: ${v.visit_date}${suffix}`, disabled: !selectable };
+    // Teknisi yang jam kerjanya bentrok dengan WO lain pada tanggal visit yang dipilih → tidak tersedia.
+    // Teknisi boleh menangani beberapa WO di hari sama selama time_in–time_out tidak beririsan.
+    // Map technician_id → wo_number (WO ini sendiri dikecualikan).
+    const bookedTechnicians = useMemo(() => {
+        const date = dkey(data.visit_date);
+        const map = new Map<string, string>();
+        if (!date) return map;
+        const a1 = timeToMin(data.time_in), a2 = timeToMin(data.time_out);
+        // Tanpa jam lengkap pada WO ini, bentrok tak dapat disimpulkan → tidak menonaktifkan siapa pun.
+        if (a1 === null || a2 === null) return map;
+        (technicianBookings ?? []).forEach((b: any) => {
+            if (String(b.id) === String(workOrder?.id)) return;
+            if (!b.technician_id || dkey(b.visit_date) !== date) return;
+            if (rangesOverlap(a1, a2, timeToMin(b.time_in), timeToMin(b.time_out))) {
+                map.set(String(b.technician_id), b.wo_number);
+            }
         });
-
-        // Pastikan nilai tersimpan tetap tampil walau tak ada di daftar (mis. saat edit).
-        if (data.visit_date && !opts.some((o: any) => dkey(o.value) === dkey(data.visit_date))) {
-            opts.unshift({ value: data.visit_date, label: data.visit_date, disabled: false });
-        }
-        return opts;
-    }, [refVisitDates, usedVisitDates, data.visit_date]);
+        return map;
+    }, [technicianBookings, data.visit_date, data.time_in, data.time_out, workOrder]);
 
     // Bulan item SO unik, urut menaik.
     const soItemMonths = useMemo(() => {
@@ -286,32 +325,67 @@ export default function Form({ workOrder, technicians, products, contracts, next
     const handleSelectContract = (contract: any) => {
         setData({
             ...data,
-            contract_id:         contract.id,
-            sales_order_id:      '',
-            sales_order_item_id: '',
-            materials:           [],
+            contract_id:               contract.id,
+            sales_order_id:            '',
+            sales_order_item_id:       '',
+            sales_order_visit_plan_id: '',
+            visit_date:                '',
+            materials:                 [],
         });
     };
 
     const handleSelectSO = (so: any) => {
         setData({
             ...data,
-            sales_order_id:      so.id,
-            sales_order_item_id: '',
-            materials:           [],
+            sales_order_id:            so.id,
+            sales_order_item_id:       '',
+            sales_order_visit_plan_id: '',
+            visit_date:                '',
+            materials:                 [],
         });
         setSoPickerOpen(false);
     };
 
-    // Memilih item SO: material used terisi dari item tsb untuk bulannya;
-    // qty sub-produk dibagi jumlah tanggal visit plan SO pada bulan itu.
+    // Total pemakaian qty sub-produk pada WO lain di SO ini untuk (parent, sub, bulan).
+    // WO yang sedang diedit dikecualikan agar alokasinya dilepas & ditawarkan ulang.
+    const subUsage = (parentId: string, subId: string, month: number) => {
+        const m = Number(month) || 1;
+        let total = 0;
+        for (const wo of (linkedSO?.work_orders ?? [])) {
+            if (String(wo.id) === String(workOrder?.id)) continue;
+            for (const mat of (wo.materials ?? [])) {
+                if (String(mat.parent_product_id) === String(parentId)
+                    && String(mat.product_id) === String(subId)
+                    && (Number(mat.month) || 1) === m) {
+                    total += Number(mat.quantity_used) || 0;
+                }
+            }
+        }
+        return total;
+    };
+
+    // Memilih item SO: material used terisi dari item tsb untuk bulannya; qty default
+    // tiap sub-produk = qty sub-produk SO − total pemakaian WO pada bulan yang sama.
     const handleSelectSoItem = (item: any) => {
         setData({
             ...data,
-            sales_order_item_id: item.id,
-            materials:           materialsFromSoItem(item, linkedSO?.items ?? [], linkedSO?.visit_plans ?? [], selectedContract),
+            sales_order_item_id:       item.id,
+            sales_order_visit_plan_id: '',
+            visit_date:                '',
+            materials:                 materialsFromSoItem(item, linkedSO?.items ?? [], subUsage),
         });
         setSoItemPickerOpen(false);
+    };
+
+    // Pilih Visit ke-N: set referensi visit plan & default tanggal dari plan tsb.
+    // Tanggal masih bisa diubah; saat simpan, tanggal WO menimpa tanggal Visit Plan SO.
+    const handleSelectVisitPlan = (planId: string) => {
+        const plan = refVisitDates.find((v: any) => String(v.id) === String(planId));
+        setData({
+            ...data,
+            sales_order_visit_plan_id: planId,
+            visit_date: planId ? (plan?.visit_date ?? data.visit_date) : data.visit_date,
+        });
     };
 
     const toggleVisitType = (val: string) => {
@@ -336,17 +410,26 @@ export default function Form({ workOrder, technicians, products, contracts, next
         editing ? put(`/work-orders/${workOrder.id}`) : post('/work-orders');
     };
 
+    // Req 2: produk parent yang diambil dari referensi item SO — qty & produk terkunci.
+    // Hanya produk baru (tambahan) dan qty sub-produk yang dapat diubah.
+    const isFromSo = (mat: any) =>
+        !!selectedSoItem
+        && String(mat.product_id) === String(selectedSoItem.product_id)
+        && (Number(mat.month) || 1) === (Number(selectedSoItem.month) || 1);
+
     const renderMaterialRows = (rows: { mat: any; idx: number }[]) =>
         rows.map(({ mat, idx }) => {
             const selected = getProduct(mat.product_id);
+            const fromSo = isFromSo(mat);
             return (
                 <>
                     <tr key={`mat-${idx}`} className="align-top">
                         <td className="px-3 py-2">
                             <button
                                 type="button"
+                                disabled={fromSo}
                                 onClick={() => setPickerTarget({ matIdx: idx })}
-                                className="w-full text-left px-3 py-1.5 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition"
+                                className="w-full text-left px-3 py-1.5 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition disabled:bg-gray-100 disabled:cursor-not-allowed disabled:hover:border-gray-200"
                             >
                                 {selected
                                     ? <span className="text-gray-800">{selected.name} <span className="text-gray-400 text-xs">(Stock: {selected.stock})</span></span>
@@ -356,10 +439,12 @@ export default function Form({ workOrder, technicians, products, contracts, next
                         </td>
                         <td className="px-3 py-2 text-gray-500 text-xs">{productUnit(selected) || '—'}</td>
                         <td className="px-3 py-2">
-                            <input type="number" min={1} className={inputCls} value={mat.quantity_used} onChange={e => updateMaterial(idx, 'quantity_used', +e.target.value)} />
+                            <input type="number" min={1} readOnly={fromSo} disabled={fromSo} className={fromSo ? `${inputCls} bg-gray-100 cursor-not-allowed` : inputCls} value={mat.quantity_used} onChange={e => updateMaterial(idx, 'quantity_used', +e.target.value)} />
                         </td>
                         <td className="px-3 py-2">
-                            <button type="button" onClick={() => removeMaterial(idx)} className="text-red-500 text-lg leading-none hover:text-red-700">×</button>
+                            {!fromSo && (
+                                <button type="button" onClick={() => removeMaterial(idx)} className="text-red-500 text-lg leading-none hover:text-red-700">×</button>
+                            )}
                         </td>
                     </tr>
 
@@ -427,6 +512,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
                     extraLabel="Stock"
                     extraKey="stock"
                     extraFormat="number"
+                    typeFilter="goods"
                 />
             )}
 
@@ -533,28 +619,65 @@ export default function Form({ workOrder, technicians, products, contracts, next
                         )}
                     </FormField>
 
-                    <FormField label={`Visit Date${selectedSoItem ? ` — Visit Plan SO (Bulan ${selectedSoItem.month})` : ''}`} error={errors.visit_date} required>
-                        {visitDateOptions.length > 0 ? (
-                            <select className={inputCls} value={data.visit_date} onChange={e => setData('visit_date', e.target.value)}>
-                                <option value="">— Pilih Tanggal Visit (dari Visit Plan SO) —</option>
-                                {visitDateOptions.map((o: any, i: number) => (
-                                    <option key={i} value={o.value} disabled={o.disabled}>{o.label}</option>
-                                ))}
-                            </select>
-                        ) : (
-                            <input type="date" className={inputCls} value={data.visit_date} onChange={e => setData('visit_date', e.target.value)} />
-                        )}
-                        {selectedSoItem
-                            ? <p className="text-xs text-gray-400 mt-1">{refVisitDates.length > 0 ? 'Satu Work Order = satu tanggal visit. Dipilih berurutan dari tanggal terkecil; tanggal yang sudah dipakai dinonaktifkan.' : 'Tidak ada tanggal di Visit Plan SO bulan ini — isi manual.'}</p>
-                            : <p className="text-xs text-gray-400 mt-1">Pilih Referensi Item SO untuk menampilkan daftar tanggal visit.</p>
-                        }
+                    <FormField label={`Pilih Visit${selectedSoItem ? ` — Visit Plan SO (Bulan ${selectedSoItem.month})` : ''}`} error={errors.sales_order_visit_plan_id}>
+                        <select
+                            className={inputCls}
+                            value={data.sales_order_visit_plan_id}
+                            onChange={e => handleSelectVisitPlan(e.target.value)}
+                            disabled={visitPlanOptions.length === 0}
+                        >
+                            <option value="">{visitPlanOptions.length ? '— Pilih Visit ke- (dari Visit Plan SO) —' : 'Pilih Referensi Item SO terlebih dahulu'}</option>
+                            {visitPlanOptions.map((o: any) => (
+                                <option key={o.id} value={o.id} disabled={o.disabled}>
+                                    Visit {o.visit_number}: {o.visit_date || '(tanpa tanggal)'}{o.disabled ? ' — sudah digunakan' : ''}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-gray-400 mt-1">
+                            {selectedSoItem
+                                ? 'Pilih visit ke- dari Visit Plan SO. Tanggal default mengikuti plan dan masih bisa diubah di bawah.'
+                                : 'Pilih Referensi Item SO untuk menampilkan daftar visit.'}
+                        </p>
                     </FormField>
+
+                    <FormField label="Visit Date" error={errors.visit_date} required>
+                        <input type="date" className={inputCls} value={data.visit_date} onChange={e => setData('visit_date', e.target.value)} />
+                        <p className="text-xs text-gray-400 mt-1">
+                            Tanggal dapat diubah bebas. Saat disimpan, tanggal ini memperbarui tanggal Visit Plan SO untuk visit yang dipilih.
+                        </p>
+                    </FormField>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField label="Time In" error={errors.time_in}>
+                            <input type="text" inputMode="numeric" placeholder="HH:MM (24 jam)" maxLength={5} className={inputCls} value={data.time_in} onChange={e => setData('time_in', formatTime24(e.target.value))} />
+                        </FormField>
+                        <FormField label="Time Out" error={errors.time_out}>
+                            <input type="text" inputMode="numeric" placeholder="HH:MM (24 jam)" maxLength={5} className={inputCls} value={data.time_out} onChange={e => setData('time_out', formatTime24(e.target.value))} />
+                        </FormField>
+                    </div>
+                    <p className="-mt-2 text-xs text-gray-400">Isi jam WO terlebih dahulu agar daftar teknisi tersaring sesuai tanggal & jam.</p>
 
                     <FormField label="Technician" error={errors.technician_id}>
                         <select className={inputCls} value={data.technician_id} onChange={e => setData('technician_id', e.target.value)}>
                             <option value="">— Select Technician (optional, can be filled later) —</option>
-                            {technicians?.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            {technicians?.map((t: any) => {
+                                const bookedWo = bookedTechnicians.get(String(t.id));
+                                const isCurrent = String(data.technician_id) === String(t.id);
+                                const unavailable = !!bookedWo && !isCurrent;
+                                return (
+                                    <option key={t.id} value={t.id} disabled={unavailable}>
+                                        {t.name}{unavailable ? ` — jam bentrok (WO ${bookedWo})` : ''}
+                                    </option>
+                                );
+                            })}
                         </select>
+                        <p className="text-xs text-gray-400 mt-1">
+                            {!data.visit_date
+                                ? 'Isi Visit Date terlebih dahulu untuk mengecek ketersediaan teknisi.'
+                                : (timeToMin(data.time_in) === null || timeToMin(data.time_out) === null)
+                                    ? 'Isi Time In & Time Out untuk mengecek bentrok jadwal. Teknisi boleh menangani beberapa WO di hari sama selama jamnya tidak beririsan.'
+                                    : 'Teknisi yang jam kerjanya beririsan dengan Work Order lain pada tanggal ini dinonaktifkan.'}
+                        </p>
                     </FormField>
 
                     <FormField label="Service Area" error={errors.service_area} required>
@@ -565,15 +688,6 @@ export default function Form({ workOrder, technicians, products, contracts, next
                             placeholder="Enter service area"
                         />
                     </FormField>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Time In (filled by technician)">
-                            <input type="time" className={inputCls} value={data.time_in} onChange={e => setData('time_in', e.target.value)} />
-                        </FormField>
-                        <FormField label="Time Out (filled by technician)">
-                            <input type="time" className={inputCls} value={data.time_out} onChange={e => setData('time_out', e.target.value)} />
-                        </FormField>
-                    </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Visit Type</label>
@@ -597,7 +711,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
                             <h3 className="font-semibold text-gray-700">Material Used</h3>
                             {selectedSoItem && (
                                 <span className="text-xs text-gray-400">
-                                    Qty sub-produk dibagi {refVisitDates.length || 1} tanggal visit (Bulan {selectedSoItem.month}, SO {linkedSO?.so_number})
+                                    Qty default sub-produk = Qty SO − pemakaian WO (Bulan {selectedSoItem.month}, SO {linkedSO?.so_number})
                                 </span>
                             )}
                         </div>
@@ -650,8 +764,6 @@ export default function Form({ workOrder, technicians, products, contracts, next
                                 );
                             })}
                         </div>
-
-                        <button type="button" onClick={addPeriod} className="mt-3 text-sm text-red-600 hover:underline">+ Tambah Periode Bulan</button>
                     </div>
 
                     <FormField label="Technician Notes">

@@ -4,9 +4,12 @@ interface Props {
     premises: any[];
     onSelect: (premise: any) => void;
     onClose: () => void;
+    // Premis yang sudah tersimpan pada Sales Order lain — tidak dapat dipilih lagi.
+    usedIds?: (string | number)[];
 }
 
-export default function PremisePickerModal({ premises, onSelect, onClose }: Props) {
+export default function PremisePickerModal({ premises, onSelect, onClose, usedIds = [] }: Props) {
+    const usedSet = useMemo(() => new Set(usedIds.map(String)), [usedIds]);
     const [search, setSearch] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
 
@@ -66,18 +69,24 @@ export default function PremisePickerModal({ premises, onSelect, onClose }: Prop
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {filtered.map((p: any) => (
-                                    <tr
-                                        key={p.id}
-                                        className="hover:bg-red-50 cursor-pointer"
-                                        onClick={() => { onSelect(p); onClose(); }}
-                                    >
-                                        <td className="px-4 py-2 font-medium text-gray-800">{p.location ?? '—'}</td>
-                                        <td className="px-3 py-2 text-gray-600 text-xs">{p.address ?? '—'}</td>
-                                        <td className="px-3 py-2 text-gray-600">{p.pic ?? '—'}</td>
-                                        <td className="px-3 py-2 text-center text-emerald-700 font-medium">{(p.visit_frequency ?? 0)}×/bln</td>
-                                    </tr>
-                                ))}
+                                {filtered.map((p: any) => {
+                                    const used = usedSet.has(String(p.id));
+                                    return (
+                                        <tr
+                                            key={p.id}
+                                            className={used ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-50 cursor-pointer'}
+                                            onClick={() => { if (used) return; onSelect(p); onClose(); }}
+                                        >
+                                            <td className="px-4 py-2 font-medium text-gray-800">
+                                                {p.location ?? '—'}
+                                                {used && <span className="ml-2 text-[10px] font-normal px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">sudah dipakai SO</span>}
+                                            </td>
+                                            <td className="px-3 py-2 text-gray-600 text-xs">{p.address ?? '—'}</td>
+                                            <td className="px-3 py-2 text-gray-600">{p.pic ?? '—'}</td>
+                                            <td className="px-3 py-2 text-center text-emerald-700 font-medium">{(p.visit_frequency ?? 0)}×/bln</td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     )}

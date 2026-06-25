@@ -12,6 +12,8 @@ interface Props {
     extraLabel?: string;
     extraKey?: string;
     extraFormat?: 'currency' | 'number' | 'text';
+    // Bila diisi, hanya produk dengan product_type tsb yang ditampilkan (mis. 'goods').
+    typeFilter?: 'goods' | 'service';
 }
 
 export default function ProductPickerModal({
@@ -21,6 +23,7 @@ export default function ProductPickerModal({
     extraLabel,
     extraKey,
     extraFormat = 'currency',
+    typeFilter,
 }: Props) {
     const [search, setSearch] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
@@ -35,13 +38,14 @@ export default function ProductPickerModal({
 
     const filtered = useMemo(() => {
         const q = search.toLowerCase().trim();
-        if (!q) return products;
-        return products.filter(p =>
+        const byType = typeFilter ? products.filter(p => p.product_type === typeFilter) : products;
+        if (!q) return byType;
+        return byType.filter(p =>
             p.name?.toLowerCase().includes(q) ||
             p.code?.toLowerCase().includes(q) ||
             p.unit?.toLowerCase().includes(q)
         );
-    }, [search, products]);
+    }, [search, products, typeFilter]);
 
     const renderExtra = (p: any) => {
         if (!extraKey) return null;

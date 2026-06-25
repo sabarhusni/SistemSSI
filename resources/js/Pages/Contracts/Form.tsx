@@ -243,6 +243,7 @@ export default function Form({ contract, customers, products, employees, taxType
                     extraLabel="Sales Price"
                     extraKey="sales_price"
                     extraFormat="currency"
+                    typeFilter={pickerTarget?.subIdx !== undefined ? 'goods' : undefined}
                 />
             )}
 

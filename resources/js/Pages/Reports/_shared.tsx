@@ -122,6 +122,7 @@ export const statusBadge = (status: string) => {
         active:     'bg-emerald-100 text-emerald-700',
         sent:       'bg-blue-100 text-blue-700',
         received:   'bg-emerald-100 text-emerald-700',
+        paid:       'bg-emerald-100 text-emerald-700',
         pending:    'bg-amber-100 text-amber-700',
         in_progress:'bg-blue-100 text-blue-700',
         low:        'bg-red-100 text-red-600',
@@ -130,7 +131,7 @@ export const statusBadge = (status: string) => {
     const labels: Record<string, string> = {
         draft: 'Draft', confirmed: 'Confirmed', completed: 'Completed',
         cancelled: 'Cancelled', active: 'Active', sent: 'Sent',
-        received: 'Received', pending: 'Pending', in_progress: 'In Progress',
+        received: 'Received', paid: 'Paid', pending: 'Pending', in_progress: 'In Progress',
         low: 'Low Stock', normal: 'Normal',
     };
     return (

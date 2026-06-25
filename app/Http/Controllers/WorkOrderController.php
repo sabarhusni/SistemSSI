@@ -6,10 +6,12 @@ use App\Models\WorkOrder;
 use App\Models\Contract;
 use App\Models\SalesOrder;
 use App\Models\Product;
+use App\Models\SalesOrderVisitPlan;
 use App\Models\Setting;
 use App\Models\Stock;
 use App\Models\StockMovement;
 use App\Models\User;
+use App\Models\WorkOrderMaterial;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -60,11 +62,18 @@ class WorkOrderController extends Controller
                 ->with([
                     'customer',
                     'salesOrders' => fn($q) => $q->where('status', 'confirmed')->orderBy('so_number')
-                        ->with(['items.product', 'visitPlans', 'premise', 'workOrders:id,sales_order_id,visit_date']),
+                        ->with(['items.product', 'visitPlans', 'premise',
+                            'workOrders' => fn($w) => $w->select('id', 'sales_order_id', 'visit_date', 'sales_order_visit_plan_id')
+                                ->with('materials:id,work_order_id,parent_product_id,product_id,month,quantity_used'),
+                        ]),
                 ])
                 ->orderBy('contract_number')
                 ->get(['id', 'contract_number', 'customer_id', 'duration_months', 'start_date', 'end_date']),
             'nextNumber'  => $this->generateNextNumber(),
+            // Penugasan teknisi yang sudah ada (untuk cek bentrok jadwal per tanggal visit).
+            'technicianBookings' => WorkOrder::whereNotNull('technician_id')
+                ->whereNotIn('status', ['cancelled'])
+                ->get(['id', 'technician_id', 'visit_date', 'wo_number', 'time_in', 'time_out']),
         ]);
     }
 
@@ -75,6 +84,7 @@ class WorkOrderController extends Controller
             'contract_id'         => 'nullable|uuid|exists:contracts,id',
             'sales_order_id'      => 'nullable|uuid|exists:sales_orders,id',
             'sales_order_item_id' => 'nullable|uuid|exists:sales_order_items,id',
+            'sales_order_visit_plan_id' => 'nullable|uuid|exists:sales_order_visit_plans,id',
             'technician_id'    => 'nullable|uuid|exists:users,id',
             'visit_date'       => 'required|date',
             'time_in'          => 'nullable|date_format:H:i,H:i:s',
@@ -107,6 +117,11 @@ class WorkOrderController extends Controller
             return back()->withErrors(['visit_date' => 'Tanggal visit ini sudah digunakan pada Work Order lain untuk SO yang sama.'])->withInput();
         }
 
+        // Teknisi boleh menangani beberapa WO di hari yang sama selama jamnya tidak bertabrakan.
+        if ($conflict = $this->technicianScheduleConflict($data)) {
+            return back()->withErrors(['technician_id' => "Jadwal teknisi bentrok dengan Work Order {$conflict} pada jam yang beririsan."])->withInput();
+        }
+
         DB::transaction(function () use ($data) {
             $wo = WorkOrder::create(collect($data)->except('materials')->toArray());
 
@@ -121,6 +136,13 @@ class WorkOrderController extends Controller
                     ]);
                 }
             }
+
+            // Req 4: produk & sub-produk baru di WO ikut menambah item Sales Order
+            // (dicocokkan per No SO, premis, dan bulan).
+            $this->syncSalesOrderItems($wo);
+
+            // Tanggal Visit yang diisi di WO menimpa tanggal Visit Plan SO (visit terpilih).
+            $this->syncVisitPlanDate($wo);
 
             // Status Completed langsung mengurangi stok sub-produk yang dipakai.
             if (($data['status'] ?? null) === 'completed') {
@@ -142,10 +164,17 @@ class WorkOrderController extends Controller
                 ->with([
                     'customer',
                     'salesOrders' => fn($q) => $q->whereIn('status', ['confirmed', 'active', 'completed'])->orderBy('so_number')
-                        ->with(['items.product', 'visitPlans', 'premise', 'workOrders:id,sales_order_id,visit_date']),
+                        ->with(['items.product', 'visitPlans', 'premise',
+                            'workOrders' => fn($w) => $w->select('id', 'sales_order_id', 'visit_date', 'sales_order_visit_plan_id')
+                                ->with('materials:id,work_order_id,parent_product_id,product_id,month,quantity_used'),
+                        ]),
                 ])
                 ->orderBy('contract_number')
                 ->get(['id', 'contract_number', 'customer_id', 'duration_months', 'start_date', 'end_date']),
+            // Penugasan teknisi yang sudah ada (untuk cek bentrok jadwal per tanggal visit).
+            'technicianBookings' => WorkOrder::whereNotNull('technician_id')
+                ->whereNotIn('status', ['cancelled'])
+                ->get(['id', 'technician_id', 'visit_date', 'wo_number', 'time_in', 'time_out']),
             // WO yang sudah Completed hanya bisa dilihat (read-only).
             'locked'      => $workOrder->status === 'completed',
         ]);
@@ -158,6 +187,7 @@ class WorkOrderController extends Controller
             'contract_id'         => 'nullable|uuid|exists:contracts,id',
             'sales_order_id'      => 'nullable|uuid|exists:sales_orders,id',
             'sales_order_item_id' => 'nullable|uuid|exists:sales_order_items,id',
+            'sales_order_visit_plan_id' => 'nullable|uuid|exists:sales_order_visit_plans,id',
             'technician_id'    => 'nullable|uuid|exists:users,id',
             'visit_date'       => 'required|date',
             'time_in'          => 'nullable|date_format:H:i,H:i:s',
@@ -191,6 +221,11 @@ class WorkOrderController extends Controller
             return back()->withErrors(['visit_date' => 'Tanggal visit ini sudah digunakan pada Work Order lain untuk SO yang sama.'])->withInput();
         }
 
+        // Teknisi boleh menangani beberapa WO di hari yang sama selama jamnya tidak bertabrakan (selain WO ini).
+        if ($conflict = $this->technicianScheduleConflict($data, $workOrder->id)) {
+            return back()->withErrors(['technician_id' => "Jadwal teknisi bentrok dengan Work Order {$conflict} pada jam yang beririsan."])->withInput();
+        }
+
         DB::transaction(function () use ($data, $workOrder) {
             $workOrder->update(collect($data)->except('materials')->toArray());
 
@@ -209,6 +244,12 @@ class WorkOrderController extends Controller
                 }
             }
 
+            // Req 4: sinkronkan produk & sub-produk baru WO ke item Sales Order.
+            $this->syncSalesOrderItems($workOrder);
+
+            // Tanggal Visit yang diubah di WO menimpa tanggal Visit Plan SO (visit terpilih).
+            $this->syncVisitPlanDate($workOrder);
+
             // Transisi ke Completed: kurangi stok sub-produk yang dipakai.
             // (WO lama dijamin belum Completed karena diblok di atas, jadi tak ada dobel potong.)
             if (($data['status'] ?? null) === 'completed') {
@@ -221,6 +262,10 @@ class WorkOrderController extends Controller
 
     public function destroy(WorkOrder $workOrder)
     {
+        if (in_array($workOrder->status, ['completed', 'cancelled'], true)) {
+            return redirect('/work-orders')->with('error', 'Work Order dengan status Completed atau Cancelled tidak bisa dihapus.');
+        }
+
         DB::transaction(function () use ($workOrder) {
             // Kembalikan stok bila WO yang dihapus sudah Completed (stok sempat dipotong).
             if ($workOrder->status === 'completed') {
@@ -230,6 +275,139 @@ class WorkOrderController extends Controller
         });
 
         return redirect('/work-orders')->with('success', 'Work Order berhasil dihapus.');
+    }
+
+    /**
+     * Cek bentrok jadwal teknisi: kembalikan nomor WO yang jamnya beririsan pada tanggal
+     * visit yang sama, atau null bila tidak ada bentrok. Teknisi boleh menangani beberapa WO
+     * di hari yang sama selama rentang time_in–time_out tidak bertabrakan. Bila salah satu WO
+     * belum mengisi jam lengkap, bentrok tidak dapat disimpulkan sehingga dianggap tidak bentrok.
+     */
+    private function technicianScheduleConflict(array $data, ?string $excludeId = null): ?string
+    {
+        if (empty($data['technician_id']) || empty($data['visit_date'])) {
+            return null;
+        }
+
+        $others = WorkOrder::where('technician_id', $data['technician_id'])
+            ->whereDate('visit_date', $data['visit_date'])
+            ->whereNotIn('status', ['cancelled'])
+            ->when($excludeId, fn($q, $id) => $q->where('id', '!=', $id))
+            ->get(['wo_number', 'time_in', 'time_out']);
+
+        foreach ($others as $other) {
+            if ($this->timesOverlap($data['time_in'] ?? null, $data['time_out'] ?? null, $other->time_in, $other->time_out)) {
+                return $other->wo_number;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Dua rentang waktu (HH:MM atau HH:MM:SS) dianggap bentrok hanya bila keduanya lengkap,
+     * valid (akhir > awal), dan saling beririsan. Batas yang bersentuhan (mis. 10:00–11:00
+     * dengan 11:00–12:00) tidak dianggap bentrok.
+     */
+    private function timesOverlap(?string $aIn, ?string $aOut, ?string $bIn, ?string $bOut): bool
+    {
+        $toMin = function (?string $t): ?int {
+            if (!$t) return null;
+            $p = explode(':', $t);
+            if (count($p) < 2) return null;
+            return (int) $p[0] * 60 + (int) $p[1];
+        };
+
+        $a1 = $toMin($aIn); $a2 = $toMin($aOut);
+        $b1 = $toMin($bIn); $b2 = $toMin($bOut);
+
+        if ($a1 === null || $a2 === null || $b1 === null || $b2 === null) return false;
+        if ($a2 <= $a1 || $b2 <= $b1) return false;
+
+        return $a1 < $b2 && $b1 < $a2;
+    }
+
+    /**
+     * Req 4: Sinkronkan produk & sub-produk baru pada Work Order ke item Sales Order.
+     * Item SO yang belum ada (dicocokkan per product_id, parent_product_id, dan bulan)
+     * ditambahkan. Premis terikat pada SO, sehingga pencocokan per-SO sudah mencakup premis.
+     * Hanya menambah item baru; item rencana SO yang sudah ada tidak diubah.
+     */
+    private function syncSalesOrderItems(WorkOrder $workOrder): void
+    {
+        if (empty($workOrder->sales_order_id)) {
+            return;
+        }
+
+        $so = SalesOrder::with('items')->find($workOrder->sales_order_id);
+        if (!$so) {
+            return;
+        }
+
+        // Agregasi seluruh pemakaian material pada SO ini per (parent, produk, bulan).
+        $groups = WorkOrderMaterial::whereHas('workOrder', fn($q) => $q->where('sales_order_id', $so->id))
+            ->get()
+            ->groupBy(fn($m) => ($m->parent_product_id ?? '') . '|' . $m->product_id . '|' . (int) ($m->month ?? 1));
+
+        foreach ($groups as $group) {
+            $mat   = $group->first();
+            $month = (int) ($mat->month ?? 1);
+
+            $exists = $so->items->first(fn($it) =>
+                (string) $it->product_id === (string) $mat->product_id
+                && (string) ($it->parent_product_id ?? '') === (string) ($mat->parent_product_id ?? '')
+                && (int) ($it->month ?? 1) === $month
+            );
+            if ($exists) {
+                continue;
+            }
+
+            $so->items()->create([
+                'product_id'        => $mat->product_id,
+                'parent_product_id' => $mat->parent_product_id,
+                'month'             => $month,
+                'quantity'          => $group->sum('quantity_used'),
+                'uom'               => $mat->uom,
+                'uom_conversion'    => 1,
+                'unit_price'        => 0,
+                'tax_rate'          => 0,
+                'tax_amount'        => 0,
+                'subtotal'          => 0,
+            ]);
+        }
+    }
+
+    /**
+     * Tanggal Visit pada Work Order menimpa tanggal Visit Plan SO untuk visit yang dipilih.
+     * Hanya berlaku bila WO menunjuk visit plan (sales_order_visit_plan_id) milik SO yang sama.
+     */
+    private function syncVisitPlanDate(WorkOrder $workOrder): void
+    {
+        if (empty($workOrder->sales_order_visit_plan_id) || empty($workOrder->visit_date)) {
+            return;
+        }
+
+        $plan = SalesOrderVisitPlan::find($workOrder->sales_order_visit_plan_id);
+        if (!$plan) {
+            return;
+        }
+
+        // Pastikan visit plan benar-benar milik SO Work Order ini.
+        if ($workOrder->sales_order_id && (string) $plan->sales_order_id !== (string) $workOrder->sales_order_id) {
+            return;
+        }
+
+        $newDate = $workOrder->visit_date instanceof \DateTimeInterface
+            ? $workOrder->visit_date->format('Y-m-d')
+            : (string) $workOrder->visit_date;
+        $oldDate = $plan->visit_date instanceof \DateTimeInterface
+            ? $plan->visit_date->format('Y-m-d')
+            : (string) $plan->visit_date;
+
+        if ($newDate !== $oldDate) {
+            $plan->visit_date = $newDate;
+            $plan->save();
+        }
     }
 
     /**

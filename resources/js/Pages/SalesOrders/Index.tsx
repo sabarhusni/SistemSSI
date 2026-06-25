@@ -59,7 +59,9 @@ export default function Index({ salesOrders, filters, contracts = [], premises =
                                 <td className="px-4 py-3"><StatusBadge status={so.status} /></td>
                                 <td className="px-4 py-3 flex gap-3">
                                     <Link href={`/sales-orders/${so.id}/edit`} className="text-blue-600 hover:underline">Edit</Link>
-                                    <ConfirmDelete href={`/sales-orders/${so.id}`} itemName={so.so_number} />
+                                    {!['completed', 'cancelled'].includes(so.status) && (
+                                        <ConfirmDelete href={`/sales-orders/${so.id}`} itemName={so.so_number} />
+                                    )}
                                 </td>
                             </tr>
                         ))}

@@ -144,7 +144,7 @@ function flattenServices(services: any[]): any[] {
     return Array.from(map.values());
 }
 
-export default function Form({ salesOrder, contracts, products, nextNumber, taxType = 'exclude', taxRateSo = 11, workOrders = [] }: any) {
+export default function Form({ salesOrder, contracts, products, nextNumber, taxType = 'exclude', taxRateSo = 11, workOrders = [], usedPremiseIds = [], woUsage = {} }: any) {
     const editing = !!salesOrder;
 
     const { data, setData, post, put, transform, processing, errors } = useForm<any>({
@@ -173,10 +173,16 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
     const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
 
     const selectedContract = contracts?.find((c: any) => String(c.id) === String(data.contract_id));
+    // Settlement Amount: total invoice kontrak terpilih yang sudah dibayar (dari backend).
+    const settlementAmount = Number(selectedContract?.settlement_amount ?? 0);
     const premiseOptions   = selectedContract?.premises ?? [];
     const selectedPremise  = premiseOptions.find((p: any) => String(p.id) === String(data.contract_premise_id));
     const getProduct       = (id: string) => products?.find((p: any) => p.id === id);
     const productUnit      = (p: any) => p?.unit ?? '';
+
+    // Qty pemakaian sub-produk pada Work Order (dikelompokkan parent-produk-bulan).
+    const subWoQty = (parentProductId: string, subProductId: string, month: any) =>
+        Number(woUsage?.[`${parentProductId}-${subProductId}-${Number(month) || 1}`] ?? 0);
 
     const setServices = (services: any[]) => setData('services', services);
     const toggleMonth = (month: number) => setCollapsed(c => ({ ...c, [month]: !c[month] }));
@@ -257,7 +263,7 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
         });
     };
 
-    const updateVisitPlan = (i: number, field: 'visit_date' | 'quantity', value: any) => {
+    const updateVisitPlan = (i: number, field: 'visit_date', value: any) => {
         const plans = [...data.visit_plans];
         plans[i] = { ...plans[i], [field]: value };
         setData('visit_plans', plans);
@@ -433,7 +439,8 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                                             <tr className="text-left text-blue-600 border-b border-blue-100">
                                                 <th className="pb-1 pr-2">Product</th>
                                                 <th className="pb-1 w-16 pr-2">Unit</th>
-                                                <th className="pb-1 w-24">Qty</th>
+                                                <th className="pb-1 w-24 pr-2">Qty</th>
+                                                <th className="pb-1 w-24">Qty WO</th>
                                                 <th className="pb-1 w-8"></th>
                                             </tr>
                                         </thead>
@@ -455,6 +462,11 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                                                         <td className="py-1 pr-2 text-gray-500">{productUnit(subProduct) || '—'}</td>
                                                         <td className="py-1 pr-2">
                                                             <input type="number" min={1} readOnly={locked} disabled={locked} className={lockedInput} value={sub.quantity} onChange={e => updateSubProduct(idx, si, 'quantity', +e.target.value)} />
+                                                        </td>
+                                                        <td className="py-1 pr-2">
+                                                            <span className="inline-block w-full px-2 py-1 rounded bg-gray-100 text-gray-700 text-center font-medium">
+                                                                {subWoQty(svc.product_id, sub.product_id, svc.month)}
+                                                            </span>
                                                         </td>
                                                         <td className="py-1">
                                                             {!locked && (
@@ -486,6 +498,7 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                     extraLabel="Sales Price"
                     extraKey="sales_price"
                     extraFormat="currency"
+                    typeFilter="goods"
                 />
             )}
 
@@ -502,6 +515,7 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                     premises={premiseOptions}
                     onSelect={handleSelectPremise}
                     onClose={() => setPremisePickerOpen(false)}
+                    usedIds={usedPremiseIds}
                 />
             )}
 
@@ -660,7 +674,7 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                                                 </table>
                                                 {!locked && (
                                                     <div className="px-4 py-2 bg-gray-50 border-t">
-                                                        <button type="button" onClick={() => addServiceToMonth(month)} className="text-xs text-red-600 hover:underline">+ Tambah Service (Bulan {month})</button>
+                                                        <button type="button" onClick={() => addServiceToMonth(month)} className="text-xs text-red-600 hover:underline">+ Add Product</button>
                                                     </div>
                                                 )}
                                             </div>
@@ -684,6 +698,14 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                             <div className="flex w-72 justify-between font-semibold text-gray-900">
                                 <span>{taxType === 'exclude' ? 'Grand Total (incl. Tax)' : 'Total'}</span>
                                 <span className="text-emerald-700">{fmt(grandTotal)}</span>
+                            </div>
+                            <div className="flex w-72 justify-between text-gray-600 border-t pt-1 mt-1">
+                                <span title="Total invoice kontrak ini yang sudah dibayar">Settlement Amount</span>
+                                <span className="text-blue-700 font-medium">{fmt(settlementAmount)}</span>
+                            </div>
+                            <div className="flex w-72 justify-between font-semibold text-gray-900">
+                                <span title="Grand Total dikurangi Settlement Amount">Sisa Nilai Pekerjaan</span>
+                                <span className="text-rose-700">{fmt(grandTotal - settlementAmount)}</span>
                             </div>
                         </div>
                     </div>
@@ -723,7 +745,6 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                                             <th className="px-3 py-2">Lokasi</th>
                                             <th className="px-3 py-2 w-40 text-center">Kunjungan Ke-</th>
                                             <th className="px-3 py-2 w-48">Tanggal Visit</th>
-                                            <th className="px-3 py-2 w-32">Qty</th>
                                             <th className="px-3 py-2 w-8"></th>
                                         </tr>
                                     </thead>
@@ -749,17 +770,6 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                                                     {dateLocked && (
                                                         <span className="text-[10px] text-emerald-600">🔒 WO Completed — tanggal terkunci</span>
                                                     )}
-                                                </td>
-                                                <td className="px-3 py-1.5">
-                                                    <input
-                                                        type="number"
-                                                        min={0}
-                                                        step="any"
-                                                        className={inputCls}
-                                                        value={row.quantity ?? ''}
-                                                        onChange={e => updateVisitPlan(i, 'quantity', e.target.value)}
-                                                        placeholder="0"
-                                                    />
                                                 </td>
                                                 <td className="px-3 py-1.5 text-center">
                                                     {!dateLocked && (

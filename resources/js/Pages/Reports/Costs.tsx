@@ -10,9 +10,9 @@ export default function Costs({ rows, byCategory, summary, filters }: any) {
     const [f, setF] = useState({ from: filters?.from ?? firstDay, to: filters?.to ?? today });
 
     const categoryColors: Record<string, string> = {
-        'Goods Purchase': 'bg-blue-100 text-blue-700',
-        'WO Material':    'bg-amber-100 text-amber-700',
-        'Operational':    'bg-gray-100 text-gray-600',
+        'Pembelian Barang': 'bg-blue-100 text-blue-700',
+        'Material WO':      'bg-amber-100 text-amber-700',
+        'Operasional':      'bg-gray-100 text-gray-600',
     };
 
     return (

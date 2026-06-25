@@ -38,14 +38,17 @@ class MenuSeeder extends Seeder
             ['group' => 'Inventory', 'group_order' => 4, 'label' => 'Purchase',         'icon' => '🛍️',  'href' => '/purchase-orders',      'permission' => 'purchase_orders.list',    'sort_order' => 5],
 
             // Reports
-            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Sales',             'icon' => '📈', 'href' => '/reports/sales',          'permission' => null, 'sort_order' => 1],
-            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Purchase',          'icon' => '📉', 'href' => '/reports/purchase',       'permission' => null, 'sort_order' => 2],
-            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Stock',             'icon' => '📦', 'href' => '/reports/stock',          'permission' => null, 'sort_order' => 3],
-            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Stock Card',        'icon' => '🗂️',  'href' => '/reports/stock-card',    'permission' => null, 'sort_order' => 4],
-            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Cash Flow',         'icon' => '💹', 'href' => '/reports/cash-flow',      'permission' => null, 'sort_order' => 5],
-            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Cash/Bank Ledger',  'icon' => '📒', 'href' => '/reports/cash-bank-ledger', 'permission' => null, 'sort_order' => 6],
-            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Costs',             'icon' => '💸', 'href' => '/reports/costs',          'permission' => null, 'sort_order' => 7],
-            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Incentive',         'icon' => '🎯', 'href' => '/reports/insentif',       'permission' => null, 'sort_order' => 8],
+            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Contract',          'icon' => '📋', 'href' => '/reports/contract',       'permission' => null, 'sort_order' => 1],
+            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Work Order',         'icon' => '🔧', 'href' => '/reports/work-order',     'permission' => null, 'sort_order' => 2],
+            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Sales',             'icon' => '📈', 'href' => '/reports/sales',          'permission' => null, 'sort_order' => 3],
+            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Purchase',          'icon' => '📉', 'href' => '/reports/purchase',       'permission' => null, 'sort_order' => 4],
+            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Stock',             'icon' => '📦', 'href' => '/reports/stock',          'permission' => null, 'sort_order' => 5],
+            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Stock Card',        'icon' => '🗂️',  'href' => '/reports/stock-card',    'permission' => null, 'sort_order' => 6],
+            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Cash Flow',         'icon' => '💹', 'href' => '/reports/cash-flow',      'permission' => null, 'sort_order' => 7],
+            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Cash/Bank Ledger',  'icon' => '📒', 'href' => '/reports/cash-bank-ledger', 'permission' => null, 'sort_order' => 8],
+            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Costs',             'icon' => '💸', 'href' => '/reports/costs',          'permission' => null, 'sort_order' => 9],
+            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Tax (Pajak)',       'icon' => '🧾', 'href' => '/reports/tax',            'permission' => null, 'sort_order' => 10],
+            ['group' => 'Reports', 'group_order' => 5, 'label' => 'Incentive',         'icon' => '🎯', 'href' => '/reports/insentif',       'permission' => null, 'sort_order' => 11],
 
             // HR
             ['group' => 'HR', 'group_order' => 6, 'label' => 'Employee',              'icon' => '🪪', 'href' => '/employees',              'permission' => null, 'sort_order' => 1],

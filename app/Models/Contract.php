@@ -23,6 +23,7 @@ class Contract extends Model
     public function services() { return $this->hasMany(ContractService::class); }
     public function salesOrders() { return $this->hasMany(SalesOrder::class); }
     public function workOrders() { return $this->hasMany(WorkOrder::class); }
+    public function invoices() { return $this->hasMany(Invoice::class); }
     public function salesEmployee() { return $this->belongsTo(\App\Models\Employee::class, 'sales_employee_id'); }
     public function leadEmployee() { return $this->belongsTo(\App\Models\Employee::class, 'lead_employee_id'); }
 

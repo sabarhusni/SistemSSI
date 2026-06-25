@@ -54,8 +54,13 @@ export default function Index({ payments, filters }: any) {
                                 <td className="px-4 py-3 text-right font-medium">{fmt(pay.amount)}</td>
                                 <td className="px-4 py-3"><StatusBadge status={pay.status} /></td>
                                 <td className="px-4 py-3 flex gap-3">
-                                    <Link href={`/payments/${pay.id}/edit`} className="text-blue-600 hover:underline">Edit</Link>
-                                    <ConfirmDelete href={`/payments/${pay.id}`} itemName={pay.payment_number} />
+                                    <Link href={`/payments/${pay.id}/edit`} className="text-blue-600 hover:underline">
+                                        {pay.status === 'verified' ? 'View' : 'Edit'}
+                                    </Link>
+                                    {/* Pembayaran yang sudah Verified tidak dapat dihapus. */}
+                                    {pay.status !== 'verified' && (
+                                        <ConfirmDelete href={`/payments/${pay.id}`} itemName={pay.payment_number} />
+                                    )}
                                 </td>
                             </tr>
                         ))}
