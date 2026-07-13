@@ -6,6 +6,7 @@ import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
 import ConfirmDelete from '@/Components/ConfirmDelete';
 import { Head, Link, usePage } from '@inertiajs/react';
+import { fmtDate } from '@/utils/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
@@ -63,9 +64,9 @@ export default function Index({ contracts, filters }: any) {
                             <tr key={c.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-mono text-xs font-medium">{c.contract_number}</td>
                                 <td className="px-4 py-3">{c.customer?.name}</td>
-                                <td className="px-4 py-3">{c.start_date}</td>
+                                <td className="px-4 py-3">{fmtDate(c.start_date)}</td>
                                 <td className="px-4 py-3 text-right">{c.duration_months ?? monthsBetween(c.start_date, c.end_date) ?? '—'}</td>
-                                <td className="px-4 py-3">{c.end_date}</td>
+                                <td className="px-4 py-3">{fmtDate(c.end_date)}</td>
                                 <td className="px-4 py-3 text-right">{fmt(c.contract_value)}</td>
                                 <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
                                 <td className="px-4 py-3 flex gap-3 items-center">

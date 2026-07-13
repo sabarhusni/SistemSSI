@@ -2,13 +2,11 @@ import AppLayout from '@/Layouts/AppLayout';
 import FormField, { inputCls } from '@/Components/FormField';
 import { Head, Link, useForm } from '@inertiajs/react';
 
-const WAREHOUSES = ['Main Warehouse', 'Jakarta Branch Warehouse', 'Surabaya Branch Warehouse', 'Field Warehouse'];
-
-export default function Form({ stockOpname, products, users, nextNumber }: any) {
+export default function Form({ stockOpname, products, employees, warehouses, nextNumber }: any) {
     const editing = !!stockOpname;
     const { data, setData, post, put, processing, errors } = useForm<any>({
         opname_number:    stockOpname?.opname_number    ?? nextNumber ?? '',
-        warehouse:        stockOpname?.warehouse        ?? '',
+        warehouse_id:     stockOpname?.warehouse_id     ?? '',
         opname_date:      stockOpname?.opname_date      ?? '',
         conducted_by_id:  stockOpname?.conducted_by_id  ?? '',
         status:           stockOpname?.status           ?? 'draft',
@@ -52,16 +50,22 @@ export default function Form({ stockOpname, products, users, nextNumber }: any) 
                         <FormField label="Opname Date" error={errors.opname_date} required>
                             <input type="date" className={inputCls} value={data.opname_date} onChange={e => setData('opname_date', e.target.value)} />
                         </FormField>
-                        <FormField label="Warehouse" error={errors.warehouse} required>
-                            <select className={inputCls} value={data.warehouse} onChange={e => setData('warehouse', e.target.value)}>
-                                <option value="">— Select Warehouse —</option>
-                                {WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
+                        <FormField label="Gudang" error={errors.warehouse_id} required>
+                            <select className={inputCls} value={data.warehouse_id} onChange={e => setData('warehouse_id', e.target.value)}>
+                                <option value="">— Pilih Gudang —</option>
+                                {warehouses?.map((w: any) => (
+                                    <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
+                                ))}
                             </select>
                         </FormField>
                         <FormField label="Conducted By">
                             <select className={inputCls} value={data.conducted_by_id} onChange={e => setData('conducted_by_id', e.target.value)}>
-                                <option value="">— Select Staff —</option>
-                                {users?.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                                <option value="">— Pilih Karyawan —</option>
+                                {employees?.map((e: any) => (
+                                    <option key={e.id} value={e.id}>
+                                        {e.employee_number} — {e.name}{e.position ? ` (${e.position})` : ''}
+                                    </option>
+                                ))}
                             </select>
                         </FormField>
                         <FormField label="Status">

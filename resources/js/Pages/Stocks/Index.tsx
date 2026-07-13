@@ -4,7 +4,7 @@ import SortableColumn from '@/Components/SortableColumn';
 import Pagination from '@/Components/Pagination';
 import { Head } from '@inertiajs/react';
 
-export default function Index({ stocks, filters }: any) {
+export default function Index({ stocks, filters, warehouses }: any) {
     const sortProps = {
         currentSort: filters.sort_by ?? 'created_at',
         currentDir: filters.sort_dir ?? 'desc',
@@ -16,9 +16,17 @@ export default function Index({ stocks, filters }: any) {
         <AppLayout header="Stock">
             <Head title="Stock" />
             <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-800">Stock Card</h2>
+                <h2 className="text-lg font-semibold text-gray-800">Stock</h2>
             </div>
-            <SearchFilter routeName="stocks.index" filters={filters} filterOptions={[]} />
+            <SearchFilter
+                routeName="stocks.index"
+                filters={filters}
+                filterOptions={[{
+                    key: 'warehouse_id',
+                    label: 'Semua Gudang',
+                    options: warehouses?.map((w: any) => ({ label: `${w.code} — ${w.name}`, value: w.id })) ?? [],
+                }]}
+            />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 border-b">
@@ -27,6 +35,7 @@ export default function Index({ stocks, filters }: any) {
                             <th className="px-4 py-3">Product</th>
                             <th className="px-4 py-3">Category</th>
                             <th className="px-4 py-3">Unit</th>
+                            <th className="px-4 py-3">Gudang</th>
                             <SortableColumn sortKey="quantity" label="Stock" className="text-right" {...sortProps} />
                             <SortableColumn sortKey="minimum_stock" label="Minimum" className="text-right" {...sortProps} />
                             <th className="px-4 py-3">Status</th>
@@ -41,6 +50,7 @@ export default function Index({ stocks, filters }: any) {
                                     <td className="px-4 py-3 font-medium">{stock.product?.name}</td>
                                     <td className="px-4 py-3 text-gray-500">{stock.product?.category?.name}</td>
                                     <td className="px-4 py-3">{stock.product?.unit}</td>
+                                    <td className="px-4 py-3 text-gray-500 text-xs">{stock.warehouse?.name ?? '—'}</td>
                                     <td className={`px-4 py-3 text-right font-bold ${isLow ? 'text-red-600' : 'text-gray-800'}`}>
                                         {stock.quantity}
                                     </td>

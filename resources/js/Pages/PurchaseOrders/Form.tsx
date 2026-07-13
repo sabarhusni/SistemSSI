@@ -9,18 +9,20 @@ const fmt = (n: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
 const normalizeItem = (it: any) => ({
+    id:         it.id ?? null,
     product_id: it.product_id ?? '',
     quantity:   it.quantity   ?? 1,
-    unit:       it.unit       ?? '',
-    pph:        it.pph        !== null && it.pph !== undefined ? Number(it.pph) : 0,
+    uom_id:     it.uom_id     ?? '',
+    tax:        it.tax        !== null && it.tax !== undefined ? Number(it.tax) : 0,
     unit_price: it.unit_price !== null && it.unit_price !== undefined ? Number(it.unit_price) : 0,
-    subtotal:   it.subtotal   ?? 0,
+    subtotal:   it.subtotal   !== null && it.subtotal !== undefined ? Number(it.subtotal) : 0,
 });
 
 const emptyItem = () => normalizeItem({});
 
 export default function Form({ purchaseOrder, suppliers, products, uoms = [], nextNumber, taxType = 'exclude', taxRatePo = 11 }: any) {
-    const editing = !!purchaseOrder;
+    const editing  = !!purchaseOrder;
+    const readOnly = editing && ['sent', 'received'].includes(purchaseOrder.status);
 
     const { data, setData, post, put, processing, errors } = useForm<any>({
         supplier_id:            purchaseOrder?.supplier_id            ?? '',
@@ -48,7 +50,7 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
     }, [data.items]);
 
     const updateItem = (i: number, field: string, rawValue: any) => {
-        const value = ['quantity', 'unit_price', 'pph'].includes(field) ? Number(rawValue) || 0 : rawValue;
+        const value = ['quantity', 'unit_price', 'tax'].includes(field) ? Number(rawValue) || 0 : rawValue;
         const items = [...data.items];
         items[i] = { ...items[i], [field]: value };
         const sub = (items[i].quantity || 0) * (items[i].unit_price || 0);
@@ -64,8 +66,8 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
         items[pickerIdx] = {
             ...cur,
             product_id: product.id,
-            unit:       cur.unit || product.unit_of_measure?.symbol || '',
-            pph:        cur.pph > 0 ? cur.pph : taxRatePo,
+            uom_id:     cur.uom_id || product.unit_of_measure_id || '',
+            tax:        cur.tax > 0 ? cur.tax : taxRatePo,
             unit_price: price,
             subtotal:   (cur.quantity || 1) * price,
         };
@@ -73,10 +75,10 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
         setPickerIdx(null);
     };
 
-    // PPH per item: exclude = subtotal × rate/100, include = subtotal × rate/(100+rate)
-    const pphOf = (item: any) => {
+    // Tax per item: exclude = subtotal × rate/100, include = subtotal × rate/(100+rate)
+    const taxOf = (item: any) => {
         const sub  = item.subtotal || 0;
-        const rate = item.pph || 0;
+        const rate = item.tax || 0;
         if (rate <= 0) return 0;
         return taxType === 'exclude'
             ? sub * rate / 100
@@ -84,18 +86,18 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
     };
 
     const subtotalAll = data.items.reduce((s: number, it: any) => s + (it.subtotal || 0), 0);
-    const pphAll      = data.items.reduce((s: number, it: any) => s + pphOf(it), 0);
+    const taxAll      = data.items.reduce((s: number, it: any) => s + taxOf(it), 0);
 
     // exclude: grand = subtotal + tax | include: grand = subtotal (tax embedded)
-    const grandTotal  = taxType === 'exclude' ? subtotalAll + pphAll : subtotalAll;
+    const grandTotal  = taxType === 'exclude' ? subtotalAll + taxAll : subtotalAll;
     // include: base before tax = subtotal - extracted tax
-    const baseAmount  = taxType === 'include'  ? subtotalAll - pphAll : subtotalAll;
+    const baseAmount  = taxType === 'include'  ? subtotalAll - taxAll : subtotalAll;
 
     const hasDuplicates = duplicateIds.size > 0;
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (hasDuplicates) return;
+        if (hasDuplicates || readOnly) return;
         editing ? put(`/purchase-orders/${purchaseOrder.id}`) : post('/purchase-orders');
     };
 
@@ -123,24 +125,30 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
             )}
 
             <div className="max-w-5xl bg-white rounded-xl shadow p-6 space-y-4">
+                {readOnly && (
+                    <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-2 text-sm text-amber-700">
+                        Purchase Order berstatus <strong className="capitalize">{purchaseOrder.status}</strong> — hanya bisa dilihat, tidak bisa diubah.
+                    </div>
+                )}
                 <form onSubmit={submit}>
                     <div className="grid grid-cols-3 gap-4 mb-4">
                         <FormField label="PO No." error={errors.po_number} required>
                             <input className={inputCls + ' bg-gray-50'} value={data.po_number} readOnly tabIndex={-1} />
                         </FormField>
                         <FormField label="PO Date" error={errors.po_date} required>
-                            <input type="date" className={inputCls} value={data.po_date} onChange={e => setData('po_date', e.target.value)} />
+                            <input type="date" className={inputCls} value={data.po_date} onChange={e => setData('po_date', e.target.value)} disabled={readOnly} />
                         </FormField>
                         <FormField label="Exp. Delivery Date">
-                            <input type="date" className={inputCls} value={data.expected_delivery_date} onChange={e => setData('expected_delivery_date', e.target.value)} />
+                            <input type="date" className={inputCls} value={data.expected_delivery_date} onChange={e => setData('expected_delivery_date', e.target.value)} disabled={readOnly} />
                         </FormField>
                     </div>
                     <div className="grid grid-cols-3 gap-4 mb-4">
                         <FormField label="Supplier" error={errors.supplier_id} required>
                             <button
                                 type="button"
-                                onClick={() => setSupplierPickerOpen(true)}
-                                className={`w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition ${errors.supplier_id ? 'border-red-400' : ''}`}
+                                onClick={() => !readOnly && setSupplierPickerOpen(true)}
+                                disabled={readOnly}
+                                className={`w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition disabled:bg-gray-50 disabled:hover:border-gray-300 disabled:cursor-not-allowed ${errors.supplier_id ? 'border-red-400' : ''}`}
                             >
                                 {selectedSupplier
                                     ? <span className="text-gray-800 font-medium">{selectedSupplier.name}</span>
@@ -152,7 +160,7 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                             )}
                         </FormField>
                         <FormField label="Payment Terms">
-                            <select className={inputCls} value={data.payment_terms} onChange={e => setData('payment_terms', e.target.value)}>
+                            <select className={inputCls} value={data.payment_terms} onChange={e => setData('payment_terms', e.target.value)} disabled={readOnly}>
                                 <option value="">— Select —</option>
                                 <option value="COD">COD</option>
                                 <option value="NET7">NET 7</option>
@@ -163,7 +171,7 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                             </select>
                         </FormField>
                         <FormField label="Status">
-                            <select className={inputCls} value={data.status} onChange={e => setData('status', e.target.value)}>
+                            <select className={inputCls} value={data.status} onChange={e => setData('status', e.target.value)} disabled={readOnly}>
                                 <option value="draft">Draft</option>
                                 <option value="sent">Sent</option>
                                 <option value="received">Received</option>
@@ -203,13 +211,15 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                                 {data.items.map((item: any, i: number) => {
                                     const selected    = getProduct(item.product_id);
                                     const isDuplicate = item.product_id && duplicateIds.has(item.product_id);
+                                    const selectedUom = uoms.find((u: any) => u.id === item.uom_id);
                                     return (
                                         <tr key={i} className={isDuplicate ? 'bg-red-50' : ''}>
                                             <td className="px-3 py-2">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setPickerIdx(i)}
-                                                    className={`w-full text-left px-3 py-1.5 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition ${isDuplicate ? 'border-red-400' : ''}`}
+                                                    onClick={() => !readOnly && setPickerIdx(i)}
+                                                    disabled={readOnly}
+                                                    className={`w-full text-left px-3 py-1.5 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition disabled:bg-gray-50 disabled:hover:border-gray-300 disabled:cursor-not-allowed ${isDuplicate ? 'border-red-400' : ''}`}
                                                 >
                                                     {selected
                                                         ? <span className="text-gray-800">{selected.name}</span>
@@ -219,37 +229,44 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                                                 {isDuplicate && <p className="text-xs text-red-500 mt-1">Product already exists on another row</p>}
                                             </td>
                                             <td className="px-3 py-2">
-                                                <input type="number" min={1} className={inputCls} value={item.quantity} onChange={e => updateItem(i, 'quantity', e.target.value)} />
+                                                <input type="number" min={1} className={inputCls} value={item.quantity} onChange={e => updateItem(i, 'quantity', e.target.value)} disabled={readOnly} />
                                             </td>
                                             <td className="px-3 py-2">
-                                                <select className={inputCls} value={item.unit} onChange={e => updateItem(i, 'unit', e.target.value)}>
+                                                <select className={inputCls} value={item.uom_id} onChange={e => updateItem(i, 'uom_id', e.target.value)} disabled={readOnly}>
                                                     <option value="">— Select —</option>
                                                     {uoms.map((u: any) => (
-                                                        <option key={u.id} value={u.symbol}>{u.symbol} — {u.name}</option>
+                                                        <option key={u.id} value={u.id}>{u.symbol} — {u.name}</option>
                                                     ))}
                                                 </select>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <input type="number" min={0} className={inputCls} value={item.unit_price} onChange={e => updateItem(i, 'unit_price', e.target.value)} />
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <input type="number" step="0.01" min={0} max={100} className={inputCls} value={item.pph} onChange={e => updateItem(i, 'pph', e.target.value)} />
-                                            </td>
-                                            {taxType === 'exclude' && (
-                                                <td className="px-3 py-2 text-right text-amber-600 text-xs">{fmt(pphOf(item))}</td>
-                                            )}
-                                            <td className="px-3 py-2 text-right font-medium">
-                                                {fmt(item.subtotal)}
-                                                {taxType === 'include' && item.pph > 0 && (
-                                                    <div className="text-xs text-gray-400 italic">Tax: {fmt(pphOf(item))}</div>
+                                                {selectedUom?.base_uom_id && (
+                                                    <p className="text-xs text-gray-400 mt-1">
+                                                        1 {selectedUom.symbol} = {Number(selectedUom.conversion_factor).toLocaleString('en-US')} {selectedUom.base_unit?.symbol}
+                                                    </p>
                                                 )}
                                             </td>
                                             <td className="px-3 py-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setData('items', data.items.filter((_: any, idx: number) => idx !== i))}
-                                                    className="text-red-500 text-lg"
-                                                >×</button>
+                                                <input type="number" min={0} className={inputCls} value={item.unit_price} onChange={e => updateItem(i, 'unit_price', e.target.value)} disabled={readOnly} />
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <input type="number" step="0.01" min={0} max={100} className={inputCls} value={item.tax} onChange={e => updateItem(i, 'tax', e.target.value)} disabled={readOnly} />
+                                            </td>
+                                            {taxType === 'exclude' && (
+                                                <td className="px-3 py-2 text-right text-amber-600 text-xs">{fmt(taxOf(item))}</td>
+                                            )}
+                                            <td className="px-3 py-2 text-right font-medium">
+                                                {fmt(item.subtotal)}
+                                                {taxType === 'include' && item.tax > 0 && (
+                                                    <div className="text-xs text-gray-400 italic">Tax: {fmt(taxOf(item))}</div>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                {!readOnly && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setData('items', data.items.filter((_: any, idx: number) => idx !== i))}
+                                                        className="text-red-500 text-lg"
+                                                    >×</button>
+                                                )}
                                             </td>
                                         </tr>
                                     );
@@ -267,7 +284,7 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                                     <td colSpan={taxType === 'exclude' ? 6 : 5} className="px-3 py-1 text-right">
                                         {taxType === 'include' ? 'Tax Amount (included)' : 'Tax Amount'}
                                     </td>
-                                    <td className="px-3 py-1 text-right text-amber-600">{fmt(pphAll)}</td>
+                                    <td className="px-3 py-1 text-right text-amber-600">{fmt(taxAll)}</td>
                                     <td></td>
                                 </tr>
                                 <tr>
@@ -281,27 +298,33 @@ export default function Form({ purchaseOrder, suppliers, products, uoms = [], ne
                         </table>
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={() => setData('items', [...data.items, emptyItem()])}
-                        className="text-sm text-red-600 hover:underline mb-4"
-                    >
-                        + Add Item
-                    </button>
+                    {!readOnly && (
+                        <button
+                            type="button"
+                            onClick={() => setData('items', [...data.items, emptyItem()])}
+                            className="text-sm text-red-600 hover:underline mb-4"
+                        >
+                            + Add Item
+                        </button>
+                    )}
 
                     <FormField label="Notes">
-                        <textarea rows={2} className={inputCls} value={data.notes} onChange={e => setData('notes', e.target.value)} />
+                        <textarea rows={2} className={inputCls} value={data.notes} onChange={e => setData('notes', e.target.value)} disabled={readOnly} />
                     </FormField>
 
                     <div className="flex gap-3 pt-2">
-                        <button
-                            type="submit"
-                            disabled={processing || hasDuplicates}
-                            className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60"
-                        >
-                            {processing ? 'Saving...' : 'Save'}
-                        </button>
-                        <Link href="/purchase-orders" className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancel</Link>
+                        {!readOnly && (
+                            <button
+                                type="submit"
+                                disabled={processing || hasDuplicates}
+                                className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60"
+                            >
+                                {processing ? 'Saving...' : 'Save'}
+                            </button>
+                        )}
+                        <Link href="/purchase-orders" className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">
+                            {readOnly ? 'Kembali' : 'Cancel'}
+                        </Link>
                     </div>
                 </form>
             </div>

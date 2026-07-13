@@ -13,11 +13,14 @@ class StockTransfer extends Model
 
     protected $fillable = [
         'transfer_number', 'from_warehouse', 'to_warehouse',
+        'from_warehouse_id', 'to_warehouse_id',
         'transfer_date', 'processed_by_id',
         'from_location', 'to_location', 'product_id', 'quantity',
         'status', 'notes', 'created_by',
     ];
 
-    public function processedBy() { return $this->belongsTo(User::class, 'processed_by_id'); }
-    public function product() { return $this->belongsTo(Product::class); }
+    public function processedBy()      { return $this->belongsTo(Employee::class, 'processed_by_id'); }
+    public function product()           { return $this->belongsTo(Product::class); }
+    public function sourceWarehouse()   { return $this->belongsTo(Warehouse::class, 'from_warehouse_id'); }
+    public function destinationWarehouse() { return $this->belongsTo(Warehouse::class, 'to_warehouse_id'); }
 }

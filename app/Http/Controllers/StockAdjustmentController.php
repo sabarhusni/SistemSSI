@@ -6,6 +6,7 @@ use App\Models\StockAdjustment;
 use App\Models\Product;
 use App\Models\Stock;
 use App\Models\StockMovement;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,7 @@ class StockAdjustmentController extends Controller
     {
         return Inertia::render('StockAdjustments/Form', [
             'products'   => Product::where('status', 'active')->where('product_type', 'goods')->orderBy('name')->get(['id', 'name', 'stock', 'cost', 'average_cost']),
+            'warehouses' => Warehouse::where('status', 'active')->orderBy('name')->get(['id', 'name', 'code']),
             'nextNumber' => $this->generateNextNumber(),
         ]);
     }
@@ -53,6 +55,7 @@ class StockAdjustmentController extends Controller
     {
         $data = $request->validate([
             'product_id'        => 'required|uuid|exists:products,id',
+            'warehouse_id'      => 'nullable|uuid|exists:warehouses,id',
             'adjustment_number' => 'required|string|max:50|unique:stock_adjustments,adjustment_number',
             'adjustment_date'   => 'required|date',
             'type'              => 'required|in:addition,subtraction',
@@ -118,6 +121,7 @@ class StockAdjustmentController extends Controller
         return Inertia::render('StockAdjustments/Form', [
             'stockAdjustment' => $stockAdjustment,
             'products'        => Product::where('status', 'active')->where('product_type', 'goods')->orderBy('name')->get(['id', 'name', 'stock', 'cost', 'average_cost']),
+            'warehouses'      => Warehouse::where('status', 'active')->orderBy('name')->get(['id', 'name', 'code']),
         ]);
     }
 
@@ -125,6 +129,7 @@ class StockAdjustmentController extends Controller
     {
         $data = $request->validate([
             'product_id'        => 'required|uuid|exists:products,id',
+            'warehouse_id'      => 'nullable|uuid|exists:warehouses,id',
             'adjustment_number' => 'required|string|max:50|unique:stock_adjustments,adjustment_number,' . $stockAdjustment->id,
             'adjustment_date'   => 'required|date',
             'type'              => 'required|in:addition,subtraction',

@@ -88,8 +88,8 @@ export default function Print({ workOrder, companyName }: any) {
                     <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-400 mb-2">References</h3>
                         <Row label="Contract No." value={workOrder.contract?.contract_number} />
-                        {workOrder.sales_order_item && (
-                            <Row label="SO Item Ref." value={`Bulan ${workOrder.sales_order_item.month} — ${workOrder.sales_order_item.product?.name ?? ''}`} />
+                        {(workOrder.month ?? workOrder.sales_order_item?.month) && (
+                            <Row label="Referensi Bulan" value={`Bulan ${workOrder.month ?? workOrder.sales_order_item?.month}`} />
                         )}
                         {premise && (
                             <>

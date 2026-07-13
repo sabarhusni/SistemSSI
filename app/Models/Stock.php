@@ -11,7 +11,8 @@ class Stock extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
 
-    protected $fillable = ['product_id', 'quantity', 'minimum_stock', 'warehouse'];
+    protected $fillable = ['product_id', 'warehouse_id', 'quantity', 'minimum_stock', 'warehouse'];
 
-    public function product() { return $this->belongsTo(Product::class); }
+    public function product()   { return $this->belongsTo(Product::class); }
+    public function warehouse() { return $this->belongsTo(Warehouse::class); }
 }

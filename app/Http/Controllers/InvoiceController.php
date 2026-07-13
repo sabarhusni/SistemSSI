@@ -128,6 +128,7 @@ class InvoiceController extends Controller
                 ->get(['id', 'code', 'name', 'unit', 'sales_price']),
             'nextNumber'    => $this->generateNextNumber(),
             'invoicedKeys'  => $this->invoicedKeysBySo(),
+            'taxType'       => Setting::get('tax_type', 'exclude'),
         ]);
     }
 
@@ -189,11 +190,10 @@ class InvoiceController extends Controller
             $data['customer_id'] = Contract::find($data['contract_id'])?->customer_id;
         }
 
-        DB::transaction(function () use ($data) {
-            $items      = collect($data['items']);
-            $subtotal   = $items->sum(fn($it) => $it['quantity'] * $it['unit_price']);
-            $tax        = $items->sum(fn($it) => $it['quantity'] * $it['unit_price'] * (($it['tax_rate'] ?? 0) / 100));
-            $total      = $subtotal + $tax;
+        $taxType = Setting::get('tax_type', 'exclude');
+
+        DB::transaction(function () use ($data, $taxType) {
+            [$subtotal, $tax, $total, $itemTax] = $this->computeTotals($data['items'], $taxType);
 
             $invoice = Invoice::create(array_merge(
                 collect($data)->except('items')->toArray(),
@@ -202,7 +202,7 @@ class InvoiceController extends Controller
 
             foreach ($data['items'] as $item) {
                 $sub = $item['quantity'] * $item['unit_price'];
-                $taxAmt = $sub * (($item['tax_rate'] ?? 0) / 100);
+                $taxAmt = $itemTax($sub, (float) ($item['tax_rate'] ?? 0));
                 $invoice->items()->create([
                     'product_id'     => $item['product_id']     ?? null,
                     'description'    => $item['description']    ?? null,
@@ -242,6 +242,7 @@ class InvoiceController extends Controller
             'products'  => Product::where('status', 'active')->orderBy('name')
                 ->get(['id', 'code', 'name', 'unit', 'sales_price']),
             'invoicedKeys' => $this->invoicedKeysBySo($invoice->id),
+            'taxType'      => Setting::get('tax_type', 'exclude'),
         ]);
     }
 
@@ -284,11 +285,10 @@ class InvoiceController extends Controller
             $data['customer_id'] = Contract::find($data['contract_id'])?->customer_id;
         }
 
-        DB::transaction(function () use ($data, $invoice) {
-            $items    = collect($data['items']);
-            $subtotal = $items->sum(fn($it) => $it['quantity'] * $it['unit_price']);
-            $tax      = $items->sum(fn($it) => $it['quantity'] * $it['unit_price'] * (($it['tax_rate'] ?? 0) / 100));
-            $total    = $subtotal + $tax;
+        $taxType = Setting::get('tax_type', 'exclude');
+
+        DB::transaction(function () use ($data, $invoice, $taxType) {
+            [$subtotal, $tax, $total, $itemTax] = $this->computeTotals($data['items'], $taxType);
 
             $invoice->update(array_merge(
                 collect($data)->except('items')->toArray(),
@@ -298,7 +298,7 @@ class InvoiceController extends Controller
             $invoice->items()->forceDelete();
             foreach ($data['items'] as $item) {
                 $sub = $item['quantity'] * $item['unit_price'];
-                $taxAmt = $sub * (($item['tax_rate'] ?? 0) / 100);
+                $taxAmt = $itemTax($sub, (float) ($item['tax_rate'] ?? 0));
                 $invoice->items()->create([
                     'product_id'     => $item['product_id']     ?? null,
                     'description'    => $item['description']    ?? null,
@@ -326,6 +326,32 @@ class InvoiceController extends Controller
 
         $invoice->delete();
         return redirect('/invoices')->with('success', 'Invoice berhasil dihapus.');
+    }
+
+    /**
+     * Hitung subtotal, tax, dan total invoice sesuai setting tax_type (exclude/include),
+     * sejalan dengan pola computeTotals() pada SalesOrderController & PurchaseOrderController.
+     * @return array{0: float, 1: float, 2: float, 3: \Closure}
+     */
+    private function computeTotals(array $items, string $taxType): array
+    {
+        $itemTax = function (float $sub, float $rate) use ($taxType): float {
+            if ($rate <= 0) return 0.0;
+            return $taxType === 'exclude'
+                ? $sub * $rate / 100
+                : $sub * $rate / (100 + $rate);
+        };
+
+        $collection = collect($items);
+        $subtotal   = $collection->sum(fn($it) => $it['quantity'] * $it['unit_price']);
+        $taxAmount  = $collection->sum(fn($it) => $itemTax(
+            $it['quantity'] * $it['unit_price'],
+            (float) ($it['tax_rate'] ?? 0)
+        ));
+        // exclude: total = subtotal + tax | include: total = subtotal (tax embedded)
+        $totalAmount = $taxType === 'exclude' ? $subtotal + $taxAmount : $subtotal;
+
+        return [$subtotal, $taxAmount, $totalAmount, $itemTax];
     }
 
     public function print(Invoice $invoice)

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\SalesOrder;
 use App\Models\Contract;
 use App\Models\ContractPremise;
+use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\Setting;
 use App\Models\UnitOfMeasure;
@@ -59,10 +60,10 @@ class SalesOrderController extends Controller
             'contracts'  => Contract::with([
                     'customer',
                     'premises.services.product',
+                    'premises.services.uom',
                     'premises.services.subProducts.product',
+                    'premises.services.subProducts.uom',
                 ])
-                // Settlement Amount: akumulasi nilai invoice kontrak yang sudah dibayar.
-                ->withSum('invoices as settlement_amount', 'paid_amount')
                 ->where('status', 'active')
                 ->orderBy('contract_number')
                 ->get(),
@@ -73,6 +74,8 @@ class SalesOrderController extends Controller
             'taxRateSo'  => (float) Setting::get('tax_rate_so', 11),
             // Premis yang sudah tersimpan di Sales Order lain tidak boleh dipilih lagi.
             'usedPremiseIds' => SalesOrder::whereNotNull('contract_premise_id')->distinct()->pluck('contract_premise_id'),
+            // SO baru belum punya invoice sendiri, sehingga belum ada Settlement Amount.
+            'settlementAmount' => 0,
         ]);
     }
 
@@ -122,6 +125,7 @@ class SalesOrderController extends Controller
         $workOrders = $salesOrder->workOrders->map(fn($wo) => [
             'id'         => $wo->id,
             'status'     => $wo->status,
+            'month'      => $wo->month,
             'visit_date' => optional($wo->visit_date)->format('Y-m-d'),
         ])->values();
 
@@ -144,10 +148,10 @@ class SalesOrderController extends Controller
             'contracts'  => Contract::with([
                     'customer',
                     'premises.services.product',
+                    'premises.services.uom',
                     'premises.services.subProducts.product',
+                    'premises.services.subProducts.uom',
                 ])
-                // Settlement Amount: akumulasi nilai invoice kontrak yang sudah dibayar.
-                ->withSum('invoices as settlement_amount', 'paid_amount')
                 // Sertakan kontrak SO ini walau tidak lagi aktif, agar data periode/premis tetap termuat.
                 ->where(fn($q) => $q->where('status', 'active')->orWhere('id', $salesOrder->contract_id))
                 ->orderBy('contract_number')
@@ -156,6 +160,11 @@ class SalesOrderController extends Controller
             'uoms'       => UnitOfMeasure::where('status', 'active')->orderBy('name')->get(['id', 'name', 'symbol']),
             'taxType'    => Setting::get('tax_type', 'exclude'),
             'taxRateSo'  => (float) Setting::get('tax_rate_so', 11),
+            // Settlement Amount: total paid_amount invoice (sudah dibayar via payment Verified)
+            // yang cocok dengan kontrak DAN No SO ini — bukan akumulasi seluruh SO pada kontrak.
+            'settlementAmount' => (float) Invoice::where('contract_id', $salesOrder->contract_id)
+                ->where('sales_order_id', $salesOrder->id)
+                ->sum('paid_amount'),
         ]);
     }
 
@@ -264,6 +273,7 @@ class SalesOrderController extends Controller
             'items.*.month'             => 'nullable|integer|min:1',
             'items.*.quantity'         => 'required|numeric|min:0',
             'items.*.uom'              => 'nullable|string|max:50',
+            'items.*.uom_id'           => 'nullable|uuid|exists:unit_of_measures,id',
             'items.*.uom_conversion'   => 'nullable|numeric|min:0',
             'items.*.unit_price'       => 'required|numeric|min:0',
             'items.*.tax_rate'         => 'nullable|numeric|min:0|max:100',
@@ -308,6 +318,7 @@ class SalesOrderController extends Controller
                 'month'             => $item['month']          ?? 1,
                 'quantity'       => $item['quantity'],
                 'uom'            => $item['uom']            ?? null,
+                'uom_id'         => $item['uom_id']          ?? null,
                 'uom_conversion' => $item['uom_conversion'] ?? 1,
                 'unit_price'     => $item['unit_price'],
                 'tax_rate'       => $item['tax_rate']       ?? 0,

@@ -21,12 +21,17 @@ const emptyItem = (month = 1) => ({
     subtotal:       0,
 });
 
-const recalcItem = (item: any) => {
-    const sub = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
-    return { ...item, subtotal: sub, tax_amount: sub * ((Number(item.tax_rate) || 0) / 100) };
+// Tax per item mengikuti setting tax_type: exclude → ditambahkan di atas subtotal,
+// include → sudah tertanam dalam harga (diekstrak dari subtotal). Sejalan dengan
+// pola lineTax() pada SalesOrders/Form.tsx & PurchaseOrders/Form.tsx.
+const recalcItem = (item: any, taxType: string) => {
+    const sub  = (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
+    const rate = Number(item.tax_rate) || 0;
+    const tax  = rate <= 0 ? 0 : (taxType === 'exclude' ? sub * rate / 100 : sub * rate / (100 + rate));
+    return { ...item, subtotal: sub, tax_amount: tax };
 };
 
-const itemFromSO = (it: any) => recalcItem({
+const itemFromSO = (it: any, taxType: string) => recalcItem({
     product_id:     it.product_id     ?? '',
     description:    it.product?.name  ?? it.description ?? '',
     month:          Number(it.month) || 1,
@@ -35,12 +40,12 @@ const itemFromSO = (it: any) => recalcItem({
     uom_conversion: it.uom_conversion ?? 1,
     unit_price:     Number(it.unit_price ?? 0),
     tax_rate:       Number(it.tax_rate ?? 0),
-});
+}, taxType);
 
 // Bangun item invoice dari item INDUK (jasa) SO untuk tiap bulan yang sudah
 // memiliki Work Order berstatus Completed. Qty mengikuti SO (tidak dijumlah antar-visit).
 // Produk SO-bulan yang sudah pernah ditagih (invoicedKeys) tidak ditampilkan lagi.
-function itemsFromCompletedWOs(so: any, invoicedKeys: string[] = []): any[] {
+function itemsFromCompletedWOs(so: any, invoicedKeys: string[] = [], taxType: string = 'exclude'): any[] {
     const wos = (so.work_orders ?? []).filter((w: any) => w.status === 'completed');
 
     // Bulan yang sudah punya WO Completed (diambil dari material WO tsb).
@@ -55,13 +60,13 @@ function itemsFromCompletedWOs(so: any, invoicedKeys: string[] = []): any[] {
     const rows = (so.items ?? [])
         .filter((it: any) => !it.parent_product_id && completedMonths.has(Number(it.month) || 1))
         .filter((it: any) => !invoiced.has(`${it.product_id}|${Number(it.month) || 1}`))
-        .map(itemFromSO)
+        .map((it: any) => itemFromSO(it, taxType))
         .sort((a: any, b: any) => a.month - b.month);
 
     return rows;
 }
 
-export default function Form({ invoice, contracts, products, nextNumber, invoicedKeys = {} }: any) {
+export default function Form({ invoice, contracts, products, nextNumber, invoicedKeys = {}, taxType = 'exclude' }: any) {
     const editing = !!invoice;
     // Invoice yang sudah lunas (paid) hanya bisa dilihat, tidak dapat diubah.
     const locked = editing && invoice?.status === 'paid';
@@ -76,7 +81,7 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
         due_date:       invoice?.due_date        ?? '',
         status:         invoice?.status          ?? 'draft',
         notes:          invoice?.notes           ?? '',
-        items: invoice?.items?.map(itemFromSO) ?? [emptyItem()],
+        items: invoice?.items?.map((it: any) => itemFromSO(it, taxType)) ?? [emptyItem()],
     });
 
     const [contractPickerOpen, setContractPickerOpen] = useState(false);
@@ -105,14 +110,16 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
         setData({
             ...data,
             sales_order_id: so.id,
-            items:          itemsFromCompletedWOs(so, invoicedKeys?.[so.id] ?? []),
+            items:          itemsFromCompletedWOs(so, invoicedKeys?.[so.id] ?? [], taxType),
         });
         setSoPickerOpen(false);
     };
 
     const subtotalAll = data.items.reduce((s: number, it: any) => s + (it.subtotal   || 0), 0);
     const taxAll      = data.items.reduce((s: number, it: any) => s + (it.tax_amount || 0), 0);
-    const grandTotal  = subtotalAll + taxAll;
+    // exclude: total = subtotal + tax | include: total = subtotal (tax sudah tertanam)
+    const grandTotal  = taxType === 'exclude' ? subtotalAll + taxAll : subtotalAll;
+    const baseAmount  = taxType === 'include' ? subtotalAll - taxAll : subtotalAll;
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -305,15 +312,15 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
                                 </tbody>
                                 <tfoot className="bg-gray-50 border-t text-sm">
                                     <tr>
-                                        <td colSpan={6} className="px-3 py-2 text-right text-gray-600">Pre-Tax Amount</td>
-                                        <td className="px-3 py-2 text-right text-gray-700 whitespace-nowrap">{fmt(subtotalAll)}</td>
+                                        <td colSpan={6} className="px-3 py-2 text-right text-gray-600">{taxType === 'include' ? 'Pre-Tax Amount' : 'Subtotal'}</td>
+                                        <td className="px-3 py-2 text-right text-gray-700 whitespace-nowrap">{fmt(baseAmount)}</td>
                                     </tr>
                                     <tr>
                                         <td colSpan={6} className="px-3 py-2 text-right text-gray-600">Tax Amount</td>
                                         <td className="px-3 py-2 text-right text-amber-600 whitespace-nowrap">{fmt(taxAll)}</td>
                                     </tr>
                                     <tr>
-                                        <td colSpan={6} className="px-3 py-2 text-right font-semibold text-gray-700">Total</td>
+                                        <td colSpan={6} className="px-3 py-2 text-right font-semibold text-gray-700">{taxType === 'exclude' ? 'Grand Total (incl. Tax)' : 'Total'}</td>
                                         <td className="px-3 py-2 text-right font-bold text-emerald-700 whitespace-nowrap">{fmt(grandTotal)}</td>
                                     </tr>
                                 </tfoot>

@@ -38,6 +38,7 @@ class JournalSettingController extends Controller
                 'equity' => 'Equity (Modal)',
                 'revenue' => 'Revenue (Pendapatan)',
                 'expense' => 'Expense (Biaya)',
+                'cogs' => 'COGS (Harga Pokok Penjualan)',
             ],
             'accountCategories' => [
                 'current' => 'Current (Lancar)',
@@ -72,6 +73,7 @@ class JournalSettingController extends Controller
                 'equity' => 'Equity (Modal)',
                 'revenue' => 'Revenue (Pendapatan)',
                 'expense' => 'Expense (Biaya)',
+                'cogs' => 'COGS (Harga Pokok Penjualan)',
             ],
             'accountCategories' => [
                 'current' => 'Current (Lancar)',

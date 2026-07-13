@@ -37,13 +37,17 @@ function visitDatesForMonth(visitPlans: any[], contract: any, month: number): an
     return dated.filter((v: any) => contractMonthOf(start, v.visit_date, duration) === month);
 }
 
-const emptySub = () => ({ product_id: '', quantity: 1, uom: '' });
+// Label unit yang ditampilkan: prioritaskan UOM (relasi uom_id), fallback ke Product.unit.
+const uomLabel = (uom: any, fallback?: string) => uom?.symbol ?? uom?.name ?? fallback ?? '';
+
+const emptySub = () => ({ product_id: '', quantity: 1, uom: '', uom_id: null });
 
 const emptyService = (taxRate = 0, month = 1) => ({
     product_id:   '',
     month,
     quantity:     1,
     uom:          '',
+    uom_id:       null,
     unit_price:   '',
     tax_rate:     taxRate,
     sub_products: [] as any[],
@@ -64,13 +68,15 @@ function servicesFromPremise(premise: any, durationMonths: number, taxRate: numb
                 product_id: svc.product_id,
                 month,
                 quantity:   Number(svc.quantity ?? 1),
-                uom:        svc.product?.unit ?? '',
+                uom:        uomLabel(svc.uom, svc.product?.unit),
+                uom_id:     svc.uom_id ?? null,
                 unit_price: Number(svc.unit_price ?? svc.product?.sales_price ?? svc.product?.price ?? 0),
                 tax_rate:   Number(svc.tax_rate ?? taxRate) || 0,
                 sub_products: (svc.sub_products ?? svc.subProducts ?? []).map((sp: any) => ({
                     product_id: sp.product_id,
                     quantity:   Number(sp.quantity ?? 1),
-                    uom:        sp.product?.unit ?? '',
+                    uom:        uomLabel(sp.uom, sp.product?.unit),
+                    uom_id:     sp.uom_id ?? null,
                 })),
             });
         }
@@ -91,11 +97,12 @@ function servicesFromItems(items: any[], taxRate: number): any[] {
         month:      p.month ?? 1,
         quantity:   p.quantity,
         uom:        p.uom ?? '',
+        uom_id:     p.uom_id ?? null,
         unit_price: p.unit_price,
         tax_rate:   p.tax_rate ?? taxRate,
         sub_products: children
             .filter((c: any) => c.parent_product_id === p.product_id && (c.month ?? 1) === (p.month ?? 1))
-            .map((c: any) => ({ product_id: c.product_id, quantity: c.quantity, uom: c.uom ?? '' })),
+            .map((c: any) => ({ product_id: c.product_id, quantity: c.quantity, uom: c.uom ?? '', uom_id: c.uom_id ?? null })),
     }));
 }
 
@@ -122,6 +129,7 @@ function flattenServices(services: any[]): any[] {
             month,
             quantity:          Number(svc.quantity || 0),
             uom:               svc.uom ?? null,
+            uom_id:            svc.uom_id ?? null,
             uom_conversion:    1,
             unit_price:        Number(svc.unit_price || 0),
             tax_rate:          Number(svc.tax_rate || 0),
@@ -134,6 +142,7 @@ function flattenServices(services: any[]): any[] {
                 month,
                 quantity:          Number(sub.quantity || 0),
                 uom:               sub.uom ?? null,
+                uom_id:            sub.uom_id ?? null,
                 uom_conversion:    1,
                 unit_price:        0,
                 tax_rate:          0,
@@ -144,7 +153,7 @@ function flattenServices(services: any[]): any[] {
     return Array.from(map.values());
 }
 
-export default function Form({ salesOrder, contracts, products, nextNumber, taxType = 'exclude', taxRateSo = 11, workOrders = [], usedPremiseIds = [], woUsage = {} }: any) {
+export default function Form({ salesOrder, contracts, products, uoms = [], nextNumber, taxType = 'exclude', taxRateSo = 11, workOrders = [], usedPremiseIds = [], woUsage = {}, settlementAmount = 0 }: any) {
     const editing = !!salesOrder;
 
     const { data, setData, post, put, transform, processing, errors } = useForm<any>({
@@ -173,8 +182,9 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
     const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
 
     const selectedContract = contracts?.find((c: any) => String(c.id) === String(data.contract_id));
-    // Settlement Amount: total invoice kontrak terpilih yang sudah dibayar (dari backend).
-    const settlementAmount = Number(selectedContract?.settlement_amount ?? 0);
+    // Settlement Amount: total invoice yang sudah dibayar (payment Verified) untuk
+    // kontrak DAN No SO ini (dari backend) — 0 untuk SO baru yang belum punya invoice.
+    const settlementAmountNum = Number(settlementAmount ?? 0);
     const premiseOptions   = selectedContract?.premises ?? [];
     const selectedPremise  = premiseOptions.find((p: any) => String(p.id) === String(data.contract_premise_id));
     const getProduct       = (id: string) => products?.find((p: any) => p.id === id);
@@ -220,6 +230,11 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
         setServices(services);
     };
 
+    // Produk dipilih manual (bukan dari kontrak) → unit diambil dari uom_id default produk.
+    const productUomId = (product: any) => product?.unit_of_measure_id ?? null;
+    const productUomLabel = (product: any) =>
+        uomLabel(uoms?.find((u: any) => String(u.id) === String(product?.unit_of_measure_id)), product?.unit);
+
     const handleSelectProduct = (product: any) => {
         if (!pickerTarget) return;
         const { svcIdx, subIdx } = pickerTarget;
@@ -229,14 +244,16 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
             services[svcIdx] = {
                 ...cur,
                 product_id: product.id,
-                uom:        cur.uom || product.unit || '',
+                uom:        cur.uom || productUomLabel(product),
+                uom_id:     cur.uom_id || productUomId(product),
                 unit_price: cur.unit_price || product.sales_price || product.price || '',
                 tax_rate:   cur.tax_rate > 0 ? cur.tax_rate : taxRateSo,
             };
             setServices(services);
         } else {
             updateSubProduct(svcIdx, subIdx, 'product_id', product.id);
-            updateSubProduct(svcIdx, subIdx, 'uom', product.unit || '');
+            updateSubProduct(svcIdx, subIdx, 'uom', productUomLabel(product));
+            updateSubProduct(svcIdx, subIdx, 'uom_id', productUomId(product));
         }
         setPickerTarget(null);
     };
@@ -308,12 +325,13 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
     const visitFreq = Number(selectedPremise?.visit_frequency) || 0;
 
     // ── Data Work Order (untuk validasi & info pada form edit) ──────────────
-    // Setiap WO dilengkapi bulan kontrak (dari visit_date) dan nomor visit (dari visit plan).
+    // Bulan diambil dari Referensi Bulan WO (wo.month); fallback ke bulan kontrak
+    // dari visit_date untuk WO lama yang belum punya kolom month. Nomor visit dari visit plan.
     const woInfo = useMemo(() => {
         const start    = selectedContract?.start_date;
         const duration = Number(selectedContract?.duration_months) > 0 ? Number(selectedContract.duration_months) : 1;
         return (workOrders ?? []).map((wo: any) => {
-            const month = start && wo.visit_date ? contractMonthOf(start, dkey(wo.visit_date), duration) : null;
+            const month = wo.month ?? (start && wo.visit_date ? contractMonthOf(start, dkey(wo.visit_date), duration) : null);
             const vp    = data.visit_plans.find((v: any) => v.visit_date && dkey(v.visit_date) === dkey(wo.visit_date));
             return { ...wo, month, visit_number: vp?.visit_number ?? null };
         });
@@ -393,7 +411,7 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                                 }
                             </button>
                         </td>
-                        <td className="px-3 py-2 text-gray-500 text-xs">{productUnit(selectedProduct) || '—'}</td>
+                        <td className="px-3 py-2 text-gray-500 text-xs">{svc.uom || productUnit(selectedProduct) || '—'}</td>
                         <td className="px-3 py-2">
                             <input type="number" min={1} readOnly={locked} disabled={locked} className={lockedInput} value={svc.quantity} onChange={e => updateService(idx, 'quantity', +e.target.value)} />
                         </td>
@@ -459,7 +477,7 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                                                                 {subProduct ? <span className="text-gray-800">{subProduct.name}</span> : <span className="text-gray-400">— Select Product —</span>}
                                                             </button>
                                                         </td>
-                                                        <td className="py-1 pr-2 text-gray-500">{productUnit(subProduct) || '—'}</td>
+                                                        <td className="py-1 pr-2 text-gray-500">{sub.uom || productUnit(subProduct) || '—'}</td>
                                                         <td className="py-1 pr-2">
                                                             <input type="number" min={1} readOnly={locked} disabled={locked} className={lockedInput} value={sub.quantity} onChange={e => updateSubProduct(idx, si, 'quantity', +e.target.value)} />
                                                         </td>
@@ -623,7 +641,9 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                                 const isCollapsed   = !!collapsed[month];
                                 const monthSubtotal = rows.reduce((s, { svc }) => s + Number(svc.quantity || 0) * Number(svc.unit_price || 0), 0);
                                 const monthWos      = woByMonth[month] ?? [];
-                                const locked        = monthLocked(month);
+                                // Req: bulan dengan Work Order Completed tidak bisa diubah item service-nya.
+                                const completedLocked = monthsCompleted.has(month);
+                                const locked        = monthLocked(month) || completedLocked;
                                 return (
                                     <div key={month} className="border rounded-lg overflow-hidden">
                                         <button
@@ -652,7 +672,9 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                                             <div className="overflow-x-auto">
                                                 {locked && (
                                                     <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-700">
-                                                        Semua tanggal visit bulan ini sudah memiliki Work Order. Item terkunci — tambahkan tanggal visit baru pada Visit Plan untuk membukanya.
+                                                        {completedLocked
+                                                            ? 'Bulan ini sudah memiliki Work Order berstatus Completed. Item service tidak dapat diubah.'
+                                                            : 'Semua tanggal visit bulan ini sudah memiliki Work Order. Item terkunci — tambahkan tanggal visit baru pada Visit Plan untuk membukanya.'}
                                                     </div>
                                                 )}
                                                 <table className="w-full text-sm min-w-[820px]">
@@ -700,12 +722,12 @@ export default function Form({ salesOrder, contracts, products, nextNumber, taxT
                                 <span className="text-emerald-700">{fmt(grandTotal)}</span>
                             </div>
                             <div className="flex w-72 justify-between text-gray-600 border-t pt-1 mt-1">
-                                <span title="Total invoice kontrak ini yang sudah dibayar">Settlement Amount</span>
-                                <span className="text-blue-700 font-medium">{fmt(settlementAmount)}</span>
+                                <span title="Total invoice SO ini yang sudah dibayar (payment Verified)">Settlement Amount</span>
+                                <span className="text-blue-700 font-medium">{fmt(settlementAmountNum)}</span>
                             </div>
                             <div className="flex w-72 justify-between font-semibold text-gray-900">
                                 <span title="Grand Total dikurangi Settlement Amount">Sisa Nilai Pekerjaan</span>
-                                <span className="text-rose-700">{fmt(grandTotal - settlementAmount)}</span>
+                                <span className="text-rose-700">{fmt(grandTotal - settlementAmountNum)}</span>
                             </div>
                         </div>
                     </div>

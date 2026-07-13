@@ -6,6 +6,7 @@ import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
 import ConfirmDelete from '@/Components/ConfirmDelete';
 import { Head, Link } from '@inertiajs/react';
+import { fmtDate } from '@/utils/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
@@ -54,7 +55,7 @@ export default function Index({ invoices, filters, contracts = [], salesOrders =
                                 <td className="px-4 py-3">{inv.customer?.name}</td>
                                 <td className="px-4 py-3 text-gray-500 font-mono text-xs">{inv.contract?.contract_number ?? '-'}</td>
                                 <td className="px-4 py-3 text-gray-500 font-mono text-xs">{inv.sales_order?.so_number ?? '-'}</td>
-                                <td className="px-4 py-3">{inv.invoice_date}</td>
+                                <td className="px-4 py-3">{fmtDate(inv.invoice_date)}</td>
                                 <td className="px-4 py-3">{inv.due_date}</td>
                                 <td className="px-4 py-3 text-right">{fmt(inv.total_amount)}</td>
                                 <td className="px-4 py-3 text-right text-emerald-700">{fmt(inv.paid_amount ?? 0)}</td>

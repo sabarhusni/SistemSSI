@@ -7,10 +7,11 @@ const REASONS = [
     'Purchase Return', 'Initial Adjustment', 'Other',
 ];
 
-export default function Form({ stockAdjustment, products, nextNumber }: any) {
+export default function Form({ stockAdjustment, products, warehouses, nextNumber }: any) {
     const editing = !!stockAdjustment;
     const { data, setData, post, put, processing, errors } = useForm<any>({
         product_id:         stockAdjustment?.product_id         ?? '',
+        warehouse_id:       stockAdjustment?.warehouse_id       ?? '',
         adjustment_number:  stockAdjustment?.adjustment_number  ?? nextNumber ?? '',
         adjustment_date:    stockAdjustment?.adjustment_date    ?? '',
         type:               stockAdjustment?.type               ?? 'addition',
@@ -41,6 +42,14 @@ export default function Form({ stockAdjustment, products, nextNumber }: any) {
                         <select className={inputCls} value={data.product_id} onChange={e => setData('product_id', e.target.value)}>
                             <option value="">— Select Product —</option>
                             {products?.map((p: any) => <option key={p.id} value={p.id}>{p.name} (Current stock: {p.stock})</option>)}
+                        </select>
+                    </FormField>
+                    <FormField label="Gudang" error={errors.warehouse_id}>
+                        <select className={inputCls} value={data.warehouse_id} onChange={e => setData('warehouse_id', e.target.value)}>
+                            <option value="">— Pilih Gudang (opsional) —</option>
+                            {warehouses?.map((w: any) => (
+                                <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
+                            ))}
                         </select>
                     </FormField>
                     <div className="grid grid-cols-2 gap-4">

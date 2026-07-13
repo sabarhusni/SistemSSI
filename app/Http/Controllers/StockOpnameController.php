@@ -3,10 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\StockOpname;
+use App\Models\Employee;
 use App\Models\Product;
 use App\Models\Stock;
 use App\Models\StockMovement;
-use App\Models\User;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -103,7 +104,7 @@ class StockOpnameController extends Controller
         $sortBy   = in_array($request->sort_by, $sortable) ? $request->sort_by : 'opname_date';
         $sortDir  = $request->sort_dir === 'asc' ? 'asc' : 'desc';
 
-        $query = StockOpname::withCount('items')->with('conductedBy')
+        $query = StockOpname::withCount('items')->with(['conductedBy', 'warehouseModel'])
             ->when($request->search, fn($q, $s) => $q->where('opname_number', 'ilike', "%$s%")->orWhere('warehouse', 'ilike', "%$s%"))
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->orderBy($sortBy, $sortDir);
@@ -118,7 +119,8 @@ class StockOpnameController extends Controller
     {
         return Inertia::render('StockOpnames/Form', [
             'products'   => Product::where('status', 'active')->where('product_type', 'goods')->orderBy('name')->get(['id', 'name', 'stock']),
-            'users'      => User::where('status', 'active')->orderBy('name')->get(),
+            'employees'  => Employee::where('status', 'active')->orderBy('name')->get(['id', 'employee_number', 'name', 'position']),
+            'warehouses' => Warehouse::where('status', 'active')->orderBy('name')->get(['id', 'name', 'code']),
             'nextNumber' => $this->generateNextNumber(),
         ]);
     }
@@ -127,9 +129,9 @@ class StockOpnameController extends Controller
     {
         $data = $request->validate([
             'opname_number'   => 'required|string|max:50|unique:stock_opnames,opname_number',
-            'warehouse'       => 'required|string|max:100',
+            'warehouse_id'    => 'required|uuid|exists:warehouses,id',
             'opname_date'     => 'required|date',
-            'conducted_by_id' => 'nullable|uuid|exists:users,id',
+            'conducted_by_id' => 'nullable|uuid|exists:employees,id',
             'status'          => 'required|in:draft,in_progress,completed,cancelled',
             'notes'           => 'nullable|string',
             'items'           => 'nullable|array',
@@ -167,7 +169,8 @@ class StockOpnameController extends Controller
         return Inertia::render('StockOpnames/Form', [
             'stockOpname' => $stockOpname->load('items'),
             'products'    => Product::where('status', 'active')->where('product_type', 'goods')->orderBy('name')->get(['id', 'name', 'stock']),
-            'users'       => User::where('status', 'active')->orderBy('name')->get(),
+            'employees'  => Employee::where('status', 'active')->orderBy('name')->get(['id', 'employee_number', 'name', 'position']),
+            'warehouses'  => Warehouse::where('status', 'active')->orderBy('name')->get(['id', 'name', 'code']),
         ]);
     }
 
@@ -175,9 +178,9 @@ class StockOpnameController extends Controller
     {
         $data = $request->validate([
             'opname_number'   => 'required|string|max:50|unique:stock_opnames,opname_number,' . $stockOpname->id,
-            'warehouse'       => 'required|string|max:100',
+            'warehouse_id'    => 'required|uuid|exists:warehouses,id',
             'opname_date'     => 'required|date',
-            'conducted_by_id' => 'nullable|uuid|exists:users,id',
+            'conducted_by_id' => 'nullable|uuid|exists:employees,id',
             'status'          => 'required|in:draft,in_progress,completed,cancelled',
             'notes'           => 'nullable|string',
             'items'           => 'nullable|array',

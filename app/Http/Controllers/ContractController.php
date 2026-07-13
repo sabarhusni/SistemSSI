@@ -131,6 +131,18 @@ class ContractController extends Controller
      */
     private function savePremises(Contract $contract, array $premises, string $taxType): void
     {
+        $productIds = collect($premises)
+            ->flatMap(fn($p) => $p['products'] ?? [])
+            ->flatMap(fn($prod) => array_merge(
+                [$prod['product_id'] ?? null],
+                array_column($prod['sub_products'] ?? [], 'product_id')
+            ))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $productUoms = Product::whereIn('id', $productIds)->pluck('unit_of_measure_id', 'id');
+
         foreach (array_values($premises) as $pi => $prem) {
             $premise = $contract->premises()->create([
                 'location'        => $prem['location'],
@@ -149,6 +161,7 @@ class ContractController extends Controller
                 $service = $contract->services()->create([
                     'contract_premise_id' => $premise->id,
                     'product_id'      => $prod['product_id'],
+                    'uom_id'          => $productUoms[$prod['product_id']] ?? null,
                     'quantity'        => $prod['quantity'],
                     'unit_price'      => $prod['unit_price'],
                     'total_price'     => $sub,
@@ -161,6 +174,7 @@ class ContractController extends Controller
                     if (!empty($sp['product_id'])) {
                         $service->subProducts()->create([
                             'product_id' => $sp['product_id'],
+                            'uom_id'     => $productUoms[$sp['product_id']] ?? null,
                             'quantity'   => $sp['quantity'],
                         ]);
                     }
@@ -223,12 +237,12 @@ class ContractController extends Controller
         DB::transaction(function () use ($data, $contract, $taxType) {
             $contract->update(collect($data)->except('premises')->toArray());
 
-            // Replace existing premises/services/sub-products.
+            // Replace existing premises/services/sub-products (hard delete, no soft-delete trail).
             foreach ($contract->services as $oldService) {
-                $oldService->subProducts()->delete();
+                $oldService->subProducts()->forceDelete();
             }
-            $contract->services()->delete();
-            $contract->premises()->delete();
+            $contract->services()->forceDelete();
+            $contract->premises()->forceDelete();
 
             $this->savePremises($contract, $data['premises'] ?? [], $taxType);
 

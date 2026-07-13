@@ -3,12 +3,26 @@ import { Head } from '@inertiajs/react';
 import { useState } from 'react';
 import { fmtDate, fmtNum, FilterBar, FilterDate, FilterSelect, applyFilters } from './_shared';
 
-const IN_TYPES  = ['in', 'purchase', 'adjustment_in', 'opname_in', 'transfer_in'];
-const OUT_TYPES = ['out', 'sale', 'adjustment_out', 'opname_out', 'transfer_out', 'wo_usage'];
+const IN_TYPES = [
+    'initial_stock', 'purchase_receipt', 'purchase_receive',
+    'in', 'purchase', 'adjustment_in', 'opname_in', 'transfer_in',
+];
 
 const typeLabel: Record<string, string> = {
-    in: 'In', purchase: 'Purchase', adjustment_in: 'Adj. In', opname_in: 'Opname In', transfer_in: 'Transfer In',
-    out: 'Out', sale: 'Sale', adjustment_out: 'Adj. Out', opname_out: 'Opname Out', transfer_out: 'Transfer Out', wo_usage: 'WO Usage',
+    initial_stock:    'Stok Awal',
+    purchase_receipt: 'Penerimaan PO',
+    purchase_receive: 'Penerimaan PO',
+    in:               'In',
+    purchase:         'Purchase',
+    adjustment_in:    'Adj. In',
+    opname_in:        'Opname In',
+    transfer_in:      'Transfer In',
+    out:              'Out',
+    sale:             'Sale',
+    adjustment_out:   'Adj. Out',
+    opname_out:       'Opname Out',
+    transfer_out:     'Transfer Out',
+    wo_usage:         'WO Usage',
 };
 
 export default function StockCard({ movements, openingBalance, product, products, filters }: any) {

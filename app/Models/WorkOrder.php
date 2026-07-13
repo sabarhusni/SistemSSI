@@ -12,7 +12,7 @@ class WorkOrder extends Model
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'contract_id', 'sales_order_id', 'sales_order_item_id', 'sales_order_visit_plan_id', 'technician_id', 'wo_number', 'visit_date',
+        'contract_id', 'sales_order_id', 'sales_order_item_id', 'sales_order_visit_plan_id', 'month', 'technician_id', 'wo_number', 'visit_date',
         'time_in', 'time_out', 'service_area', 'visit_types', 'status', 'technician_notes',
     ];
 
@@ -25,7 +25,7 @@ class WorkOrder extends Model
     public function salesOrder() { return $this->belongsTo(SalesOrder::class); }
     public function salesOrderItem() { return $this->belongsTo(SalesOrderItem::class); }
     public function salesOrderVisitPlan() { return $this->belongsTo(SalesOrderVisitPlan::class); }
-    public function technician() { return $this->belongsTo(User::class, 'technician_id'); }
+    public function technician() { return $this->belongsTo(Employee::class, 'technician_id'); }
     public function materials() { return $this->hasMany(WorkOrderMaterial::class); }
 
     /**

@@ -6,6 +6,7 @@ import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
 import ConfirmDelete from '@/Components/ConfirmDelete';
 import { Head, Link } from '@inertiajs/react';
+import { fmtDate } from '@/utils/date';
 
 export default function Index({ employees, filters }: any) {
     const sortProps = {
@@ -60,7 +61,7 @@ export default function Index({ employees, filters }: any) {
                                 <td className="px-4 py-3 text-gray-600">{emp.position ?? '—'}</td>
                                 <td className="px-4 py-3 text-gray-500">{emp.department ?? '—'}</td>
                                 <td className="px-4 py-3 text-gray-500">{emp.phone ?? '—'}</td>
-                                <td className="px-4 py-3 text-gray-500">{emp.join_date ?? '—'}</td>
+                                <td className="px-4 py-3 text-gray-500">{fmtDate(emp.join_date)}</td>
                                 <td className="px-4 py-3"><StatusBadge status={emp.status} /></td>
                                 <td className="px-4 py-3 flex gap-3 items-center">
                                     <Link href={`/employees/${emp.id}/edit`} className="text-blue-600 hover:underline">Edit</Link>

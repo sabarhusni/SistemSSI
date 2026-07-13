@@ -13,7 +13,7 @@ class PurchaseOrder extends Model
 
     protected $fillable = [
         'supplier_id', 'po_number', 'po_date',
-        'expected_delivery_date', 'total_amount', 'status', 'notes', 'payment_terms',
+        'expected_delivery_date', 'total_amount', 'total_amoun_bef_tax', 'total_tax', 'status', 'notes', 'payment_terms',
     ];
 
     public function supplier() { return $this->belongsTo(Supplier::class); }

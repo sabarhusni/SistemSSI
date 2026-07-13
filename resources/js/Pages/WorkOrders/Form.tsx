@@ -3,7 +3,6 @@ import FormField, { inputCls } from '@/Components/FormField';
 import ProductPickerModal from '@/Components/ProductPickerModal';
 import ContractPickerModal from '@/Components/ContractPickerModal';
 import SalesOrderRefPickerModal from '@/Components/SalesOrderRefPickerModal';
-import SalesOrderItemPickerModal from '@/Components/SalesOrderItemPickerModal';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState, useMemo } from 'react';
 
@@ -62,30 +61,33 @@ function visitDatesForMonth(visitPlans: any[], contract: any, month: number): an
     return dated.filter((v: any) => contractMonthOf(start, v.visit_date, duration) === month);
 }
 
-// Susun material used dari satu item service SO (parent) untuk bulan item tersebut.
-// Qty default tiap sub-produk = qty sub-produk SO − total pemakaian WO pada bulan yang sama.
-function materialsFromSoItem(item: any, soItems: any[], subUsage: (parentId: string, subId: string, month: number) => number): any[] {
-    if (!item) return [];
-    const month = Number(item.month) || 1;
-    const subs  = (soItems ?? []).filter(
-        (it: any) => it.parent_product_id === item.product_id && (Number(it.month) || 1) === month
-    );
+// Susun material used dari SEMUA item service SO (parent) pada bulan yang dipilih.
+// Qty default tiap sub-produk = qty sub-produk SO dibagi rata sejumlah visit plan
+// SO pada bulan tsb (satu visit menggunakan satu bagian dari total qty bulan itu).
+function materialsFromMonth(month: number, parentItems: any[], soItems: any[], visitCount: number): any[] {
+    if (!month) return [];
+    const items = (parentItems ?? []).filter((it: any) => (Number(it.month) || 1) === month);
 
-    return [{
-        product_id:    item.product_id,
-        month,
-        uom:           item.uom ?? item.product?.unit ?? '',
-        quantity_used: Number(item.quantity) || 1,
-        sub_products: subs.map((sp: any) => {
-            const soQty = Number(sp.quantity) || 0;
-            const used  = subUsage(item.product_id, sp.product_id, month);
-            return {
-                product_id:    sp.product_id,
-                uom:           sp.uom ?? sp.product?.unit ?? '',
-                quantity_used: round2(Math.max(0, soQty - used)),
-            };
-        }),
-    }];
+    return items.map((item: any) => {
+        const subs = (soItems ?? []).filter(
+            (it: any) => it.parent_product_id === item.product_id && (Number(it.month) || 1) === month
+        );
+        return {
+            product_id:    item.product_id,
+            month,
+            uom:           item.uom ?? item.product?.unit ?? '',
+            quantity_used: Number(item.quantity) || 1,
+            sub_products: subs.map((sp: any) => {
+                const soQty = Number(sp.quantity) || 0;
+                const perVisit = visitCount > 0 ? soQty / visitCount : soQty;
+                return {
+                    product_id:    sp.product_id,
+                    uom:           sp.uom ?? sp.product?.unit ?? '',
+                    quantity_used: round2(Math.max(0, perVisit)),
+                };
+            }),
+        };
+    });
 }
 
 // Rekonstruksi struktur bersarang dari baris flat work_order_materials saat edit.
@@ -159,7 +161,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
     const { data, setData, post, put, transform, processing, errors } = useForm<any>({
         contract_id:               workOrder?.contract_id               ?? '',
         sales_order_id:            workOrder?.sales_order_id            ?? '',
-        sales_order_item_id:       workOrder?.sales_order_item_id       ?? '',
+        month:                     workOrder?.month ?? workOrder?.sales_order_item?.month ?? '',
         sales_order_visit_plan_id: workOrder?.sales_order_visit_plan_id ?? '',
         technician_id:    workOrder?.technician_id    ?? '',
         wo_number:        workOrder?.wo_number        ?? nextNumber ?? '',
@@ -177,7 +179,6 @@ export default function Form({ workOrder, technicians, products, contracts, next
     const [pickerTarget, setPickerTarget] = useState<{ matIdx: number; subIdx?: number } | null>(null);
     const [contractPickerOpen, setContractPickerOpen] = useState(false);
     const [soPickerOpen, setSoPickerOpen] = useState(false);
-    const [soItemPickerOpen, setSoItemPickerOpen] = useState(false);
     const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
 
     const getProduct = (id: string) => products?.find((p: any) => p.id === id);
@@ -239,18 +240,15 @@ export default function Form({ workOrder, technicians, products, contracts, next
     );
     const selectedPremise = linkedSO?.premise ?? null;
 
-    // Item service SO (parent saja) untuk popup referensi.
+    // Item service SO (parent saja) untuk referensi bulan & material used.
     const soItems = useMemo(() => (linkedSO?.items ?? []).filter((it: any) => !it.parent_product_id), [linkedSO]);
-    const selectedSoItem = useMemo(
-        () => (linkedSO?.items ?? []).find((it: any) => it.id === data.sales_order_item_id) ?? null,
-        [linkedSO, data.sales_order_item_id]
-    );
+    const selectedMonth = useMemo(() => Number(data.month) || null, [data.month]);
 
-    // Referensi tanggal visit plan SO untuk bulan item yang dipilih.
+    // Referensi tanggal visit plan SO untuk bulan yang dipilih.
     const refVisitDates = useMemo(() => {
-        if (!linkedSO || !selectedSoItem || !selectedContract) return [];
-        return visitDatesForMonth(linkedSO.visit_plans, selectedContract, Number(selectedSoItem.month) || 1);
-    }, [linkedSO, selectedSoItem, selectedContract]);
+        if (!linkedSO || !selectedMonth || !selectedContract) return [];
+        return visitDatesForMonth(linkedSO.visit_plans, selectedContract, selectedMonth);
+    }, [linkedSO, selectedMonth, selectedContract]);
 
     // Tanggal visit yang sudah dipakai WO lain pada SO yang sama (kecuali WO ini).
     const dkey = (d: any) => String(d ?? '').slice(0, 10);
@@ -301,7 +299,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
     }, [soItems]);
 
     // Bulan "aktif" = bulan terkecil yang tanggal visit-nya belum semua terpakai WO.
-    // Pemilihan Referensi Item SO hanya boleh pada bulan ini (berurutan, tak boleh loncat).
+    // Pemilihan Referensi Bulan hanya boleh pada bulan ini (berurutan, tak boleh loncat).
     const activeMonth = useMemo(() => {
         const start = selectedContract?.start_date;
         const dur = Number(selectedContract?.duration_months) > 0 ? Number(selectedContract.duration_months) : 1;
@@ -327,7 +325,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
             ...data,
             contract_id:               contract.id,
             sales_order_id:            '',
-            sales_order_item_id:       '',
+            month:                     '',
             sales_order_visit_plan_id: '',
             visit_date:                '',
             materials:                 [],
@@ -338,7 +336,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
         setData({
             ...data,
             sales_order_id:            so.id,
-            sales_order_item_id:       '',
+            month:                     '',
             sales_order_visit_plan_id: '',
             visit_date:                '',
             materials:                 [],
@@ -346,35 +344,18 @@ export default function Form({ workOrder, technicians, products, contracts, next
         setSoPickerOpen(false);
     };
 
-    // Total pemakaian qty sub-produk pada WO lain di SO ini untuk (parent, sub, bulan).
-    // WO yang sedang diedit dikecualikan agar alokasinya dilepas & ditawarkan ulang.
-    const subUsage = (parentId: string, subId: string, month: number) => {
-        const m = Number(month) || 1;
-        let total = 0;
-        for (const wo of (linkedSO?.work_orders ?? [])) {
-            if (String(wo.id) === String(workOrder?.id)) continue;
-            for (const mat of (wo.materials ?? [])) {
-                if (String(mat.parent_product_id) === String(parentId)
-                    && String(mat.product_id) === String(subId)
-                    && (Number(mat.month) || 1) === m) {
-                    total += Number(mat.quantity_used) || 0;
-                }
-            }
-        }
-        return total;
-    };
-
-    // Memilih item SO: material used terisi dari item tsb untuk bulannya; qty default
-    // tiap sub-produk = qty sub-produk SO − total pemakaian WO pada bulan yang sama.
-    const handleSelectSoItem = (item: any) => {
+    // Memilih bulan referensi: material used terisi dari SEMUA item service SO pada
+    // bulan tsb; qty default tiap sub-produk = qty sub-produk SO dibagi rata sejumlah
+    // visit plan SO pada bulan tsb.
+    const handleSelectMonth = (month: number) => {
+        const visitCount = visitDatesForMonth(linkedSO?.visit_plans, selectedContract, month).length;
         setData({
             ...data,
-            sales_order_item_id:       item.id,
+            month,
             sales_order_visit_plan_id: '',
             visit_date:                '',
-            materials:                 materialsFromSoItem(item, linkedSO?.items ?? [], subUsage),
+            materials:                 materialsFromMonth(month, soItems, linkedSO?.items ?? [], visitCount),
         });
-        setSoItemPickerOpen(false);
     };
 
     // Pilih Visit ke-N: set referensi visit plan & default tanggal dari plan tsb.
@@ -410,12 +391,13 @@ export default function Form({ workOrder, technicians, products, contracts, next
         editing ? put(`/work-orders/${workOrder.id}`) : post('/work-orders');
     };
 
-    // Req 2: produk parent yang diambil dari referensi item SO — qty & produk terkunci.
+    // Req 2: produk parent yang diambil dari referensi bulan SO — qty & produk terkunci.
     // Hanya produk baru (tambahan) dan qty sub-produk yang dapat diubah.
     const isFromSo = (mat: any) =>
-        !!selectedSoItem
-        && String(mat.product_id) === String(selectedSoItem.product_id)
-        && (Number(mat.month) || 1) === (Number(selectedSoItem.month) || 1);
+        soItems.some((it: any) =>
+            String(it.product_id) === String(mat.product_id)
+            && (Number(it.month) || 1) === (Number(mat.month) || 1)
+        );
 
     const renderMaterialRows = (rows: { mat: any; idx: number }[]) =>
         rows.map(({ mat, idx }) => {
@@ -533,17 +515,6 @@ export default function Form({ workOrder, technicians, products, contracts, next
                 />
             )}
 
-            {soItemPickerOpen && (
-                <SalesOrderItemPickerModal
-                    items={soItems}
-                    soNumber={linkedSO?.so_number}
-                    activeMonth={activeMonth}
-                    currentMonth={selectedSoItem ? Number(selectedSoItem.month) : null}
-                    onSelect={handleSelectSoItem}
-                    onClose={() => setSoItemPickerOpen(false)}
-                />
-            )}
-
             <div className="max-w-4xl bg-white rounded-xl shadow p-6">
                 <form onSubmit={submit} className="space-y-4">
 
@@ -602,31 +573,37 @@ export default function Form({ workOrder, technicians, products, contracts, next
                         )}
                     </FormField>
 
-                    <FormField label="Referensi Item SO" error={errors.sales_order_item_id}>
-                        <button
-                            type="button"
+                    <FormField label="Referensi Bulan" error={errors.month}>
+                        <select
+                            className={inputCls}
+                            value={data.month}
+                            onChange={e => handleSelectMonth(+e.target.value)}
                             disabled={!linkedSO}
-                            onClick={() => setSoItemPickerOpen(true)}
-                            className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition disabled:bg-gray-50 disabled:cursor-not-allowed"
                         >
-                            {selectedSoItem
-                                ? <span className="text-gray-800">Bulan {selectedSoItem.month} — {selectedSoItem.product?.name ?? '—'} <span className="text-gray-400 text-xs">(Qty {selectedSoItem.quantity} {selectedSoItem.uom ?? ''})</span></span>
-                                : <span className="text-gray-400">{linkedSO ? '— Pilih Item Service SO —' : 'Pilih SO terlebih dahulu'}</span>
-                            }
-                        </button>
+                            <option value="">{linkedSO ? '— Pilih Bulan —' : 'Pilih SO terlebih dahulu'}</option>
+                            {soItemMonths.map((m: number) => {
+                                const ok = m === selectedMonth || (activeMonth != null && m === activeMonth);
+                                const reason = activeMonth != null && m > activeMonth ? 'belum giliran' : 'selesai';
+                                return (
+                                    <option key={m} value={m} disabled={!ok}>
+                                        Bulan {m}{!ok ? ` — ${reason}` : ''}
+                                    </option>
+                                );
+                            })}
+                        </select>
                         {linkedSO && (
-                            <p className="text-xs text-gray-400 mt-1">Item product diambil dari SO <span className="font-mono">{linkedSO.so_number}</span></p>
+                            <p className="text-xs text-gray-400 mt-1">Bulan berurutan dari yang terkecil. Produk diambil dari SO <span className="font-mono">{linkedSO.so_number}</span></p>
                         )}
                     </FormField>
 
-                    <FormField label={`Pilih Visit${selectedSoItem ? ` — Visit Plan SO (Bulan ${selectedSoItem.month})` : ''}`} error={errors.sales_order_visit_plan_id}>
+                    <FormField label={`Pilih Visit${selectedMonth ? ` — Visit Plan SO (Bulan ${selectedMonth})` : ''}`} error={errors.sales_order_visit_plan_id}>
                         <select
                             className={inputCls}
                             value={data.sales_order_visit_plan_id}
                             onChange={e => handleSelectVisitPlan(e.target.value)}
                             disabled={visitPlanOptions.length === 0}
                         >
-                            <option value="">{visitPlanOptions.length ? '— Pilih Visit ke- (dari Visit Plan SO) —' : 'Pilih Referensi Item SO terlebih dahulu'}</option>
+                            <option value="">{visitPlanOptions.length ? '— Pilih Visit ke- (dari Visit Plan SO) —' : 'Pilih Referensi Bulan terlebih dahulu'}</option>
                             {visitPlanOptions.map((o: any) => (
                                 <option key={o.id} value={o.id} disabled={o.disabled}>
                                     Visit {o.visit_number}: {o.visit_date || '(tanpa tanggal)'}{o.disabled ? ' — sudah digunakan' : ''}
@@ -634,9 +611,9 @@ export default function Form({ workOrder, technicians, products, contracts, next
                             ))}
                         </select>
                         <p className="text-xs text-gray-400 mt-1">
-                            {selectedSoItem
+                            {selectedMonth
                                 ? 'Pilih visit ke- dari Visit Plan SO. Tanggal default mengikuti plan dan masih bisa diubah di bawah.'
-                                : 'Pilih Referensi Item SO untuk menampilkan daftar visit.'}
+                                : 'Pilih Referensi Bulan untuk menampilkan daftar visit.'}
                         </p>
                     </FormField>
 
@@ -664,9 +641,10 @@ export default function Form({ workOrder, technicians, products, contracts, next
                                 const bookedWo = bookedTechnicians.get(String(t.id));
                                 const isCurrent = String(data.technician_id) === String(t.id);
                                 const unavailable = !!bookedWo && !isCurrent;
+                                const label = `${t.employee_number} — ${t.name}${t.position ? ` (${t.position})` : ''}`;
                                 return (
                                     <option key={t.id} value={t.id} disabled={unavailable}>
-                                        {t.name}{unavailable ? ` — jam bentrok (WO ${bookedWo})` : ''}
+                                        {label}{unavailable ? ` — jam bentrok (WO ${bookedWo})` : ''}
                                     </option>
                                 );
                             })}
@@ -709,9 +687,9 @@ export default function Form({ workOrder, technicians, products, contracts, next
                     <div>
                         <div className="flex items-center justify-between mb-2 mt-2">
                             <h3 className="font-semibold text-gray-700">Material Used</h3>
-                            {selectedSoItem && (
+                            {selectedMonth && (
                                 <span className="text-xs text-gray-400">
-                                    Qty default sub-produk = Qty SO − pemakaian WO (Bulan {selectedSoItem.month}, SO {linkedSO?.so_number})
+                                    Qty default sub-produk = Qty SO ÷ jumlah visit plan (Bulan {selectedMonth}, SO {linkedSO?.so_number})
                                 </span>
                             )}
                         </div>
@@ -720,7 +698,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
                         )}
 
                         {groups.length === 0 && (
-                            <p className="text-sm text-gray-400 italic mb-2">Belum ada material. Pilih Referensi Item SO untuk mengisi otomatis, atau tambah periode bulan.</p>
+                            <p className="text-sm text-gray-400 italic mb-2">Belum ada material. Pilih Referensi Bulan untuk mengisi otomatis semua produk SO, atau tambah periode bulan.</p>
                         )}
 
                         <div className="space-y-3">

@@ -5,6 +5,7 @@ import SortableColumn from '@/Components/SortableColumn';
 import Pagination from '@/Components/Pagination';
 import ConfirmDelete from '@/Components/ConfirmDelete';
 import { Head, Link } from '@inertiajs/react';
+import { fmtDate } from '@/utils/date';
 
 export default function Index({ stockAdjustments, filters }: any) {
     const sortProps = {
@@ -48,7 +49,7 @@ export default function Index({ stockAdjustments, filters }: any) {
                                         {adj.type === 'addition' ? 'Addition' : 'Subtraction'}
                                     </span>
                                 </td>
-                                <td className="px-4 py-3">{adj.adjustment_date}</td>
+                                <td className="px-4 py-3">{fmtDate(adj.adjustment_date)}</td>
                                 <td className="px-4 py-3 text-right">{adj.quantity_before}</td>
                                 <td className="px-4 py-3 text-right font-semibold">{adj.quantity_after}</td>
                                 <td className="px-4 py-3 text-gray-500 max-w-xs truncate">{adj.reason}</td>

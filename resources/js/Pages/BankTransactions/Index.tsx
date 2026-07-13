@@ -6,6 +6,7 @@ import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
 import ConfirmDelete from '@/Components/ConfirmDelete';
 import { Head, Link } from '@inertiajs/react';
+import { fmtDate } from '@/utils/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
@@ -51,7 +52,7 @@ export default function Index({ bankTransactions, filters }: any) {
                     <tbody className="divide-y">
                         {bankTransactions.data?.map((tx: any) => (
                             <tr key={tx.id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3">{tx.transaction_date}</td>
+                                <td className="px-4 py-3">{fmtDate(tx.transaction_date)}</td>
                                 <td className="px-4 py-3 text-xs">
                                     <div>{tx.bank_account?.bank_name}</div>
                                     <div className="text-gray-400">{tx.bank_account?.account_number}</div>

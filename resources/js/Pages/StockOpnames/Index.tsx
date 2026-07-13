@@ -6,6 +6,7 @@ import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
 import ConfirmDelete from '@/Components/ConfirmDelete';
 import { Head, Link } from '@inertiajs/react';
+import { fmtDate } from '@/utils/date';
 
 export default function Index({ stockOpnames, filters }: any) {
     const sortProps = {
@@ -42,8 +43,8 @@ export default function Index({ stockOpnames, filters }: any) {
                         {stockOpnames.data?.map((op: any) => (
                             <tr key={op.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-mono text-xs font-medium">{op.opname_number}</td>
-                                <td className="px-4 py-3">{op.warehouse}</td>
-                                <td className="px-4 py-3">{op.opname_date}</td>
+                                <td className="px-4 py-3">{op.warehouse_model?.name ?? op.warehouse ?? '—'}</td>
+                                <td className="px-4 py-3">{fmtDate(op.opname_date)}</td>
                                 <td className="px-4 py-3 text-gray-500">{op.conducted_by?.name ?? '-'}</td>
                                 <td className="px-4 py-3 text-right">{op.items_count ?? 0}</td>
                                 <td className="px-4 py-3"><StatusBadge status={op.status} /></td>

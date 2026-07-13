@@ -2,18 +2,16 @@ import AppLayout from '@/Layouts/AppLayout';
 import FormField, { inputCls } from '@/Components/FormField';
 import { Head, Link, useForm } from '@inertiajs/react';
 
-const WAREHOUSES = ['Main Warehouse', 'Jakarta Branch Warehouse', 'Surabaya Branch Warehouse', 'Field Warehouse'];
-
-export default function Form({ stockTransfer, products, users }: any) {
+export default function Form({ stockTransfer, products, employees, warehouses }: any) {
     const editing = !!stockTransfer;
     const { data, setData, post, put, processing, errors } = useForm<any>({
-        transfer_number:  stockTransfer?.transfer_number  ?? '',
-        from_warehouse:   stockTransfer?.from_warehouse   ?? '',
-        to_warehouse:     stockTransfer?.to_warehouse     ?? '',
-        transfer_date:    stockTransfer?.transfer_date    ?? '',
-        processed_by_id:  stockTransfer?.processed_by_id  ?? '',
-        status:           stockTransfer?.status           ?? 'draft',
-        notes:            stockTransfer?.notes            ?? '',
+        transfer_number:   stockTransfer?.transfer_number   ?? '',
+        from_warehouse_id: stockTransfer?.from_warehouse_id ?? '',
+        to_warehouse_id:   stockTransfer?.to_warehouse_id   ?? '',
+        transfer_date:     stockTransfer?.transfer_date     ?? '',
+        processed_by_id:   stockTransfer?.processed_by_id   ?? '',
+        status:            stockTransfer?.status            ?? 'draft',
+        notes:             stockTransfer?.notes             ?? '',
         items: stockTransfer?.items ?? [{ product_id: '', quantity: 1 }],
     });
 
@@ -40,22 +38,30 @@ export default function Form({ stockTransfer, products, users }: any) {
                         <FormField label="Transfer Date" error={errors.transfer_date} required>
                             <input type="date" className={inputCls} value={data.transfer_date} onChange={e => setData('transfer_date', e.target.value)} />
                         </FormField>
-                        <FormField label="From Warehouse" error={errors.from_warehouse} required>
-                            <select className={inputCls} value={data.from_warehouse} onChange={e => setData('from_warehouse', e.target.value)}>
-                                <option value="">— Select Source Warehouse —</option>
-                                {WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
+                        <FormField label="Gudang Asal" error={errors.from_warehouse_id} required>
+                            <select className={inputCls} value={data.from_warehouse_id} onChange={e => setData('from_warehouse_id', e.target.value)}>
+                                <option value="">— Pilih Gudang Asal —</option>
+                                {warehouses?.map((w: any) => (
+                                    <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
+                                ))}
                             </select>
                         </FormField>
-                        <FormField label="To Warehouse" error={errors.to_warehouse} required>
-                            <select className={inputCls} value={data.to_warehouse} onChange={e => setData('to_warehouse', e.target.value)}>
-                                <option value="">— Select Destination Warehouse —</option>
-                                {WAREHOUSES.filter(w => w !== data.from_warehouse).map(w => <option key={w} value={w}>{w}</option>)}
+                        <FormField label="Gudang Tujuan" error={errors.to_warehouse_id} required>
+                            <select className={inputCls} value={data.to_warehouse_id} onChange={e => setData('to_warehouse_id', e.target.value)}>
+                                <option value="">— Pilih Gudang Tujuan —</option>
+                                {warehouses?.filter((w: any) => w.id !== data.from_warehouse_id).map((w: any) => (
+                                    <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
+                                ))}
                             </select>
                         </FormField>
                         <FormField label="Processed By">
                             <select className={inputCls} value={data.processed_by_id} onChange={e => setData('processed_by_id', e.target.value)}>
-                                <option value="">— Select Staff —</option>
-                                {users?.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                                <option value="">— Pilih Karyawan —</option>
+                                {employees?.map((e: any) => (
+                                    <option key={e.id} value={e.id}>
+                                        {e.employee_number} — {e.name}{e.position ? ` (${e.position})` : ''}
+                                    </option>
+                                ))}
                             </select>
                         </FormField>
                         <FormField label="Status">

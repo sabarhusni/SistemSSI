@@ -1,8 +1,12 @@
 import AppLayout from '@/Layouts/AppLayout';
+import FormField, { inputCls } from '@/Components/FormField';
 import { Head, Link, useForm } from '@inertiajs/react';
 
-export default function Receive({ purchaseOrder }: any) {
+export default function Receive({ purchaseOrder, warehouses }: any) {
+    const isReceived = purchaseOrder.status === 'received';
+
     const { data, setData, post, processing } = useForm<any>({
+        warehouse_id: '',
         items: purchaseOrder.items.map((item: any) => ({
             id:          item.id,
             receive_qty: 0,
@@ -17,6 +21,7 @@ export default function Receive({ purchaseOrder }: any) {
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (isReceived) return;
         post(`/purchase-orders/${purchaseOrder.id}/receive`);
     };
 
@@ -36,7 +41,7 @@ export default function Receive({ purchaseOrder }: any) {
                     </div>
                     <div>
                         <span className="font-medium text-gray-500">PO Date:</span>{' '}
-                        {purchaseOrder.order_date}
+                        {purchaseOrder.po_date}
                     </div>
                     <div>
                         <span className="font-medium text-gray-500">Status:</span>{' '}
@@ -44,7 +49,29 @@ export default function Receive({ purchaseOrder }: any) {
                     </div>
                 </div>
 
+                {isReceived && (
+                    <div className="rounded-md bg-emerald-50 border border-emerald-200 px-4 py-2 text-sm text-emerald-700">
+                        ✓ Semua barang telah diterima. Purchase Order ini sudah selesai dan tidak bisa diubah lagi.
+                    </div>
+                )}
+
                 <form onSubmit={submit}>
+                    <div className="mb-4">
+                        <FormField label="Terima ke Gudang">
+                            <select
+                                className={inputCls}
+                                value={data.warehouse_id}
+                                onChange={e => setData('warehouse_id', e.target.value)}
+                                disabled={isReceived}
+                            >
+                                <option value="">— Pilih Gudang (opsional) —</option>
+                                {warehouses?.map((w: any) => (
+                                    <option key={w.id} value={w.id}>{w.code} — {w.name}</option>
+                                ))}
+                            </select>
+                        </FormField>
+                    </div>
+
                     <div className="border rounded-lg overflow-hidden mb-4">
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 border-b">
@@ -60,10 +87,13 @@ export default function Receive({ purchaseOrder }: any) {
                             <tbody className="divide-y">
                                 {purchaseOrder.items.map((item: any, i: number) => {
                                     const remaining = item.quantity - (item.received_qty ?? 0);
+                                    const conversionFactor = Number(item.conversion_factor) || 1;
+                                    const receiveQty = data.items[i]?.receive_qty ?? 0;
+                                    const showConversion = item.base_uom?.id && item.base_uom.id !== item.uom?.id;
                                     return (
                                         <tr key={item.id} className={remaining <= 0 ? 'bg-gray-50 text-gray-400' : ''}>
                                             <td className="px-4 py-2">{item.product?.name ?? '—'}</td>
-                                            <td className="px-4 py-2 text-gray-500">{item.unit ?? '—'}</td>
+                                            <td className="px-4 py-2 text-gray-500">{item.uom?.symbol ?? '—'}</td>
                                             <td className="px-4 py-2 text-right">{item.quantity}</td>
                                             <td className="px-4 py-2 text-right">{item.received_qty ?? 0}</td>
                                             <td className="px-4 py-2 text-right font-medium">
@@ -76,11 +106,16 @@ export default function Receive({ purchaseOrder }: any) {
                                                     type="number"
                                                     min={0}
                                                     max={remaining}
-                                                    disabled={remaining <= 0}
-                                                    value={data.items[i]?.receive_qty ?? 0}
+                                                    disabled={isReceived || remaining <= 0}
+                                                    value={receiveQty}
                                                     onChange={e => updateQty(i, Math.min(+e.target.value, remaining))}
                                                     className="w-full rounded-md border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-red-400 disabled:bg-gray-100 disabled:cursor-not-allowed"
                                                 />
+                                                {showConversion && receiveQty > 0 && (
+                                                    <p className="text-xs text-gray-400 mt-1">
+                                                        = {receiveQty * conversionFactor} {item.base_uom?.symbol}
+                                                    </p>
+                                                )}
                                             </td>
                                         </tr>
                                     );
@@ -90,18 +125,20 @@ export default function Receive({ purchaseOrder }: any) {
                     </div>
 
                     <div className="flex gap-3">
-                        <button
-                            type="submit"
-                            disabled={processing}
-                            className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60"
-                        >
-                            {processing ? 'Saving...' : 'Save Receipt'}
-                        </button>
+                        {!isReceived && (
+                            <button
+                                type="submit"
+                                disabled={processing}
+                                className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60"
+                            >
+                                {processing ? 'Saving...' : 'Save Receipt'}
+                            </button>
+                        )}
                         <Link
                             href="/purchase-orders"
                             className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
                         >
-                            Cancel
+                            {isReceived ? 'Kembali' : 'Cancel'}
                         </Link>
                     </div>
                 </form>

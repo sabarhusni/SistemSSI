@@ -8,6 +8,7 @@ const ACCOUNT_TYPES = [
     { value: 'equity',    label: 'Equity' },
     { value: 'revenue',   label: 'Revenue' },
     { value: 'expense',   label: 'Expense' },
+    { value: 'cogs',   label: 'COGS' },
 ];
 
 const ACCOUNT_CATEGORIES = [

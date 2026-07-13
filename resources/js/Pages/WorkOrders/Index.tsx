@@ -6,6 +6,7 @@ import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
 import ConfirmDelete from '@/Components/ConfirmDelete';
 import { Head, Link } from '@inertiajs/react';
+import { fmtDate } from '@/utils/date';
 
 export default function Index({ workOrders, filters, contracts = [], salesOrders = [] }: any) {
     const sortProps = {
@@ -52,7 +53,7 @@ export default function Index({ workOrders, filters, contracts = [], salesOrders
                                 <td className="px-4 py-3 text-gray-500 font-mono text-xs">{wo.sales_order?.so_number ?? '-'}</td>
                                 <td className="px-4 py-3 text-gray-500 font-mono text-xs">{wo.contract?.contract_number ?? '-'}</td>
                                 <td className="px-4 py-3">{wo.technician?.name}</td>
-                                <td className="px-4 py-3">{wo.visit_date}</td>
+                                <td className="px-4 py-3">{fmtDate(wo.visit_date)}</td>
                                 <td className="px-4 py-3">{wo.time_in ?? '-'}</td>
                                 <td className="px-4 py-3">{wo.time_out ?? '-'}</td>
                                 <td className="px-4 py-3">{wo.service_area}</td>

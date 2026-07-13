@@ -4,13 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\WorkOrder;
 use App\Models\Contract;
+use App\Models\Employee;
 use App\Models\SalesOrder;
 use App\Models\Product;
 use App\Models\SalesOrderVisitPlan;
 use App\Models\Setting;
 use App\Models\Stock;
 use App\Models\StockMovement;
-use App\Models\User;
 use App\Models\WorkOrderMaterial;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -54,7 +54,7 @@ class WorkOrderController extends Controller
     public function create()
     {
         return Inertia::render('WorkOrders/Form', [
-            'technicians' => User::where('status', 'active')->orderBy('name')->get(),
+            'technicians' => Employee::where('status', 'active')->orderBy('name')->get(['id', 'employee_number', 'name', 'position']),
             'products'    => Product::where('status', 'active')->orderBy('name')->get(['id', 'code', 'name', 'unit_of_measure_id', 'unit', 'stock', 'product_type']),
             // Hanya kontrak aktif yang punya minimal satu Sales Order berstatus confirmed.
             'contracts'   => Contract::where('status', 'active')
@@ -85,7 +85,8 @@ class WorkOrderController extends Controller
             'sales_order_id'      => 'nullable|uuid|exists:sales_orders,id',
             'sales_order_item_id' => 'nullable|uuid|exists:sales_order_items,id',
             'sales_order_visit_plan_id' => 'nullable|uuid|exists:sales_order_visit_plans,id',
-            'technician_id'    => 'nullable|uuid|exists:users,id',
+            'month'            => 'nullable|integer|min:1',
+            'technician_id'    => 'nullable|uuid|exists:employees,id',
             'visit_date'       => 'required|date',
             'time_in'          => 'nullable|date_format:H:i,H:i:s',
             'time_out'         => 'nullable|date_format:H:i,H:i:s',
@@ -157,7 +158,7 @@ class WorkOrderController extends Controller
     {
         return Inertia::render('WorkOrders/Form', [
             'workOrder'   => $workOrder->load(['materials', 'salesOrder', 'salesOrderItem', 'contract']),
-            'technicians' => User::where('status', 'active')->orderBy('name')->get(),
+            'technicians' => Employee::where('status', 'active')->orderBy('name')->get(['id', 'employee_number', 'name', 'position']),
             'products'    => Product::where('status', 'active')->orderBy('name')->get(['id', 'code', 'name', 'unit_of_measure_id', 'unit', 'stock', 'product_type']),
             'contracts'   => Contract::whereIn('status', ['active', 'completed'])
                 ->where(fn($q) => $q->whereHas('salesOrders', fn($s) => $s->where('status', 'confirmed'))->orWhere('id', $workOrder->contract_id))
@@ -188,7 +189,8 @@ class WorkOrderController extends Controller
             'sales_order_id'      => 'nullable|uuid|exists:sales_orders,id',
             'sales_order_item_id' => 'nullable|uuid|exists:sales_order_items,id',
             'sales_order_visit_plan_id' => 'nullable|uuid|exists:sales_order_visit_plans,id',
-            'technician_id'    => 'nullable|uuid|exists:users,id',
+            'month'            => 'nullable|integer|min:1',
+            'technician_id'    => 'nullable|uuid|exists:employees,id',
             'visit_date'       => 'required|date',
             'time_in'          => 'nullable|date_format:H:i,H:i:s',
             'time_out'         => 'nullable|date_format:H:i,H:i:s',
@@ -411,19 +413,20 @@ class WorkOrderController extends Controller
     }
 
     /**
-     * Kurangi stok untuk tiap sub-produk (parent_product_id terisi) yang dipakai WO.
+     * Kurangi stok untuk tiap material WO (parent maupun sub-produk) yang produknya
+     * bertipe "goods" — produk bertipe "service" tidak mempengaruhi stok.
      * Catatan: kolom stok bertipe integer, qty pecahan dibulatkan ke bilangan terdekat.
      */
     private function deductStockForMaterials(WorkOrder $workOrder): void
     {
-        $subs = $workOrder->materials()->whereNotNull('parent_product_id')->get();
+        $materials = $workOrder->materials()->get();
 
-        foreach ($subs as $mat) {
+        foreach ($materials as $mat) {
             $qty = (int) round((float) $mat->quantity_used);
             if ($qty <= 0) continue;
 
             $product = Product::lockForUpdate()->find($mat->product_id);
-            if (!$product) continue;
+            if (!$product || $product->product_type !== 'goods') continue;
 
             $after = max(0, (int) ($product->stock ?? 0) - $qty);
             $product->stock = $after;
@@ -447,17 +450,18 @@ class WorkOrderController extends Controller
 
     /**
      * Kembalikan stok yang sempat dipotong oleh WO (saat WO Completed dihapus).
+     * Hanya produk bertipe "goods" yang stoknya sempat dipotong (lihat deductStockForMaterials).
      */
     private function restoreStockForMaterials(WorkOrder $workOrder): void
     {
-        $subs = $workOrder->materials()->whereNotNull('parent_product_id')->get();
+        $materials = $workOrder->materials()->get();
 
-        foreach ($subs as $mat) {
+        foreach ($materials as $mat) {
             $qty = (int) round((float) $mat->quantity_used);
             if ($qty <= 0) continue;
 
             $product = Product::lockForUpdate()->find($mat->product_id);
-            if (!$product) continue;
+            if (!$product || $product->product_type !== 'goods') continue;
 
             $after = (int) ($product->stock ?? 0) + $qty;
             $product->stock = $after;

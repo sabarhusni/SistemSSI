@@ -24,6 +24,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\JournalSettingController;
+use App\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
@@ -38,6 +39,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('suppliers', SupplierController::class);
     Route::resource('products', ProductController::class);
     Route::resource('unit-of-measures', UnitOfMeasureController::class);
+    Route::resource('warehouses', WarehouseController::class);
 
     // Operations (Modul 6-9)
     Route::resource('contracts', ContractController::class);

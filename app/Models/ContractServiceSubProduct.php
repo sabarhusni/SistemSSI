@@ -11,8 +11,9 @@ class ContractServiceSubProduct extends Model
 {
     use HasFactory, HasUuids, SoftDeletes;
 
-    protected $fillable = ['contract_service_id', 'product_id', 'quantity'];
+    protected $fillable = ['contract_service_id', 'product_id', 'uom_id', 'quantity'];
 
     public function contractService() { return $this->belongsTo(ContractService::class); }
     public function product() { return $this->belongsTo(Product::class); }
+    public function uom() { return $this->belongsTo(UnitOfMeasure::class, 'uom_id'); }
 }

@@ -5,6 +5,7 @@ import SortableColumn from '@/Components/SortableColumn';
 import Pagination from '@/Components/Pagination';
 import ConfirmDelete from '@/Components/ConfirmDelete';
 import { Head, Link } from '@inertiajs/react';
+import { fmtDate } from '@/utils/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
@@ -42,7 +43,7 @@ export default function Index({ cashTransactions, filters }: any) {
                     <tbody className="divide-y">
                         {cashTransactions.data?.map((tx: any) => (
                             <tr key={tx.id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3">{tx.transaction_date}</td>
+                                <td className="px-4 py-3">{fmtDate(tx.transaction_date)}</td>
                                 <td className="px-4 py-3">
                                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tx.type === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                                         {tx.type === 'in' ? 'In' : 'Out'}

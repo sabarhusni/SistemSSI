@@ -12,7 +12,7 @@ class StockOpname extends Model
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'opname_number', 'warehouse', 'opname_date',
+        'opname_number', 'warehouse', 'warehouse_id', 'opname_date',
         'conducted_by_id', 'status', 'stock_applied', 'notes',
     ];
 
@@ -20,6 +20,7 @@ class StockOpname extends Model
         'stock_applied' => 'boolean',
     ];
 
-    public function conductedBy() { return $this->belongsTo(User::class, 'conducted_by_id'); }
-    public function items() { return $this->hasMany(StockOpnameItem::class); }
+    public function conductedBy()  { return $this->belongsTo(Employee::class, 'conducted_by_id'); }
+    public function warehouseModel() { return $this->belongsTo(Warehouse::class, 'warehouse_id'); }
+    public function items()         { return $this->hasMany(StockOpnameItem::class); }
 }

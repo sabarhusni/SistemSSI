@@ -6,6 +6,7 @@ import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
 import ConfirmDelete from '@/Components/ConfirmDelete';
 import { Head, Link } from '@inertiajs/react';
+import { fmtDate } from '@/utils/date';
 
 export default function Index({ stockTransfers, filters }: any) {
     const sortProps = {
@@ -42,9 +43,9 @@ export default function Index({ stockTransfers, filters }: any) {
                         {stockTransfers.data?.map((tr: any) => (
                             <tr key={tr.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-mono text-xs font-medium">{tr.transfer_number}</td>
-                                <td className="px-4 py-3">{tr.from_warehouse}</td>
-                                <td className="px-4 py-3">{tr.to_warehouse}</td>
-                                <td className="px-4 py-3">{tr.transfer_date}</td>
+                                <td className="px-4 py-3">{tr.source_warehouse?.name ?? tr.from_warehouse ?? '—'}</td>
+                                <td className="px-4 py-3">{tr.destination_warehouse?.name ?? tr.to_warehouse ?? '—'}</td>
+                                <td className="px-4 py-3">{fmtDate(tr.transfer_date)}</td>
                                 <td className="px-4 py-3 text-gray-500">{tr.processed_by?.name ?? '-'}</td>
                                 <td className="px-4 py-3"><StatusBadge status={tr.status} /></td>
                                 <td className="px-4 py-3 flex gap-3">

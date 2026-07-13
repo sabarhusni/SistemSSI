@@ -7,6 +7,7 @@ use App\Models\ProductCategory;
 use App\Models\Stock;
 use App\Models\StockMovement;
 use App\Models\UnitOfMeasure;
+use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -85,10 +86,12 @@ class ProductController extends Controller
             // Hanya produk tipe 'goods' yang punya stok fisik
             if ($product->product_type === 'goods') {
                 $qty = (int) ($product->stock ?? 0);
+                $pusatWarehouse = Warehouse::where('type', 'pusat')->where('status', 'active')->first();
 
                 Stock::create([
-                    'product_id' => $product->id,
-                    'quantity'   => $qty,
+                    'product_id'   => $product->id,
+                    'warehouse_id' => $pusatWarehouse?->id,
+                    'quantity'     => $qty,
                 ]);
 
                 if ($qty > 0) {

@@ -6,6 +6,7 @@ import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
 import ConfirmDelete from '@/Components/ConfirmDelete';
 import { Head, Link } from '@inertiajs/react';
+import { fmtDate } from '@/utils/date';
 
 const fmt = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
@@ -45,12 +46,12 @@ export default function Index({ purchaseOrders, filters }: any) {
                             <tr key={po.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-mono text-xs font-medium">{po.po_number}</td>
                                 <td className="px-4 py-3">{po.supplier?.name}</td>
-                                <td className="px-4 py-3">{po.order_date}</td>
-                                <td className="px-4 py-3 text-gray-500">{po.expected_delivery_date ?? '-'}</td>
+                                <td className="px-4 py-3">{fmtDate(po.po_date)}</td>
+                                <td className="px-4 py-3 text-gray-500">{fmtDate(po.expected_delivery_date)}</td>
                                 <td className="px-4 py-3 text-right">{fmt(po.total_amount)}</td>
                                 <td className="px-4 py-3"><StatusBadge status={po.status} /></td>
                                 <td className="px-4 py-3 flex gap-3">
-                                    {(po.status === 'sent' || po.status === 'draft') && (
+                                    {po.status === 'sent' && (
                                         <Link href={`/purchase-orders/${po.id}/receive`} className="text-red-600 hover:underline">Receive</Link>
                                     )}
                                     <Link href={`/purchase-orders/${po.id}/edit`} className="text-blue-600 hover:underline">Edit</Link>

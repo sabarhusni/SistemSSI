@@ -20,9 +20,10 @@ class MenuSeeder extends Seeder
             ['group' => 'Operations', 'group_order' => 2, 'label' => 'Supplier',            'icon' => '🏭', 'href' => '/suppliers',             'permission' => 'suppliers.list',          'sort_order' => 2],
             ['group' => 'Operations', 'group_order' => 2, 'label' => 'Product',             'icon' => '📦', 'href' => '/products',              'permission' => 'products.list',           'sort_order' => 3],
             ['group' => 'Operations', 'group_order' => 2, 'label' => 'Unit of Measure',     'icon' => '📐', 'href' => '/unit-of-measures',      'permission' => null,                      'sort_order' => 4],
-            ['group' => 'Operations', 'group_order' => 2, 'label' => 'Contract',            'icon' => '📋', 'href' => '/contracts',             'permission' => 'contracts.list',          'sort_order' => 5],
-            ['group' => 'Operations', 'group_order' => 2, 'label' => 'Sales Order',         'icon' => '🛒', 'href' => '/sales-orders',          'permission' => 'sales_orders.list',       'sort_order' => 6],
-            ['group' => 'Operations', 'group_order' => 2, 'label' => 'Work Service Order',  'icon' => '🔧', 'href' => '/work-orders',           'permission' => 'work_orders.list',        'sort_order' => 7],
+            ['group' => 'Operations', 'group_order' => 2, 'label' => 'Gudang',               'icon' => '🏪', 'href' => '/warehouses',             'permission' => null,                      'sort_order' => 5],
+            ['group' => 'Operations', 'group_order' => 2, 'label' => 'Contract',            'icon' => '📋', 'href' => '/contracts',             'permission' => 'contracts.list',          'sort_order' => 6],
+            ['group' => 'Operations', 'group_order' => 2, 'label' => 'Sales Order',         'icon' => '🛒', 'href' => '/sales-orders',          'permission' => 'sales_orders.list',       'sort_order' => 7],
+            ['group' => 'Operations', 'group_order' => 2, 'label' => 'Work Service Order',  'icon' => '🔧', 'href' => '/work-orders',           'permission' => 'work_orders.list',        'sort_order' => 8],
 
             // Finance
             ['group' => 'Finance', 'group_order' => 3, 'label' => 'Invoice',            'icon' => '🧾', 'href' => '/invoices',              'permission' => 'invoices.list',           'sort_order' => 1],
