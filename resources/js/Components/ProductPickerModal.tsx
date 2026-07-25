@@ -13,7 +13,13 @@ interface Props {
     extraKey?: string;
     extraFormat?: 'currency' | 'number' | 'text';
     // Bila diisi, hanya produk dengan product_type tsb yang ditampilkan (mis. 'goods').
+    // Menjadi tipe default saat allowTypeToggle aktif.
     typeFilter?: 'goods' | 'service';
+    // Bila diisi, hanya produk dengan nama kategori tsb yang ditampilkan (mis. 'Pest Control').
+    // Otomatis diabaikan saat user beralih ke tab "Goods".
+    categoryFilter?: string;
+    // Tampilkan tab Service/Goods agar user bisa beralih tipe produk di dalam modal.
+    allowTypeToggle?: boolean;
 }
 
 export default function ProductPickerModal({
@@ -24,8 +30,11 @@ export default function ProductPickerModal({
     extraKey,
     extraFormat = 'currency',
     typeFilter,
+    categoryFilter,
+    allowTypeToggle = false,
 }: Props) {
     const [search, setSearch] = useState('');
+    const [activeType, setActiveType] = useState<'goods' | 'service' | undefined>(typeFilter);
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => { inputRef.current?.focus(); }, []);
@@ -36,16 +45,20 @@ export default function ProductPickerModal({
         return () => window.removeEventListener('keydown', handler);
     }, [onClose]);
 
+    const effectiveType = allowTypeToggle ? activeType : typeFilter;
+
     const filtered = useMemo(() => {
         const q = search.toLowerCase().trim();
-        const byType = typeFilter ? products.filter(p => p.product_type === typeFilter) : products;
-        if (!q) return byType;
-        return byType.filter(p =>
+        const byType = effectiveType ? products.filter(p => p.product_type === effectiveType) : products;
+        // Kategori Pest Control/Scenting hanya berlaku untuk produk service.
+        const byCategory = (categoryFilter && effectiveType !== 'goods') ? byType.filter(p => p.category?.name === categoryFilter) : byType;
+        if (!q) return byCategory;
+        return byCategory.filter(p =>
             p.name?.toLowerCase().includes(q) ||
             p.code?.toLowerCase().includes(q) ||
             p.unit?.toLowerCase().includes(q)
         );
-    }, [search, products, typeFilter]);
+    }, [search, products, effectiveType, categoryFilter]);
 
     const renderExtra = (p: any) => {
         if (!extraKey) return null;
@@ -75,7 +88,7 @@ export default function ProductPickerModal({
                 </div>
 
                 {/* Search */}
-                <div className="px-4 py-3 border-b">
+                <div className="px-4 py-3 border-b space-y-2">
                     <input
                         ref={inputRef}
                         className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
@@ -83,6 +96,27 @@ export default function ProductPickerModal({
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                     />
+                    {allowTypeToggle && (
+                        <div className="flex gap-1">
+                            {([
+                                { val: 'service', label: 'Service' },
+                                { val: 'goods', label: 'Goods' },
+                            ] as const).map(opt => (
+                                <button
+                                    key={opt.val}
+                                    type="button"
+                                    onClick={() => setActiveType(opt.val)}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium transition ${
+                                        activeType === opt.val
+                                            ? 'bg-red-100 text-red-700 border border-red-300'
+                                            : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
+                                    }`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* List */}

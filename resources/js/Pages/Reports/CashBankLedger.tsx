@@ -1,7 +1,7 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
-import { fmt, fmtDate, SummaryCard, FilterBar, FilterDate, FilterSelect, ReportTable, applyFilters } from './_shared';
+import { fmt, fmtDate, SummaryCard, FilterBar, FilterDate, FilterSelect, ReportTable, applyFilters, exportToExcel } from './_shared';
 
 export default function CashBankLedger({ rows, summary, bankAccounts, filters }: any) {
     const today = new Date().toISOString().slice(0, 10);
@@ -9,10 +9,19 @@ export default function CashBankLedger({ rows, summary, bankAccounts, filters }:
 
     const [f, setF] = useState({ from: filters?.from ?? firstDay, to: filters?.to ?? today, source: filters?.source ?? '', bank_account_id: filters?.bank_account_id ?? '' });
 
+    const handleExport = () => exportToExcel('Cash_Bank_Ledger', [{
+        name: 'Ledger',
+        headers: ['Date', 'Source', 'Reference', 'Description', 'Debit (In)', 'Credit (Out)', 'Balance'],
+        rows: (rows ?? []).map((r: any) => [
+            r.date, r.source_name, r.reference ?? '-', r.description ?? '-',
+            Number(r.debit ?? 0), Number(r.credit ?? 0), Number(r.balance ?? 0),
+        ]),
+    }]);
+
     return (
         <AppLayout header="Cash / Bank Ledger">
             <Head title="Cash/Bank Ledger" />
-            <FilterBar onApply={() => applyFilters('/reports/cash-bank-ledger', f)}>
+            <FilterBar onApply={() => applyFilters('/reports/cash-bank-ledger', f)} onExport={handleExport}>
                 <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
                 <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
                 <FilterSelect label="Source" value={f.source} onChange={v => setF({ ...f, source: v, bank_account_id: '' })}>

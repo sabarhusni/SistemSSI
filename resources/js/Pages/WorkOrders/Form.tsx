@@ -12,12 +12,18 @@ const VISIT_TYPES = [
     { value: 'followup',  label: 'Follow Up' },
 ];
 
-const emptySub = () => ({ product_id: '', quantity_used: 1, uom: '' });
+const SERVICE_TYPES = [
+    { value: 'pest_control', label: 'Pest Control' },
+    { value: 'scenting',     label: 'Scenting' },
+];
+
+const emptySub = () => ({ product_id: '', quantity_used: 1, uom: '', method_of_application: '' });
 
 const emptyMaterial = (month = 1) => ({
     product_id:   '',
     month,
     uom:          '',
+    method_of_application: '',
     quantity_used: 1,
     sub_products: [] as any[],
 });
@@ -76,6 +82,7 @@ function materialsFromMonth(month: number, parentItems: any[], soItems: any[], v
             product_id:    item.product_id,
             month,
             uom:           item.uom ?? item.product?.unit ?? '',
+            method_of_application: '',
             quantity_used: Number(item.quantity) || 1,
             sub_products: subs.map((sp: any) => {
                 const soQty = Number(sp.quantity) || 0;
@@ -83,6 +90,7 @@ function materialsFromMonth(month: number, parentItems: any[], soItems: any[], v
                 return {
                     product_id:    sp.product_id,
                     uom:           sp.uom ?? sp.product?.unit ?? '',
+                    method_of_application: '',
                     quantity_used: round2(Math.max(0, perVisit)),
                 };
             }),
@@ -101,10 +109,11 @@ function materialsFromRows(rows: any[]): any[] {
         product_id:    p.product_id,
         month:         p.month ?? 1,
         uom:           p.uom ?? '',
+        method_of_application: p.method_of_application ?? '',
         quantity_used: p.quantity_used,
         sub_products: children
             .filter((c: any) => c.parent_product_id === p.product_id && (c.month ?? 1) === (p.month ?? 1))
-            .map((c: any) => ({ product_id: c.product_id, quantity_used: c.quantity_used, uom: c.uom ?? '' })),
+            .map((c: any) => ({ product_id: c.product_id, quantity_used: c.quantity_used, uom: c.uom ?? '', method_of_application: c.method_of_application ?? '' })),
     }));
 }
 
@@ -129,6 +138,7 @@ function flattenMaterials(materials: any[]): any[] {
             parent_product_id: null,
             month,
             uom:               m.uom ?? null,
+            method_of_application: m.method_of_application ?? null,
             quantity_used:     Number(m.quantity_used || 1),
         });
         for (const sub of (m.sub_products ?? [])) {
@@ -138,6 +148,7 @@ function flattenMaterials(materials: any[]): any[] {
                 parent_product_id: m.product_id,
                 month,
                 uom:               sub.uom ?? null,
+                method_of_application: sub.method_of_application ?? null,
                 quantity_used:     Number(sub.quantity_used || 1),
             });
         }
@@ -180,6 +191,9 @@ export default function Form({ workOrder, technicians, products, contracts, next
     const [contractPickerOpen, setContractPickerOpen] = useState(false);
     const [soPickerOpen, setSoPickerOpen] = useState(false);
     const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+    // Tipe layanan dipilih dulu untuk menyaring daftar Contract No. Bila kontrak sudah
+    // terpilih, tipe layanan mengikuti kontrak tsb (konsisten dengan filter yang aktif).
+    const [serviceType, setServiceType] = useState<string>('');
 
     const getProduct = (id: string) => products?.find((p: any) => p.id === id);
     const productUnit = (p: any) => p?.unit ?? '';
@@ -229,6 +243,12 @@ export default function Form({ workOrder, technicians, products, contracts, next
     const selectedContract = useMemo(
         () => contracts?.find((c: any) => String(c.id) === String(data.contract_id)),
         [contracts, data.contract_id]
+    );
+    // Bila kontrak sudah terpilih, tipe layanan mengikuti kontrak tsb; selain itu ikut pilihan Services.
+    const effectiveServiceType = selectedContract ? (selectedContract.service_type ?? '') : serviceType;
+    const filteredContracts = useMemo(
+        () => (contracts ?? []).filter((c: any) => !effectiveServiceType || c.service_type === effectiveServiceType),
+        [contracts, effectiveServiceType]
     );
     // SO berstatus confirmed pada kontrak terpilih.
     const confirmedSOs = useMemo(() => selectedContract?.sales_orders ?? [], [selectedContract]);
@@ -319,6 +339,22 @@ export default function Form({ workOrder, technicians, products, contracts, next
         }
         return null;
     }, [soItemMonths, linkedSO, selectedContract, workOrder]);
+
+    // Ganti tipe layanan: bila kontrak yang sudah dipilih tidak cocok tipe baru, reset pilihan kontrak.
+    const handleSelectServiceType = (value: string) => {
+        setServiceType(value);
+        if (selectedContract && selectedContract.service_type !== value) {
+            setData({
+                ...data,
+                contract_id:               '',
+                sales_order_id:            '',
+                month:                     '',
+                sales_order_visit_plan_id: '',
+                visit_date:                '',
+                materials:                 [],
+            });
+        }
+    };
 
     const handleSelectContract = (contract: any) => {
         setData({
@@ -424,6 +460,9 @@ export default function Form({ workOrder, technicians, products, contracts, next
                             <input type="number" min={1} readOnly={fromSo} disabled={fromSo} className={fromSo ? `${inputCls} bg-gray-100 cursor-not-allowed` : inputCls} value={mat.quantity_used} onChange={e => updateMaterial(idx, 'quantity_used', +e.target.value)} />
                         </td>
                         <td className="px-3 py-2">
+                            <input type="text" placeholder="Metode aplikasi" className={inputCls} value={mat.method_of_application ?? ''} onChange={e => updateMaterial(idx, 'method_of_application', e.target.value)} />
+                        </td>
+                        <td className="px-3 py-2">
                             {!fromSo && (
                                 <button type="button" onClick={() => removeMaterial(idx)} className="text-red-500 text-lg leading-none hover:text-red-700">×</button>
                             )}
@@ -431,7 +470,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
                     </tr>
 
                     <tr key={`sub-${idx}`} className="bg-blue-50">
-                        <td colSpan={4} className="px-4 py-2">
+                        <td colSpan={5} className="px-4 py-2">
                             <div className="flex items-center justify-between mb-1">
                                 <span className="text-xs font-semibold text-blue-700">Sub Product</span>
                                 <button type="button" onClick={() => addSubProduct(idx)} className="text-xs text-blue-600 hover:underline">+ Add Sub Product</button>
@@ -445,7 +484,8 @@ export default function Form({ workOrder, technicians, products, contracts, next
                                         <tr className="text-left text-blue-600 border-b border-blue-100">
                                             <th className="pb-1 pr-2">Sub Product</th>
                                             <th className="pb-1 w-16 pr-2">Unit</th>
-                                            <th className="pb-1 w-24">Qty</th>
+                                            <th className="pb-1 w-24 pr-2">Qty</th>
+                                            <th className="pb-1 w-32">Method of Application</th>
                                             <th className="pb-1 w-8"></th>
                                         </tr>
                                     </thead>
@@ -466,6 +506,9 @@ export default function Form({ workOrder, technicians, products, contracts, next
                                                     <td className="py-1 pr-2 text-gray-500">{productUnit(subProduct) || '—'}</td>
                                                     <td className="py-1 pr-2">
                                                         <input type="number" min={0} step="any" className={inputCls} value={sub.quantity_used} onChange={e => updateSubProduct(idx, si, 'quantity_used', +e.target.value)} />
+                                                    </td>
+                                                    <td className="py-1 pr-2">
+                                                        <input type="text" placeholder="Metode aplikasi" className={inputCls} value={sub.method_of_application ?? ''} onChange={e => updateSubProduct(idx, si, 'method_of_application', e.target.value)} />
                                                     </td>
                                                     <td className="py-1">
                                                         <button type="button" onClick={() => removeSubProduct(idx, si)} className="text-red-400 hover:text-red-600 text-base leading-none">×</button>
@@ -500,7 +543,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
 
             {contractPickerOpen && (
                 <ContractPickerModal
-                    contracts={contracts ?? []}
+                    contracts={filteredContracts}
                     onSelect={handleSelectContract}
                     onClose={() => setContractPickerOpen(false)}
                 />
@@ -539,18 +582,34 @@ export default function Form({ workOrder, technicians, products, contracts, next
                         </FormField>
                     </div>
 
-                    <FormField label="Contract No." error={errors.contract_id} required>
-                        <button
-                            type="button"
-                            onClick={() => setContractPickerOpen(true)}
-                            className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition"
-                        >
-                            {selectedContract
-                                ? <span className="text-gray-800">{selectedContract.contract_number} — {selectedContract.customer?.name ?? ''}</span>
-                                : <span className="text-gray-400">— Pilih Kontrak —</span>
-                            }
-                        </button>
-                    </FormField>
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField label="Services">
+                            <select
+                                className={inputCls}
+                                value={effectiveServiceType}
+                                onChange={e => handleSelectServiceType(e.target.value)}
+                            >
+                                <option value="">— Pilih Tipe Layanan —</option>
+                                {SERVICE_TYPES.map(s => (
+                                    <option key={s.value} value={s.value}>{s.label}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-gray-400 mt-1">Menentukan daftar Contract No. di samping.</p>
+                        </FormField>
+                        <FormField label="Contract No." error={errors.contract_id} required>
+                            <button
+                                type="button"
+                                disabled={!effectiveServiceType}
+                                onClick={() => setContractPickerOpen(true)}
+                                className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition disabled:bg-gray-50 disabled:cursor-not-allowed"
+                            >
+                                {selectedContract
+                                    ? <span className="text-gray-800">{selectedContract.contract_number} — {selectedContract.customer?.name ?? ''}</span>
+                                    : <span className="text-gray-400">{effectiveServiceType ? '— Pilih Kontrak —' : 'Pilih Services terlebih dahulu'}</span>
+                                }
+                            </button>
+                        </FormField>
+                    </div>
 
                     <FormField label="Referensi SO (Confirmed)" error={errors.sales_order_id}>
                         <button
@@ -720,12 +779,13 @@ export default function Form({ workOrder, technicians, products, contracts, next
 
                                         {!isCollapsed && (
                                             <div className="overflow-x-auto">
-                                                <table className="w-full text-sm min-w-[640px]">
+                                                <table className="w-full text-sm min-w-[820px]">
                                                     <thead className="bg-gray-50 border-b">
                                                         <tr className="text-left text-gray-600 text-xs">
                                                             <th className="px-3 py-2">Product</th>
                                                             <th className="px-3 py-2 w-20">Unit</th>
                                                             <th className="px-3 py-2 w-28">Qty</th>
+                                                            <th className="px-3 py-2 w-40">Method of Application</th>
                                                             <th className="px-3 py-2 w-8"></th>
                                                         </tr>
                                                     </thead>

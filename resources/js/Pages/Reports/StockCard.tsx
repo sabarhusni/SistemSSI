@@ -1,7 +1,7 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
-import { fmtDate, fmtNum, FilterBar, FilterDate, FilterSelect, applyFilters } from './_shared';
+import { fmtDate, fmtNum, FilterBar, FilterDate, FilterSelect, applyFilters, exportToExcel } from './_shared';
 
 const IN_TYPES = [
     'initial_stock', 'purchase_receipt', 'purchase_receive',
@@ -41,10 +41,19 @@ export default function StockCard({ movements, openingBalance, product, products
     const totalIn  = rows.filter((r: any) => r.isIn).reduce((s: number, r: any) => s + r.quantity, 0);
     const totalOut = rows.filter((r: any) => !r.isIn).reduce((s: number, r: any) => s + r.quantity, 0);
 
+    const handleExport = () => exportToExcel(`Stock_Card_${product?.name ?? 'Product'}`, [{
+        name: 'Stock Card',
+        headers: ['Date', 'Type', 'Reference', 'Notes', 'In', 'Out', 'Balance', 'By'],
+        rows: rows.map((r: any) => [
+            r.created_at?.slice(0, 10) ?? '', typeLabel[r.type] ?? r.type, r.reference_type ?? '-',
+            r.notes ?? '-', r.isIn ? r.quantity : '', !r.isIn ? r.quantity : '', r.balance, r.created_by?.name ?? '-',
+        ]),
+    }]);
+
     return (
         <AppLayout header="Stock Card / Stock History">
             <Head title="Stock Card" />
-            <FilterBar onApply={() => applyFilters('/reports/stock-card', f)}>
+            <FilterBar onApply={() => applyFilters('/reports/stock-card', f)} onExport={product ? handleExport : undefined}>
                 <FilterSelect label="Product" value={f.product_id} onChange={v => setF({ ...f, product_id: v })}>
                     <option value="">— Select Product —</option>
                     {products?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}

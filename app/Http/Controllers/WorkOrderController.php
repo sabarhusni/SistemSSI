@@ -30,11 +30,12 @@ class WorkOrderController extends Controller
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->when($request->contract_id, fn($q, $v) => $q->where('contract_id', $v))
             ->when($request->sales_order_id, fn($q, $v) => $q->where('sales_order_id', $v))
+            ->when($request->service_type, fn($q, $v) => $q->whereHas('contract', fn($cq) => $cq->where('service_type', $v)))
             ->orderBy($sortBy, $sortDir);
 
         return Inertia::render('WorkOrders/Index', [
             'workOrders'  => $query->paginate(15)->withQueryString(),
-            'filters'     => $request->only('search', 'status', 'contract_id', 'sales_order_id', 'sort_by', 'sort_dir'),
+            'filters'     => $request->only('search', 'status', 'contract_id', 'sales_order_id', 'service_type', 'sort_by', 'sort_dir'),
             'contracts'   => Contract::whereHas('workOrders')->orderBy('contract_number')->get(['id', 'contract_number']),
             'salesOrders' => SalesOrder::whereHas('workOrders')->orderBy('so_number')->get(['id', 'so_number']),
         ]);
@@ -44,7 +45,8 @@ class WorkOrderController extends Controller
     {
         $year   = date('y');
         $prefix = 'WO' . $year;
-        $last   = WorkOrder::where('wo_number', 'like', $prefix . '%')
+        $last   = WorkOrder::withTrashed()->where('wo_number', 'like', $prefix . '%')
+            ->where('deleted_at', null) // Hanya ambil WO yang belum dihapus
             ->orderBy('wo_number', 'desc')
             ->value('wo_number');
         $seq = $last ? ((int) substr($last, strlen($prefix)) + 1) : 1;
@@ -64,11 +66,12 @@ class WorkOrderController extends Controller
                     'salesOrders' => fn($q) => $q->where('status', 'confirmed')->orderBy('so_number')
                         ->with(['items.product', 'visitPlans', 'premise',
                             'workOrders' => fn($w) => $w->select('id', 'sales_order_id', 'visit_date', 'sales_order_visit_plan_id')
+                                ->where('status', '!=', 'cancelled')
                                 ->with('materials:id,work_order_id,parent_product_id,product_id,month,quantity_used'),
                         ]),
                 ])
                 ->orderBy('contract_number')
-                ->get(['id', 'contract_number', 'customer_id', 'duration_months', 'start_date', 'end_date']),
+                ->get(['id', 'contract_number', 'customer_id', 'duration_months', 'start_date', 'end_date', 'service_type']),
             'nextNumber'  => $this->generateNextNumber(),
             // Penugasan teknisi yang sudah ada (untuk cek bentrok jadwal per tanggal visit).
             'technicianBookings' => WorkOrder::whereNotNull('technician_id')
@@ -80,7 +83,7 @@ class WorkOrderController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'wo_number'        => 'required|string|max:50|unique:work_orders,wo_number',
+            'wo_number'        => 'required|string|max:50',
             'contract_id'         => 'nullable|uuid|exists:contracts,id',
             'sales_order_id'      => 'nullable|uuid|exists:sales_orders,id',
             'sales_order_item_id' => 'nullable|uuid|exists:sales_order_items,id',
@@ -100,6 +103,7 @@ class WorkOrderController extends Controller
             'materials.*.parent_product_id' => 'nullable|uuid|exists:products,id',
             'materials.*.month'             => 'nullable|integer|min:1',
             'materials.*.uom'               => 'nullable|string|max:50',
+            'materials.*.method_of_application' => 'nullable|string|max:255',
             'materials.*.quantity_used'     => 'required|numeric|min:0',
         ]);
 
@@ -112,9 +116,11 @@ class WorkOrderController extends Controller
             $data['contract_id'] = SalesOrder::find($data['sales_order_id'])?->contract_id;
         }
 
-        // Satu tanggal visit pada satu SO hanya boleh dipakai satu Work Order.
+        // Satu tanggal visit pada satu SO hanya boleh dipakai satu Work Order aktif.
+        // WO yang Cancelled tidak menahan tanggal, sehingga tanggalnya bisa dipakai WO baru.
         if (!empty($data['sales_order_id']) && !empty($data['visit_date'])
-            && WorkOrder::where('sales_order_id', $data['sales_order_id'])->whereDate('visit_date', $data['visit_date'])->exists()) {
+            && WorkOrder::where('sales_order_id', $data['sales_order_id'])->whereDate('visit_date', $data['visit_date'])
+                ->where('status', '!=', 'cancelled')->exists()) {
             return back()->withErrors(['visit_date' => 'Tanggal visit ini sudah digunakan pada Work Order lain untuk SO yang sama.'])->withInput();
         }
 
@@ -133,6 +139,7 @@ class WorkOrderController extends Controller
                         'parent_product_id' => $mat['parent_product_id'] ?? null,
                         'month'             => $mat['month'] ?? 1,
                         'uom'               => $mat['uom'] ?? null,
+                        'method_of_application' => $mat['method_of_application'] ?? null,
                         'quantity_used'     => $mat['quantity_used'],
                     ]);
                 }
@@ -167,11 +174,12 @@ class WorkOrderController extends Controller
                     'salesOrders' => fn($q) => $q->whereIn('status', ['confirmed', 'active', 'completed'])->orderBy('so_number')
                         ->with(['items.product', 'visitPlans', 'premise',
                             'workOrders' => fn($w) => $w->select('id', 'sales_order_id', 'visit_date', 'sales_order_visit_plan_id')
+                                ->where('status', '!=', 'cancelled')
                                 ->with('materials:id,work_order_id,parent_product_id,product_id,month,quantity_used'),
                         ]),
                 ])
                 ->orderBy('contract_number')
-                ->get(['id', 'contract_number', 'customer_id', 'duration_months', 'start_date', 'end_date']),
+                ->get(['id', 'contract_number', 'customer_id', 'duration_months', 'start_date', 'end_date', 'service_type']),
             // Penugasan teknisi yang sudah ada (untuk cek bentrok jadwal per tanggal visit).
             'technicianBookings' => WorkOrder::whereNotNull('technician_id')
                 ->whereNotIn('status', ['cancelled'])
@@ -184,7 +192,7 @@ class WorkOrderController extends Controller
     public function update(Request $request, WorkOrder $workOrder)
     {
         $data = $request->validate([
-            'wo_number'        => 'required|string|max:50|unique:work_orders,wo_number,' . $workOrder->id,
+            'wo_number'        => 'required|string|max:50',
             'contract_id'         => 'nullable|uuid|exists:contracts,id',
             'sales_order_id'      => 'nullable|uuid|exists:sales_orders,id',
             'sales_order_item_id' => 'nullable|uuid|exists:sales_order_items,id',
@@ -204,6 +212,7 @@ class WorkOrderController extends Controller
             'materials.*.parent_product_id' => 'nullable|uuid|exists:products,id',
             'materials.*.month'             => 'nullable|integer|min:1',
             'materials.*.uom'               => 'nullable|string|max:50',
+            'materials.*.method_of_application' => 'nullable|string|max:255',
             'materials.*.quantity_used'     => 'required|numeric|min:0',
         ]);
 
@@ -216,9 +225,11 @@ class WorkOrderController extends Controller
             $data['contract_id'] = SalesOrder::find($data['sales_order_id'])?->contract_id;
         }
 
-        // Satu tanggal visit pada satu SO hanya boleh dipakai satu Work Order (selain WO ini).
+        // Satu tanggal visit pada satu SO hanya boleh dipakai satu Work Order aktif (selain WO ini).
+        // WO yang Cancelled tidak menahan tanggal, sehingga tanggalnya bisa dipakai WO baru.
         if (!empty($data['sales_order_id']) && !empty($data['visit_date'])
             && WorkOrder::where('sales_order_id', $data['sales_order_id'])->whereDate('visit_date', $data['visit_date'])
+                ->where('status', '!=', 'cancelled')
                 ->where('id', '!=', $workOrder->id)->exists()) {
             return back()->withErrors(['visit_date' => 'Tanggal visit ini sudah digunakan pada Work Order lain untuk SO yang sama.'])->withInput();
         }
@@ -241,6 +252,7 @@ class WorkOrderController extends Controller
                         'parent_product_id' => $mat['parent_product_id'] ?? null,
                         'month'             => $mat['month'] ?? 1,
                         'uom'               => $mat['uom'] ?? null,
+                        'method_of_application' => $mat['method_of_application'] ?? null,
                         'quantity_used'     => $mat['quantity_used'],
                     ]);
                 }
@@ -264,8 +276,8 @@ class WorkOrderController extends Controller
 
     public function destroy(WorkOrder $workOrder)
     {
-        if (in_array($workOrder->status, ['completed', 'cancelled'], true)) {
-            return redirect('/work-orders')->with('error', 'Work Order dengan status Completed atau Cancelled tidak bisa dihapus.');
+        if ($workOrder->status === 'completed') {
+            return redirect('/work-orders')->with('error', 'Work Order dengan status Completed tidak bisa dihapus.');
         }
 
         DB::transaction(function () use ($workOrder) {
@@ -481,7 +493,7 @@ class WorkOrderController extends Controller
     {
         $workOrder->load([
             'contract.customer',
-            'salesOrder.premise',
+            'salesOrder.premise.services.product',
             'salesOrder.visitPlans',
             'salesOrderItem.product',
             'technician',

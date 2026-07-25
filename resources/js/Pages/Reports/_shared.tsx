@@ -1,4 +1,5 @@
 import { router } from '@inertiajs/react';
+import * as XLSX from 'xlsx';
 
 export const fmt = (n: any) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(n ?? 0));
@@ -33,7 +34,7 @@ export function SummaryCard({ label, value, sub, color = 'emerald' }: { label: s
     );
 }
 
-export function FilterBar({ children, onApply }: { children: React.ReactNode; onApply: () => void }) {
+export function FilterBar({ children, onApply, onExport }: { children: React.ReactNode; onApply: () => void; onExport?: () => void }) {
     return (
         <div className="bg-white rounded-xl shadow px-5 py-4 mb-4 flex flex-wrap items-end gap-3">
             {children}
@@ -44,6 +45,15 @@ export function FilterBar({ children, onApply }: { children: React.ReactNode; on
             >
                 Show
             </button>
+            {onExport && (
+                <button
+                    type="button"
+                    onClick={onExport}
+                    className="px-4 py-2 bg-emerald-600 text-white text-sm rounded-md hover:bg-emerald-700"
+                >
+                    📊 Export Excel
+                </button>
+            )}
             <button
                 type="button"
                 onClick={() => window.print()}
@@ -53,6 +63,26 @@ export function FilterBar({ children, onApply }: { children: React.ReactNode; on
             </button>
         </div>
     );
+}
+
+/**
+ * Client-side Excel export. Each sheet gets its own tab; cell values are passed
+ * as raw strings/numbers (not pre-formatted) so Excel can sort/sum them natively.
+ */
+export type ExcelSheet = {
+    name: string;
+    headers: string[];
+    rows: (string | number | null | undefined)[][];
+};
+
+export function exportToExcel(filename: string, sheets: ExcelSheet[]) {
+    const wb = XLSX.utils.book_new();
+    sheets.forEach(sheet => {
+        const ws = XLSX.utils.aoa_to_sheet([sheet.headers, ...sheet.rows.map(r => r.map(v => v ?? ''))]);
+        XLSX.utils.book_append_sheet(wb, ws, sheet.name.slice(0, 31));
+    });
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `${filename}_${stamp}.xlsx`);
 }
 
 export function FilterDate({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {

@@ -4,12 +4,32 @@ import { Fragment, useEffect } from 'react';
 const fmtDate = (d: string) =>
     d ? new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
 
+// Tanggal gaya DD/MM/YYYY dipakai pada Service Report Pest Control.
+const fmtShort = (d: string) => {
+    if (!d) return '—';
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return '—';
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${dt.getFullYear()}`;
+};
+
 const statusLabel: Record<string, string> = {
     pending: 'Pending', in_progress: 'In Progress', completed: 'Completed', cancelled: 'Cancelled',
 };
 
 const visitTypeLabel: Record<string, string> = {
     routine: 'Routine', complaint: 'Complaint', followup: 'Follow Up',
+};
+
+const purposeLabel: Record<string, string> = {
+    routine: 'Routine (R)', complaint: 'Complaint (C)', followup: 'Follow Up (F)',
+};
+
+// Identitas perusahaan pada kop surat (sama dengan yang dipakai di cetak Contract).
+const COMPANY = {
+    name: 'CV. SINERGY SERVE INDONESIA',
+    addressLines: ['Sekedengdeur No. 15, Ujungberung', 'Kota Bandung, Jawa Barat 40167'],
 };
 
 function Row({ label, value }: { label: string; value: any }) {
@@ -26,6 +46,12 @@ export default function Print({ workOrder, companyName }: any) {
         const t = setTimeout(() => window.print(), 400);
         return () => clearTimeout(t);
     }, []);
+
+    // Pest Control pakai layout Service Report (Form H). Tipe service lain (mis. Scenting)
+    // tetap memakai layout generik di bawah, tidak berubah.
+    if (workOrder.contract?.service_type === 'pest_control') {
+        return <PestControlServiceReport workOrder={workOrder} companyName={companyName} />;
+    }
 
     const materials: any[] = workOrder.materials ?? [];
     const parents = materials.filter((m: any) => !m.parent_product_id);
@@ -49,7 +75,7 @@ export default function Print({ workOrder, companyName }: any) {
 
     return (
         <div className="min-h-screen bg-gray-100 print:bg-white py-8 print:py-0">
-            <Head title={`Work Order ${workOrder.wo_number}`} />
+            <Head title={`Service Report ${workOrder.wo_number}`} />
 
             <div className="max-w-3xl mx-auto mb-4 flex gap-3 print:hidden">
                 <button
@@ -72,7 +98,7 @@ export default function Print({ workOrder, companyName }: any) {
                         <p className="text-sm text-gray-500 mt-1">Work Service Order Document</p>
                     </div>
                     <div className="text-right">
-                        <h2 className="text-lg font-bold uppercase">Work Order</h2>
+                        <h2 className="text-lg font-bold uppercase">Service Report</h2>
                         <p className="text-sm font-mono mt-1">{workOrder.wo_number}</p>
                         <p className="text-xs text-gray-500 mt-1">Status: {statusLabel[workOrder.status] ?? workOrder.status}</p>
                     </div>
@@ -178,6 +204,276 @@ export default function Print({ workOrder, companyName }: any) {
                         <p className="border-t border-gray-400 pt-1">{premise?.pic ?? '(______________)'}</p>
                     </div>
                 </div>
+            </div>
+        </div>
+    );
+}
+
+// Kop surat dipakai berulang di tiap halaman Service Report Pest Control.
+function PestHeader({ companyNameResolved, woNumber }: { companyNameResolved: string; woNumber: string }) {
+    return (
+        <div className="flex items-start justify-between border-b-2 border-amber-600 pb-3 mb-3">
+            <div className="flex items-start gap-2">
+                <img src="/images/logo_ssi_new.png" alt="" className="h-10 w-10 object-contain shrink-0" />
+                <div>
+                    <p className="text-[11px] font-bold uppercase">Service Report <span className="font-normal normal-case">(Record of Pesticides Usage)</span></p>
+                    <p className="text-[10px] text-gray-500">Report to Customer</p>
+                </div>
+            </div>
+            <div className="text-right">
+                <h2 className="text-base font-extrabold text-amber-600">{companyNameResolved}</h2>
+                <p className="text-[10px] text-gray-500">Reference No: {woNumber}</p>
+            </div>
+        </div>
+    );
+}
+
+function PestFooter({ companyNameResolved }: { companyNameResolved: string }) {
+    return (
+        <p className="text-[9px] text-gray-400 mt-6 border-t pt-2">
+            {companyNameResolved} — {COMPANY.addressLines.join(', ')}
+        </p>
+    );
+}
+
+// Baris "Label : Value" pada tabel Section A, konsisten dengan gaya InfoRow di cetak Contract.
+function PestRow({ label, value }: { label: string; value: any }) {
+    return (
+        <tr>
+            <td className="border border-gray-400 px-2 py-1 w-44 align-top text-gray-600">{label}</td>
+            <td className="border border-gray-400 px-1 py-1 w-3 align-top text-center">:</td>
+            <td className="border border-gray-400 px-2 py-1 align-top font-medium">{value || ' '}</td>
+        </tr>
+    );
+}
+
+// Layout Service Report (Form H) khusus kontrak Pest Control. Kolom yang datanya belum
+// dicatat sistem (Active Ingredient, Class, Conc. %, Total Area Treated, Licence No,
+// Vehicle No, Site Risk Assessment, Pest Status, Recommendations) dicetak kosong untuk
+// diisi manual — tidak ada penambahan skema database untuk atribut tersebut.
+function PestControlServiceReport({ workOrder, companyName }: any) {
+    const premise = workOrder.sales_order?.premise ?? null;
+    const services: any[] = premise?.services ?? [];
+    const customer = workOrder.contract?.customer ?? {};
+    const materials: any[] = workOrder.materials ?? [];
+    const visitTypes: string[] = workOrder.visit_types ?? [];
+    const purpose = visitTypes.length ? visitTypes.map(v => purposeLabel[v] ?? v).join(', ') : '—';
+    const companyNameResolved = companyName || COMPANY.name;
+    const customerName = premise?.location || customer.company_name || customer.name;
+
+    return (
+        <div className="min-h-screen bg-gray-100 print:bg-white py-8 print:py-0 text-[11px] leading-snug text-gray-900">
+            <Head title={`Service Report ${workOrder.wo_number}`} />
+            <style>{`@media print { @page { size: A4; margin: 12mm; } }`}</style>
+
+            <div className="max-w-[800px] mx-auto mb-4 flex gap-3 print:hidden">
+                <button
+                    type="button"
+                    onClick={() => window.print()}
+                    className="px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+                >
+                    🖨 Print / Save as PDF
+                </button>
+                <Link href="/work-orders" className="px-4 py-2 rounded-md border border-gray-300 bg-white text-sm text-gray-700 hover:bg-gray-50">
+                    ← Back to List
+                </Link>
+            </div>
+
+            {/* ===================== HALAMAN 1 ===================== */}
+            <div className="max-w-[800px] mx-auto bg-white shadow print:shadow-none px-10 py-8 print:p-0">
+                <PestHeader companyNameResolved={companyNameResolved} woNumber={workOrder.wo_number} />
+
+                <h3 className="font-bold border-b border-gray-800 mb-1">A. CUSTOMER INFORMATION</h3>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                    <table className="w-full border-collapse h-fit">
+                        <tbody>
+                            <PestRow label="Purpose of Treatment" value={purpose} />
+                            <PestRow label="Contract / Job No." value={workOrder.contract?.contract_number} />
+                            <PestRow label="Service Area" value={workOrder.service_area} />
+                            <PestRow label="Type of Premises" value={null} />
+                            <PestRow label="Customer Name" value={customerName} />
+                            <PestRow label="Contact Name" value={premise?.pic} />
+                            <PestRow label="Contact Number" value={premise?.phone} />
+                            <PestRow label="Address Site Of Application" value={premise?.address} />
+                        </tbody>
+                    </table>
+                    <div>
+                        <table className="w-full border-collapse mb-2">
+                            <thead>
+                                <tr className="bg-gray-100 text-left">
+                                    <th className="border border-gray-400 px-2 py-1">Type of Pests Covered</th>
+                                    <th className="border border-gray-400 px-2 py-1 w-12 text-center">Qty</th>
+                                    <th className="border border-gray-400 px-2 py-1 w-12 text-center">Freq</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {services.length === 0 && (
+                                    <tr><td colSpan={3} className="border border-gray-400 px-2 py-2 text-center text-gray-400">—</td></tr>
+                                )}
+                                {services.map((svc: any, i: number) => (
+                                    <tr key={i}>
+                                        <td className="border border-gray-400 px-2 py-1">{svc.product?.description || svc.product?.name || '—'}</td>
+                                        <td className="border border-gray-400 px-2 py-1 text-center">{svc.quantity ?? '—'}</td>
+                                        <td className="border border-gray-400 px-2 py-1 text-center">{svc.visit_frequency ?? '—'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <div className="border border-gray-400 px-2 py-1">
+                            <span className="text-gray-500">Site Risk Assessments:</span>
+                            <div className="h-9" />
+                        </div>
+                    </div>
+                </div>
+
+                <h3 className="font-bold border-b border-gray-800 mb-1">B. PESTICIDES APPLIED</h3>
+                <table className="w-full border-collapse text-center mb-2">
+                    <thead>
+                        <tr className="bg-gray-100">
+                            <th className="border border-gray-400 px-2 py-1">Active Ingredient</th>
+                            <th className="border border-gray-400 px-2 py-1">Trade Name</th>
+                            <th className="border border-gray-400 px-2 py-1 w-14">Class</th>
+                            <th className="border border-gray-400 px-2 py-1 w-20">Conc. Diluted Sol'n Applied %</th>
+                            <th className="border border-gray-400 px-2 py-1 w-24">Method of Application</th>
+                            <th className="border border-gray-400 px-2 py-1 w-20">Total Area Treated</th>
+                            <th className="border border-gray-400 px-2 py-1 w-24">Total Qty Diluted Sol'n used</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {materials.length === 0 && (
+                            <tr><td colSpan={7} className="border border-gray-400 px-2 py-3 text-gray-400">No material.</td></tr>
+                        )}
+                        {materials.map((m: any, i: number) => (
+                            <tr key={i}>
+                                <td className="border border-gray-400 px-2 py-1">&nbsp;</td>
+                                <td className="border border-gray-400 px-2 py-1 text-left">{m.product?.name ?? '—'}</td>
+                                <td className="border border-gray-400 px-2 py-1">&nbsp;</td>
+                                <td className="border border-gray-400 px-2 py-1">&nbsp;</td>
+                                <td className="border border-gray-400 px-2 py-1">{m.method_of_application || '—'}</td>
+                                <td className="border border-gray-400 px-2 py-1">&nbsp;</td>
+                                <td className="border border-gray-400 px-2 py-1">{m.quantity_used} {m.uom || m.product?.unit || ''}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                <p className="font-semibold underline mb-1">Precautionary Statement</p>
+                <table className="w-full border-collapse text-center mb-3">
+                    <tbody>
+                        <tr>
+                            <td className="border border-gray-400 px-2 py-1 bg-gray-50"></td>
+                            <td className="border border-gray-400 px-2 py-1 font-medium">Class 1a</td>
+                            <td className="border border-gray-400 px-2 py-1 font-medium">Class 1b</td>
+                            <td className="border border-gray-400 px-2 py-1 font-medium">Class 2</td>
+                            <td className="border border-gray-400 px-2 py-1 font-medium">Class 3</td>
+                            <td className="border border-gray-400 px-2 py-1 font-medium">Class 4</td>
+                        </tr>
+                        <tr>
+                            <td className="border border-gray-400 px-2 py-1 font-medium bg-gray-50">Colour Band</td>
+                            <td className="border border-gray-400 px-2 py-1">Black</td>
+                            <td className="border border-gray-400 px-2 py-1">Red</td>
+                            <td className="border border-gray-400 px-2 py-1">Yellow</td>
+                            <td className="border border-gray-400 px-2 py-1">Blue</td>
+                            <td className="border border-gray-400 px-2 py-1">Nil</td>
+                        </tr>
+                        <tr>
+                            <td className="border border-gray-400 px-2 py-1 font-medium bg-gray-50">Warning</td>
+                            <td className="border border-gray-400 px-2 py-1">VERY HIGHLY POISONOUS<br />Symbol of skull &amp; Crossbones</td>
+                            <td className="border border-gray-400 px-2 py-1">HIGHLY POISONOUS<br />Symbol of skull &amp; Crossbones</td>
+                            <td className="border border-gray-400 px-2 py-1">POISONOUS</td>
+                            <td className="border border-gray-400 px-2 py-1">HARMFUL</td>
+                            <td className="border border-gray-400 px-2 py-1">Nil</td>
+                        </tr>
+                        <tr>
+                            <td colSpan={6} className="border border-gray-400 px-2 py-1 font-semibold">KEEP AWAY FROM FOODSTUFF AND CHILDREN</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3 className="font-bold border-b border-gray-800 mb-1">C. PEST STATUS</h3>
+                <table className="w-full border-collapse mb-3">
+                    <thead>
+                        <tr className="bg-gray-100 text-left">
+                            <th className="border border-gray-400 px-2 py-1 w-28">Pest</th>
+                            <th className="border border-gray-400 px-2 py-1 w-20">Level</th>
+                            <th className="border border-gray-400 px-2 py-1 w-32">Location Found</th>
+                            <th className="border border-gray-400 px-2 py-1">Remark</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {[0, 1, 2].map(i => (
+                            <tr key={i}>
+                                <td className="border border-gray-400 px-2 py-2">&nbsp;</td>
+                                <td className="border border-gray-400 px-2 py-2">&nbsp;</td>
+                                <td className="border border-gray-400 px-2 py-2">&nbsp;</td>
+                                <td className="border border-gray-400 px-2 py-2">&nbsp;</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                <h3 className="font-bold border-b border-gray-800 mb-1">D. RECOMMENDATIONS</h3>
+                <table className="w-full border-collapse mb-3">
+                    <thead>
+                        <tr className="bg-gray-100 text-left">
+                            <th className="border border-gray-400 px-2 py-1 w-32">Type</th>
+                            <th className="border border-gray-400 px-2 py-1">Recommendations</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {[0, 1].map(i => (
+                            <tr key={i}>
+                                <td className="border border-gray-400 px-2 py-2">&nbsp;</td>
+                                <td className="border border-gray-400 px-2 py-2">&nbsp;</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+
+                <h3 className="font-bold border-b border-gray-800 mb-1">E. SERVICE VISIT NOTES</h3>
+                <div className="border border-gray-400 px-2 py-2 min-h-[50px] whitespace-pre-line mb-2">
+                    {workOrder.technician_notes || ''}
+                </div>
+
+                <PestFooter companyNameResolved={companyNameResolved} />
+            </div>
+
+            {/* ===================== HALAMAN 2 ===================== */}
+            <div className="max-w-[800px] mx-auto bg-white shadow print:shadow-none px-10 py-8 print:p-0 mt-8 print:mt-0 break-before-page">
+                <PestHeader companyNameResolved={companyNameResolved} woNumber={workOrder.wo_number} />
+
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <h3 className="font-bold border-b border-gray-800 mb-1">F. APPLICATOR'S INFORMATION</h3>
+                        <p className="mb-2">I declare the information above is true and correct:</p>
+                        <p className="mb-1">Signature:</p>
+                        <div className="h-14 border-b border-gray-400 mb-2" />
+                        <p>Applicators Name: {workOrder.technician?.name || '—'}</p>
+                        <div className="flex justify-between mt-1">
+                            <span>Licence No: </span>
+                            <span>Time in: {workOrder.time_in || '—'}</span>
+                        </div>
+                        <div className="flex justify-between mt-1">
+                            <span>Treatment Date: {fmtShort(workOrder.visit_date)}</span>
+                            <span>Time out: {workOrder.time_out || '—'}</span>
+                        </div>
+                        <p className="mt-2">Name of other Applicator(s):</p>
+                        <div className="h-6 border-b border-gray-400 mb-2" />
+                        <p>Vehicle No:</p>
+                    </div>
+                    <div>
+                        <h3 className="font-bold border-b border-gray-800 mb-1">G. CUSTOMER'S SIGNATURE / CHOP</h3>
+                        <p className="mb-2">I acknowledge receipt of the above report:</p>
+                        <p className="mb-1">Signature:</p>
+                        <div className="h-14 border-b border-gray-400 mb-2" />
+                        <p>Chop:</p>
+                        <div className="h-10 border-b border-gray-400 mb-2" />
+                        <p>Name of Customer: {premise?.pic || '—'}</p>
+                        <p>Date:</p>
+                    </div>
+                </div>
+
+                <PestFooter companyNameResolved={companyNameResolved} />
             </div>
         </div>
     );

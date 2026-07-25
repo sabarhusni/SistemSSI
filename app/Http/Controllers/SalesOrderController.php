@@ -24,7 +24,7 @@ class SalesOrderController extends Controller
 
         $query = SalesOrder::with([
                 'customer', 'salesPerson',
-                'contract:id,contract_number',
+                'contract:id,contract_number,service_type',
                 'premise:id,location,address,pic',
             ])
             ->withCount(['items', 'workOrders'])
@@ -32,11 +32,12 @@ class SalesOrderController extends Controller
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->when($request->contract_id, fn($q, $v) => $q->where('contract_id', $v))
             ->when($request->contract_premise_id, fn($q, $v) => $q->where('contract_premise_id', $v))
+            ->when($request->service_type, fn($q, $v) => $q->whereHas('contract', fn($cq) => $cq->where('service_type', $v)))
             ->orderBy($sortBy, $sortDir);
 
         return Inertia::render('SalesOrders/Index', [
             'salesOrders' => $query->paginate(15)->withQueryString(),
-            'filters'     => $request->only('search', 'status', 'contract_id', 'contract_premise_id', 'sort_by', 'sort_dir'),
+            'filters'     => $request->only('search', 'status', 'contract_id', 'contract_premise_id', 'service_type', 'sort_by', 'sort_dir'),
             'contracts'   => Contract::whereHas('salesOrders')->orderBy('contract_number')->get(['id', 'contract_number']),
             'premises'    => ContractPremise::whereIn('id', SalesOrder::query()->whereNotNull('contract_premise_id')->distinct()->pluck('contract_premise_id'))
                 ->orderBy('location')->get(['id', 'location']),
@@ -47,7 +48,8 @@ class SalesOrderController extends Controller
     {
         $year   = date('y');
         $prefix = 'SO' . $year;
-        $last   = SalesOrder::where('so_number', 'like', $prefix . '%')
+        $last   = SalesOrder::withTrashed()->where('so_number', 'like', $prefix . '%')
+            ->where('deleted_at', null) // Hanya ambil SO yang belum dihapus
             ->orderBy('so_number', 'desc')
             ->value('so_number');
         $seq = $last ? ((int) substr($last, strlen($prefix)) + 1) : 1;
@@ -233,8 +235,8 @@ class SalesOrderController extends Controller
 
     public function destroy(SalesOrder $salesOrder)
     {
-        if (in_array($salesOrder->status, ['completed', 'cancelled'], true)) {
-            return redirect('/sales-orders')->with('error', 'Sales Order dengan status Completed atau Cancelled tidak bisa dihapus.');
+        if ($salesOrder->status === 'completed') {
+            return redirect('/sales-orders')->with('error', 'Sales Order dengan status Completed tidak bisa dihapus.');
         }
 
         $salesOrder->delete();
@@ -257,10 +259,8 @@ class SalesOrderController extends Controller
 
     private function validateData(Request $request, ?SalesOrder $salesOrder = null): array
     {
-        $unique = 'unique:sales_orders,so_number' . ($salesOrder ? ',' . $salesOrder->id : '');
-
         return $request->validate([
-            'so_number'                => 'required|string|max:50|' . $unique,
+            'so_number'                => 'required|string|max:50',
             'contract_id'              => 'nullable|uuid|exists:contracts,id',
             'contract_premise_id'      => 'nullable|uuid|exists:contract_premises,id',
             'customer_id'              => 'nullable|uuid|exists:customers,id',
@@ -330,10 +330,23 @@ class SalesOrderController extends Controller
 
     private function saveVisitPlans(SalesOrder $so, array $plans): void
     {
+        $start = $so->contract?->start_date;
+
         foreach ($plans as $plan) {
+            $date = $plan['visit_date'] ?? null;
+
+            // Tanggal visit yang dikosongkan otomatis diisi tanggal 1 pada bulan ke-N
+            // (visit_number), dihitung dari bulan mulai kontrak.
+            if (empty($date) && $start) {
+                $date = \Illuminate\Support\Carbon::parse($start)
+                    ->startOfMonth()
+                    ->addMonths(max(0, (int) $plan['visit_number'] - 1))
+                    ->toDateString();
+            }
+
             $so->visitPlans()->create([
                 'visit_number' => $plan['visit_number'],
-                'visit_date'   => $plan['visit_date'] ?? null,
+                'visit_date'   => $date,
                 'quantity'     => $plan['quantity'] ?? null,
             ]);
         }

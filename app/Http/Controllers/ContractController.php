@@ -23,11 +23,12 @@ class ContractController extends Controller
             ->withCount(['salesOrders as active_so_count' => fn($q) => $q->whereNotIn('status', ['draft', 'cancelled'])])
             ->when($request->search, fn($q, $s) => $q->where('contract_number', 'ilike', "%$s%")->orWhereHas('customer', fn($cq) => $cq->where('name', 'ilike', "%$s%")))
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
+            ->when($request->service_type, fn($q, $s) => $q->where('service_type', $s))
             ->orderBy($sortBy, $sortDir);
 
         return Inertia::render('Contracts/Index', [
             'contracts' => $query->paginate(15)->withQueryString(),
-            'filters'   => $request->only('search', 'status', 'sort_by', 'sort_dir'),
+            'filters'   => $request->only('search', 'status', 'service_type', 'sort_by', 'sort_dir'),
         ]);
     }
 
@@ -36,8 +37,8 @@ class ContractController extends Controller
         return Inertia::render('Contracts/Form', [
             'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
             'products'  => Product::where('status', 'active')->orderBy('name')
-                ->with('unitOfMeasure:id,name,symbol')
-                ->get(['id', 'name', 'unit_of_measure_id', 'price', 'sales_price', 'product_type']),
+                ->with(['unitOfMeasure:id,name,symbol', 'category:id,name'])
+                ->get(['id', 'category_id', 'name', 'unit_of_measure_id', 'price', 'sales_price', 'product_type']),
             'employees' => Employee::where('status', 'active')->orderBy('name')->get(['id', 'name', 'position', 'department']),
             'taxType'   => Setting::get('tax_type', 'exclude'),
             'taxRateSo' => (float) Setting::get('tax_rate_so', 11),
@@ -89,6 +90,7 @@ class ContractController extends Controller
             'duration_months'        => 'required|integer|min:1',
             'invoice_frequency'      => 'required|integer|min:1',
             'status'                 => 'required|in:draft,active,completed,cancelled',
+            'service_type'           => 'required|in:pest_control,scenting',
             'notes'                  => 'nullable|string',
             'sales_type'             => 'nullable|in:canvas,lead',
             'sales_name'             => 'nullable|string|max:100',
@@ -208,8 +210,8 @@ class ContractController extends Controller
             'contract'  => $contract->load(['premises.services.subProducts']),
             'customers' => Customer::where('status', 'active')->orderBy('name')->get(),
             'products'  => Product::where('status', 'active')->orderBy('name')
-                ->with('unitOfMeasure:id,name,symbol')
-                ->get(['id', 'name', 'unit_of_measure_id', 'price', 'sales_price', 'product_type']),
+                ->with(['unitOfMeasure:id,name,symbol', 'category:id,name'])
+                ->get(['id', 'category_id', 'name', 'unit_of_measure_id', 'price', 'sales_price', 'product_type']),
             'employees' => Employee::where('status', 'active')->orderBy('name')->get(['id', 'name', 'position', 'department']),
             'taxType'   => Setting::get('tax_type', 'exclude'),
             'taxRateSo' => (float) Setting::get('tax_rate_so', 11),

@@ -9,6 +9,11 @@ import { useMemo, useState } from 'react';
 const fmt = (n: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
+const SERVICE_TYPES = [
+    { value: 'pest_control', label: 'Pest Control' },
+    { value: 'scenting',     label: 'Scenting' },
+];
+
 const woBadgeCls = (s: string) =>
     ({
         pending:     'bg-gray-100 text-gray-600',
@@ -180,8 +185,16 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
     const [contractPickerOpen, setContractPickerOpen] = useState(false);
     const [premisePickerOpen, setPremisePickerOpen] = useState(false);
     const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+    // Tipe layanan dipilih dulu untuk menyaring daftar No Kontrak. Saat edit, kontrak sudah
+    // terkunci sehingga tipe layanan mengikuti kontrak yang tersimpan (tidak dapat diubah).
+    const [serviceType, setServiceType] = useState<string>('');
 
     const selectedContract = contracts?.find((c: any) => String(c.id) === String(data.contract_id));
+    const effectiveServiceType = editing ? (selectedContract?.service_type ?? '') : serviceType;
+    const filteredContracts = useMemo(
+        () => (contracts ?? []).filter((c: any) => !effectiveServiceType || c.service_type === effectiveServiceType),
+        [contracts, effectiveServiceType]
+    );
     // Settlement Amount: total invoice yang sudah dibayar (payment Verified) untuk
     // kontrak DAN No SO ini (dari backend) — 0 untuk SO baru yang belum punya invoice.
     const settlementAmountNum = Number(settlementAmount ?? 0);
@@ -256,6 +269,21 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
             updateSubProduct(svcIdx, subIdx, 'uom_id', productUomId(product));
         }
         setPickerTarget(null);
+    };
+
+    // Ganti tipe layanan: bila kontrak yang sudah dipilih tidak cocok tipe baru, reset pilihan kontrak.
+    const handleSelectServiceType = (value: string) => {
+        setServiceType(value);
+        if (selectedContract && selectedContract.service_type !== value) {
+            setData({
+                ...data,
+                contract_id:         '',
+                contract_premise_id: '',
+                customer_id:         '',
+                services:            [],
+                visit_plans:         [],
+            });
+        }
     };
 
     // Memilih kontrak baru: reset premis & item, item baru terisi setelah premis dipilih.
@@ -522,7 +550,7 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
 
             {contractPickerOpen && (
                 <ContractPickerModal
-                    contracts={contracts ?? []}
+                    contracts={filteredContracts}
                     onSelect={handleSelectContract}
                     onClose={() => setContractPickerOpen(false)}
                 />
@@ -572,17 +600,33 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
                         </FormField>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
+                        <FormField label="Services">
+                            <select
+                                className={inputCls}
+                                value={effectiveServiceType}
+                                disabled={editing}
+                                onChange={e => handleSelectServiceType(e.target.value)}
+                            >
+                                <option value="">— Pilih Tipe Layanan —</option>
+                                {SERVICE_TYPES.map(s => (
+                                    <option key={s.value} value={s.value}>{s.label}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-gray-400 mt-1">
+                                {editing ? 'Mengikuti kontrak tersimpan.' : 'Menentukan daftar No Kontrak di samping.'}
+                            </p>
+                        </FormField>
                         <FormField label="Contract Reference">
                             <button
                                 type="button"
-                                disabled={editing}
+                                disabled={editing || !effectiveServiceType}
                                 onClick={() => setContractPickerOpen(true)}
-                                className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition disabled:bg-gray-50 disabled:cursor-default disabled:hover:border-gray-200"
+                                className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition disabled:bg-gray-50 disabled:cursor-not-allowed disabled:hover:border-gray-200"
                             >
                                 {selectedContract
                                     ? <span className="text-gray-800">{selectedContract.contract_number}</span>
-                                    : <span className="text-gray-400">— Pilih Kontrak —</span>
+                                    : <span className="text-gray-400">{effectiveServiceType || editing ? '— Pilih Kontrak —' : 'Pilih Services terlebih dahulu'}</span>
                                 }
                             </button>
                             {selectedContract && (
@@ -734,7 +778,7 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
 
                     {/* ── Visit Plan (mengikuti visit frequency premis) ───── */}
                     <div>
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-1">
                             <h3 className="font-semibold text-gray-700">Visit Plan</h3>
                             <div className="flex items-center gap-3">
                                 <span className="text-xs text-gray-400">{data.visit_plans.length} kunjungan</span>
@@ -756,6 +800,7 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
                                 )}
                             </div>
                         </div>
+                        <p className="text-xs text-gray-400 mb-2">Tanggal kosong otomatis diisi tanggal 1 pada bulan sesuai urutan visit saat disimpan.</p>
                         {data.visit_plans.length === 0 ? (
                             <p className="text-sm text-gray-400 italic">Belum ada rencana kunjungan. Pilih premis dengan <strong>Visit Frequency</strong> pada kontrak.</p>
                         ) : (

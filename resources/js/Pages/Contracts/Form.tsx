@@ -51,6 +51,7 @@ export default function Form({ contract, customers, products, employees, taxType
         contract_value:       contract?.contract_value       ?? '',
         invoice_frequency:    contract?.invoice_frequency    ?? 1,
         status:               contract?.status               ?? 'draft',
+        service_type:         contract?.service_type         ?? '',
         notes:                contract?.notes                ?? '',
         sales_type:           contract?.sales_type           ?? '',
         sales_employee_id:    contract?.sales_employee_id    ?? '',
@@ -89,6 +90,11 @@ export default function Form({ contract, customers, products, employees, taxType
     const getProduct = (id: string) => products?.find((p: any) => p.id === id);
     const productUnit = (p: any) => p?.unit_of_measure?.symbol ?? p?.unit ?? '';
 
+    // Product category shown in the picker follows the selected Services option.
+    const serviceCategory = data.service_type === 'pest_control' ? 'Pest Control'
+        : data.service_type === 'scenting' ? 'Scenting'
+        : undefined;
+
     // Per-line tax, honoring global tax type (exclude: added on top | include: embedded).
     const lineTax = (sub: number, rate: number) =>
         rate <= 0 ? 0
@@ -109,6 +115,16 @@ export default function Form({ contract, customers, products, employees, taxType
 
     // ── Premise helpers ────────────────────────────────────────────────────
     const setPremises = (premises: any[]) => setData('premises', premises);
+
+    // Ganti Services (Pest Control/Scenting) → produk yang sudah dipilih tidak lagi
+    // relevan dengan kategori baru, jadi reset ke satu baris produk kosong per premis.
+    const handleServiceTypeChange = (val: string) => {
+        setData({
+            ...data,
+            service_type: val,
+            premises: data.premises.map((p: any) => ({ ...p, products: [emptyProduct()] })),
+        });
+    };
 
     const updatePremise = (pi: number, field: string, value: any) => {
         const premises = [...data.premises];
@@ -243,7 +259,9 @@ export default function Form({ contract, customers, products, employees, taxType
                     extraLabel="Sales Price"
                     extraKey="sales_price"
                     extraFormat="currency"
-                    typeFilter={pickerTarget?.subIdx !== undefined ? 'goods' : undefined}
+                    typeFilter={pickerTarget?.subIdx !== undefined ? 'goods' : 'service'}
+                    categoryFilter={pickerTarget?.subIdx === undefined ? serviceCategory : undefined}
+                    allowTypeToggle={pickerTarget?.subIdx === undefined}
                 />
             )}
 
@@ -276,6 +294,24 @@ export default function Form({ contract, customers, products, employees, taxType
                             </select>
                         </FormField>
                     </div>
+
+                    <FormField label="Services" error={errors.service_type} required>
+                        <div className="flex gap-6">
+                            {[{ val: 'pest_control', label: 'Pest Control' }, { val: 'scenting', label: 'Scenting' }].map(opt => (
+                                <label key={opt.val} className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="service_type"
+                                        value={opt.val}
+                                        checked={data.service_type === opt.val}
+                                        onChange={() => handleServiceTypeChange(opt.val)}
+                                        className="w-4 h-4 text-red-600 focus:ring-red-500"
+                                    />
+                                    <span className="text-sm text-gray-700">{opt.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </FormField>
 
                     <FormField label="Customer" error={errors.customer_id} required>
                         <button
@@ -375,7 +411,7 @@ export default function Form({ contract, customers, products, employees, taxType
                                                     <th className="px-3 py-2 w-32">Sales Price</th>
                                                     <th className="px-3 py-2 w-20 text-center">Tax %</th>
                                                     {taxType === 'exclude' && <th className="px-3 py-2 w-24 text-right">Tax (Rp)</th>}
-                                                    <th className="px-3 py-2 w-40">Keterangan Lokasi</th>
+                                                    <th className="px-3 py-2 w-40">Keterangan</th>
                                                     <th className="px-3 py-2 w-20 text-right">Subtotal</th>
                                                     <th className="px-3 py-2 w-8"></th>
                                                 </tr>

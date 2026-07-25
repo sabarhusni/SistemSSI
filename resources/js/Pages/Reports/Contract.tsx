@@ -1,7 +1,7 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
-import { fmt, fmtNum, fmtDate, SummaryCard, FilterBar, FilterDate, FilterSelect, ReportTable, statusBadge, applyFilters } from './_shared';
+import { fmt, fmtNum, fmtDate, SummaryCard, FilterBar, FilterDate, FilterSelect, ReportTable, statusBadge, applyFilters, exportToExcel } from './_shared';
 
 export default function Contract({ contracts, summary, customers, filters }: any) {
     const today = new Date().toISOString().slice(0, 10);
@@ -16,10 +16,20 @@ export default function Contract({ contracts, summary, customers, filters }: any
 
     const salesName = (c: any) => c.sales_employee?.name ?? c.sales_name ?? '—';
 
+    const handleExport = () => exportToExcel('Laporan_Kontrak', [{
+        name: 'Kontrak',
+        headers: ['No. Kontrak', 'Customer', 'Mulai', 'Selesai', 'Durasi (bln)', 'Sales', 'Nilai', 'SO', 'WO', 'Tertagih', 'Status'],
+        rows: (contracts ?? []).map((c: any) => [
+            c.contract_number, c.customer?.name ?? '-', c.start_date, c.end_date, c.duration_months ?? '',
+            salesName(c), Number(c.contract_value ?? 0), c.sales_orders_count ?? 0, c.work_orders_count ?? 0,
+            Number(c.invoices_sum_total_amount ?? 0), c.status,
+        ]),
+    }]);
+
     return (
         <AppLayout header="Laporan Kontrak">
             <Head title="Laporan Kontrak" />
-            <FilterBar onApply={() => applyFilters('/reports/contract', f)}>
+            <FilterBar onApply={() => applyFilters('/reports/contract', f)} onExport={handleExport}>
                 <FilterDate label="Dari" value={f.from} onChange={v => setF({ ...f, from: v })} />
                 <FilterDate label="Sampai" value={f.to} onChange={v => setF({ ...f, to: v })} />
                 <FilterSelect label="Customer" value={f.customer_id} onChange={v => setF({ ...f, customer_id: v })}>

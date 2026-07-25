@@ -1,7 +1,7 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
-import { fmt, fmtDate, SummaryCard, FilterBar, FilterDate, FilterSelect, ReportTable, statusBadge, applyFilters } from './_shared';
+import { fmt, fmtDate, SummaryCard, FilterBar, FilterDate, FilterSelect, ReportTable, statusBadge, applyFilters, exportToExcel } from './_shared';
 
 export default function Sales({ orders, summary, customers, users, filters }: any) {
     const today = new Date().toISOString().slice(0, 10);
@@ -9,10 +9,19 @@ export default function Sales({ orders, summary, customers, users, filters }: an
 
     const [f, setF] = useState({ from: filters?.from ?? firstDay, to: filters?.to ?? today, customer_id: filters?.customer_id ?? '', status: filters?.status ?? '', sales_person_id: filters?.sales_person_id ?? '' });
 
+    const handleExport = () => exportToExcel('Sales_Report', [{
+        name: 'Sales',
+        headers: ['Order Date', 'SO No.', 'Customer', 'Sales', 'Items', 'Total', 'Status'],
+        rows: (orders ?? []).map((o: any) => [
+            o.order_date, o.so_number, o.customer?.name ?? '-', o.sales_person?.name ?? '-',
+            o.items?.length ?? 0, Number(o.total_amount ?? 0), o.status,
+        ]),
+    }]);
+
     return (
         <AppLayout header="Sales Report">
             <Head title="Sales Report" />
-            <FilterBar onApply={() => applyFilters('/reports/sales', f)}>
+            <FilterBar onApply={() => applyFilters('/reports/sales', f)} onExport={handleExport}>
                 <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
                 <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
                 <FilterSelect label="Customer" value={f.customer_id} onChange={v => setF({ ...f, customer_id: v })}>

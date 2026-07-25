@@ -21,6 +21,9 @@ function monthsBetween(start: string, end: string): number | null {
     return m > 0 ? m : null;
 }
 
+const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'Pest Control' : v === 'scenting' ? 'Scenting' : '—';
+const serviceTypeCls = (v: string) => v === 'pest_control' ? 'bg-amber-100 text-amber-700' : v === 'scenting' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400';
+
 export default function Index({ contracts, filters }: any) {
     const { flash } = usePage().props as any;
     const sortProps = {
@@ -40,10 +43,15 @@ export default function Index({ contracts, filters }: any) {
                 </div>
             )}
             <SearchFilter routeName="contracts.index" filters={filters}
-                filterOptions={[{ key: 'status', label: 'All Statuses', options: [
-                    { label: 'Draft', value: 'draft' }, { label: 'Active', value: 'active' },
-                    { label: 'Completed', value: 'completed' }, { label: 'Cancelled', value: 'cancelled' },
-                ]}]}
+                filterOptions={[
+                    { key: 'status', label: 'All Statuses', options: [
+                        { label: 'Draft', value: 'draft' }, { label: 'Active', value: 'active' },
+                        { label: 'Completed', value: 'completed' }, { label: 'Cancelled', value: 'cancelled' },
+                    ]},
+                    { key: 'service_type', label: 'All Services', options: [
+                        { label: 'Pest Control', value: 'pest_control' }, { label: 'Scenting', value: 'scenting' },
+                    ]},
+                ]}
             />
             <div className="bg-white rounded-xl shadow overflow-hidden">
                 <table className="w-full text-sm">
@@ -51,6 +59,7 @@ export default function Index({ contracts, filters }: any) {
                         <tr className="text-left text-gray-600">
                             <SortableColumn sortKey="contract_number" label="Contract No." {...sortProps} />
                             <th className="px-4 py-3">Customer</th>
+                            <th className="px-4 py-3">Services</th>
                             <SortableColumn sortKey="start_date" label="Start" {...sortProps} />
                             <th className="px-4 py-3 text-right">Duration (Months)</th>
                             <SortableColumn sortKey="end_date" label="End" {...sortProps} />
@@ -64,6 +73,11 @@ export default function Index({ contracts, filters }: any) {
                             <tr key={c.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-mono text-xs font-medium">{c.contract_number}</td>
                                 <td className="px-4 py-3">{c.customer?.name}</td>
+                                <td className="px-4 py-3">
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${serviceTypeCls(c.service_type)}`}>
+                                        {serviceTypeLabel(c.service_type)}
+                                    </span>
+                                </td>
                                 <td className="px-4 py-3">{fmtDate(c.start_date)}</td>
                                 <td className="px-4 py-3 text-right">{c.duration_months ?? monthsBetween(c.start_date, c.end_date) ?? '—'}</td>
                                 <td className="px-4 py-3">{fmtDate(c.end_date)}</td>

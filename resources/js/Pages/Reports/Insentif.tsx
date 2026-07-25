@@ -1,7 +1,7 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
-import { fmt, fmtDate, SummaryCard, FilterBar, FilterDate, FilterSelect, ReportTable, applyFilters } from './_shared';
+import { fmt, fmtDate, SummaryCard, FilterBar, FilterDate, FilterSelect, ReportTable, applyFilters, exportToExcel } from './_shared';
 
 export default function Insentif({ byPerson, summary, users, filters }: any) {
     const today = new Date().toISOString().slice(0, 10);
@@ -18,10 +18,27 @@ export default function Insentif({ byPerson, summary, users, filters }: any) {
 
     const toggleExpand = (id: string) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
+    const handleExport = () => exportToExcel('Sales_Incentive_Report', [
+        {
+            name: 'Ringkasan',
+            headers: ['Sales Person', 'SO Count', 'Total Sales', `Incentive (${summary?.rate ?? 0}%)`],
+            rows: (byPerson ?? []).map((p: any) => [
+                p.person_name, p.order_count, Number(p.total_sales ?? 0), Number(p.insentif ?? 0),
+            ]),
+        },
+        {
+            name: 'Detail SO',
+            headers: ['Sales Person', 'SO No.', 'Order Date', 'Customer', 'Amount', 'Status'],
+            rows: (byPerson ?? []).flatMap((p: any) => (p.orders ?? []).map((o: any) => [
+                p.person_name, o.so_number, o.order_date, o.customer ?? '-', Number(o.amount ?? 0), o.status,
+            ])),
+        },
+    ]);
+
     return (
         <AppLayout header="Sales Incentive Report">
             <Head title="Incentive Report" />
-            <FilterBar onApply={() => applyFilters('/reports/insentif', f)}>
+            <FilterBar onApply={() => applyFilters('/reports/insentif', f)} onExport={handleExport}>
                 <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
                 <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
                 <FilterSelect label="Sales Person" value={f.user_id} onChange={v => setF({ ...f, user_id: v })}>

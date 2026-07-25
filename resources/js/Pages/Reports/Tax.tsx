@@ -1,7 +1,7 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
-import { fmt, fmtNum, fmtDate, fmtMonth, SummaryCard, FilterBar, FilterDate, FilterSelect, ReportTable, statusBadge, applyFilters } from './_shared';
+import { fmt, fmtNum, fmtDate, fmtMonth, SummaryCard, FilterBar, FilterDate, FilterSelect, ReportTable, statusBadge, applyFilters, exportToExcel } from './_shared';
 
 export default function Tax({ invoices, byMonth, summary, customers, filters }: any) {
     const today = new Date().toISOString().slice(0, 10);
@@ -14,10 +14,28 @@ export default function Tax({ invoices, byMonth, summary, customers, filters }: 
         status: filters?.status ?? '',
     });
 
+    const handleExport = () => exportToExcel('Laporan_Pajak', [
+        {
+            name: 'Faktur',
+            headers: ['Tanggal', 'No. Faktur', 'Customer', 'DPP', 'Tarif (%)', 'PPN', 'Total', 'Status'],
+            rows: (invoices ?? []).map((inv: any) => [
+                inv.invoice_date, inv.invoice_number, inv.customer ?? '-', Number(inv.dpp ?? 0),
+                Number(inv.tax_rate ?? 0), Number(inv.tax ?? 0), Number(inv.total ?? 0), inv.status,
+            ]),
+        },
+        {
+            name: 'Rekap Bulanan',
+            headers: ['Bulan', 'Jml Faktur', 'DPP', 'PPN', 'Total'],
+            rows: (byMonth ?? []).map((m: any) => [
+                m.month, m.count, Number(m.dpp ?? 0), Number(m.tax ?? 0), Number(m.total ?? 0),
+            ]),
+        },
+    ]);
+
     return (
         <AppLayout header="Laporan Pajak (PPN)">
             <Head title="Laporan Pajak" />
-            <FilterBar onApply={() => applyFilters('/reports/tax', f)}>
+            <FilterBar onApply={() => applyFilters('/reports/tax', f)} onExport={handleExport}>
                 <FilterDate label="Dari" value={f.from} onChange={v => setF({ ...f, from: v })} />
                 <FilterDate label="Sampai" value={f.to} onChange={v => setF({ ...f, to: v })} />
                 <FilterSelect label="Customer" value={f.customer_id} onChange={v => setF({ ...f, customer_id: v })}>

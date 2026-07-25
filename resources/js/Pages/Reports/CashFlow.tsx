@@ -1,7 +1,7 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
-import { fmt, fmtMonth, SummaryCard, FilterBar, FilterDate, ReportTable, applyFilters } from './_shared';
+import { fmt, fmtMonth, SummaryCard, FilterBar, FilterDate, ReportTable, applyFilters, exportToExcel } from './_shared';
 
 export default function CashFlow({ rows, summary, filters }: any) {
     const today = new Date().toISOString().slice(0, 10);
@@ -11,10 +11,23 @@ export default function CashFlow({ rows, summary, filters }: any) {
 
     const netColor = (n: number) => n >= 0 ? 'text-emerald-700 font-semibold' : 'text-red-600 font-semibold';
 
+    const handleExport = () => exportToExcel('Cash_Flow_Report', [{
+        name: 'Cash Flow',
+        headers: ['Period', 'Cash In', 'Bank In', 'Total In', 'Cash Out', 'Bank Out', 'Total Out', 'Net'],
+        rows: (rows ?? []).map((r: any) => {
+            const totalIn = Number(r.cash_in ?? 0) + Number(r.bank_in ?? 0);
+            const totalOut = Number(r.cash_out ?? 0) + Number(r.bank_out ?? 0);
+            return [
+                r.month, Number(r.cash_in ?? 0), Number(r.bank_in ?? 0), totalIn,
+                Number(r.cash_out ?? 0), Number(r.bank_out ?? 0), totalOut, Number(r.net ?? 0),
+            ];
+        }),
+    }]);
+
     return (
         <AppLayout header="Cash Flow Report">
             <Head title="Cash Flow" />
-            <FilterBar onApply={() => applyFilters('/reports/cash-flow', f)}>
+            <FilterBar onApply={() => applyFilters('/reports/cash-flow', f)} onExport={handleExport}>
                 <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
                 <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
             </FilterBar>

@@ -26,14 +26,16 @@ function monthsBetween(start: string, end: string): number | null {
 
 const productUnit = (p: any) => p?.unit_of_measure?.symbol ?? p?.unit ?? '';
 
-// Identitas perusahaan penerbit kontrak (kop surat). company_name dari Settings
-// dipakai bila ada; sisanya mengikuti letterhead U-Scent.
+// Identitas perusahaan penerbit kontrak (kop surat, sama untuk semua tipe layanan).
 const COMPANY = {
     name: 'CV. SINERGY SERVE INDONESIA',
     addressLines: ['Sekedengdeur No. 15, Ujungberung', 'Kota Bandung, Jawa Barat 40167'],
-    brand: 'U-SCENT',
-    brandTagline: 'Oil Aroma',
-    signerTitle: 'Sales Consultant',
+};
+
+// Identitas brand & susunan dokumen berbeda per tipe layanan (Pest Control vs Scenting).
+const BRANDS: Record<string, { brand: string; tagline: string; signerTitle: string; internalLabel: string }> = {
+    pest_control: { brand: 'U-PEST', tagline: 'Pest Management', signerTitle: 'Business Consultant', internalLabel: 'U-Pest' },
+    scenting:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Sales Consultant',    internalLabel: 'U-Scent' },
 };
 
 // Satu baris dalam kotak informasi: Label : Value.
@@ -45,12 +47,12 @@ function InfoRow({ label, value, hint }: { label: string; value?: any; hint?: st
                 {hint && <span className="block text-[9px] leading-tight text-gray-400">{hint}</span>}
             </td>
             <td className="border border-gray-500 px-1 py-1 align-top text-center w-3">:</td>
-            <td className="border border-gray-500 px-2 py-1 align-top font-medium break-words">{value || ' '}</td>
+            <td className="border border-gray-500 px-2 py-1 align-top font-medium break-words">{value || ' '}</td>
         </tr>
     );
 }
 
-// Judul seksi gaya U-Scent (oranye, tebal, garis bawah).
+// Judul seksi gaya letterhead (oranye, tebal, garis bawah).
 function SectionTitle({ children }: { children: any }) {
     return (
         <h3 className="text-[11px] font-bold uppercase text-amber-600 border-b border-amber-600 mb-1 mt-3">
@@ -59,8 +61,20 @@ function SectionTitle({ children }: { children: any }) {
     );
 }
 
-// 13 ketentuan baku perjanjian kontrak (halaman 2).
-const SYARAT: string[] = [
+// Isi ketentuan kontrak (poin 1–3) dipakai di kotak "Perjanjian".
+function PerjanjianItems({ months, start, end, paymentTerms, extra }: { months: number; start: string; end: string; paymentTerms: any; extra?: string }) {
+    return (
+        <ol className="list-decimal ml-4 space-y-1">
+            <li>Jangka waktu kontrak adalah {months} Bulan.</li>
+            <li>Dimulai pada tanggal {fmtShort(start)} s/d {fmtShort(end)}, atau terhitung mulai tanggal pekerjaan pertama dilakukan.</li>
+            <li>Ketentuan Pembayaran maksimal {paymentTerms} hari setelah invoice diterima.</li>
+            {extra && <li>{extra}</li>}
+        </ol>
+    );
+}
+
+// 13 ketentuan baku perjanjian kontrak Scenting (halaman 2).
+const SYARAT_SCENTING: string[] = [
     'Pihak Pelanggan sepakat untuk melakukan kerjasama sewa alat mesin Scenting dan Refill Oil Aroma kepada CV. Sinergy Serve Indonesia. Dalam kerja sama tersebut, CV. Sinergy Serve Indonesia akan menyewakan unit mesin Scenting berlaku selama periode kontrak berjalan.',
     'Pihak Pelanggan mengijinkan CV. Sinergy Serve Indonesia untuk melakukan pemasangan mesin Scenting, dan pihak pelanggan mengijinkan CV. Sinergy Serve Indonesia untuk melakukan pelepasan dan penarikan unit apabila kontrak kerjasama tersebut telah berakhir.',
     'Kontrak baru mulai efektif apabila unit mesin Scenting telah terpasang dan terisi Oil Aroma oleh CV. Sinergy Serve Indonesia, atau terhitung sejak pekerjaan pertama dilakukan dan Pelanggan telah menandatangani laporan pekerjaan untuk periode kontrak yang telah disepakati.',
@@ -76,11 +90,31 @@ const SYARAT: string[] = [
     'Perjanjian ini disetujui dan ditandatangani oleh kedua belah pihak dalam keadaan sehat jasmani dan rohani tanpa ada paksaan dari pihak manapun.',
 ];
 
+// 12 ketentuan baku perjanjian kontrak Pest Control (halaman 2).
+const SYARAT_PEST: string[] = [
+    'Seluruh persyaratan dan kondisi dalam perjanjian ini berlaku selama masa perjanjian yang disepakati antara CV. Sinergy Serve Indonesia dan Pelanggan.',
+    'CV. Sinergy Serve Indonesia bertanggung jawab melaksanakan pengendalian terhadap semua jenis hama yang telah disepakati kedua belah pihak pada perjanjian ini.',
+    'Pelanggan bertanggung jawab untuk bekerjasama dalam hal pelaksanaan rekomendasi tertulis guna memperbaiki sanitasi, menutup akses masuk hama dan lainnya yang bertujuan demi keberhasilan program pengendalian hama ini. Pengguna jasa bertanggung jawab untuk membantu kelancaran semua proses pengendalian hama pada setiap kedatangan teknisi yakni dengan membuka akses masuk ruangan yang akan dikendalikan dan lainnya.',
+    'CV. Sinergy Serve Indonesia memberikan garansi pekerjaan berupa pekerjaan ulang tanpa biaya tambahan, jika masih ditemukan adanya permasalahan hama selama masa kontrak berlangsung. Garansi ini tidak berlaku untuk jenis hama serangga terbang dikarenakan daya re-infestasi dan daya jangkaunya sangat tinggi. Garansi ini tidak berlaku untuk kontrak kurang dari 12 bulan. CV. Sinergy Serve Indonesia tidak memberikan garansi kerusakan dan perbaikan bangunan serta isinya. Garansi ini berlaku hanya pada lokasi dan luas area yang tertera dalam perjanjian ini. Garansi berlaku selama kontrak.',
+    'CV. Sinergy Serve Indonesia melaksanakan jasanya berdasarkan kepada peraturan perundangan yang berlaku. Jika oleh karena sesuatu hal terdapat perubahaan peraturan perundangan tersebut, CV. Sinergy Serve Indonesia berhak untuk merevisi biaya ataupun membatalkan perjanjian yang telah disepakati.',
+    'Jika Pelanggan tidak memenuhi kewajiban pembayarannya pada batas waktu yang telah disetujui, CV. Sinergy Serve Indonesia berhak membatalkan perjanjian atau penundaan pekerjaan sampai kewajiban pembayaran terselesaikan.',
+    'Apabila dikemudian hari terjadi perselisihan dalam penafsiran atau pelaksanaan ketentuan-ketentuan dari perjanjian ini, CV. Sinergy Serve Indonesia dan Pelanggan sepakat untuk menyelesaikannya secara musyawarah.',
+    'Yang dimaksud dengan force majeure adalah hal-hal darurat yang secara langsung maupun tidak langsung dapat mempengaruhi pelaksanaan pekerjaan yang terjadi di luar kekuasaan/kemampuan manusia serta tidak dapat diduga sebelumnya. Hal-hal yang dapat dikategorikan dalam keadaan force majeure adalah peristiwa-peristiwa yang termasuk, tetapi tidak terbatas pada: Bencana alam (gempa bumi, banjir, wabah penyakit); Tindakan sabotase, peperangan, huru hara nasional; Tindakan pemerintah dalam bidang ekonomi dan keuangan; Curah hujan yang terus menerus sehingga menghambat pelaksanaan pekerjaan.',
+    'Force Majeure harus diberitahukan secara tertulis oleh pihak yang terkena kepada pihak lainnya, serta menyertakan bukti-bukti yang sah dari instansi yang berwenang.',
+    'Tanggung jawab kedua belah pihak dalam perjanjian ini akan gugur jika masing-masing pihak mengalami hambatan dalam melaksanakan tugas dan kewajibannya dikarenakan peristiwa yang termasuk dalam kategori force majeure pada ayat diatas.',
+    'Kedua belah pihak berhak memutuskan kontrak perjanjian jika salah satu pihak tidak melaksanakan ketentuan dan syarat-syarat yang telah disepakati bersama. Pemberitahuan pembatalan diajukan secara tertulis 1 (satu) bulan sebelumnya dan pihak penerima pembatalan wajib memberikan jawaban paling lambat 14 (empatbelas) hari sejak pemberitahuan secara tertulis itu diterima. Pembatalan perjanjian ini dapat terlaksana setelah kedua belah pihak menyelesaikan kewajiban terakhirnya terlebih dahulu.',
+    'Perjanjian ini disetujui dan ditandatangani oleh kedua belah pihak dalam keadaan sehat jasmani dan rohani tanpa ada paksaan dari pihak manapun.',
+];
+
 export default function Print({ contract, companyName, taxType = 'exclude' }: any) {
     useEffect(() => {
         const t = setTimeout(() => window.print(), 400);
         return () => clearTimeout(t);
     }, []);
+
+    const isPest = contract.service_type === 'pest_control';
+    const BRAND = BRANDS[contract.service_type] ?? BRANDS.scenting;
+    const SYARAT = isPest ? SYARAT_PEST : SYARAT_SCENTING;
 
     const customer = contract.customer ?? {};
     const premises = contract.premises ?? [];
@@ -92,11 +126,24 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
     const grandMonthly = taxType === 'exclude' ? subtotal + taxTotal : subtotal;
 
     const months = contract.duration_months ?? monthsBetween(contract.start_date, contract.end_date) ?? 0;
+
+    // Pest Control ditagih untuk seluruh masa kontrak sekaligus (bukan per bulan),
+    // jadi tiap baris & total dikalikan jumlah bulan kontrak.
+    const lineContractTotal = (svc: any) => {
+        const monthly = taxType === 'exclude' ? Number(svc.total_price || 0) + Number(svc.tax_amount || 0) : Number(svc.total_price || 0);
+        return monthly * months;
+    };
+    const grandContractTotal = Number(contract.contract_value ?? grandMonthly * months);
+
     const paymentTerms = customer.payment_terms ?? 30;
     const companyNameResolved = companyName || COMPANY.name;
 
     const workAddress = [work.location, work.address].filter(Boolean).join('\n');
     const custAddress = [customer.address, customer.city, customer.province].filter(Boolean).join(', ');
+
+    const internalOptions = isPest
+        ? [{ label: 'Contract', on: true }, { label: 'Job', on: false }, { label: 'Other', on: false }]
+        : [{ label: 'Contract', on: true }, { label: 'Job', on: false }, { label: 'Trial', on: false }, { label: 'Other', on: false }];
 
     return (
         <div className="min-h-screen bg-gray-100 print:bg-white py-8 print:py-0 text-[11px] leading-snug text-gray-900">
@@ -123,40 +170,38 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
 
                 {/* Kop surat */}
                 <div className="flex items-start justify-between border-b-2 border-amber-600 pb-3">
-                    <div>
-                        <h1 className="text-base font-bold text-amber-700">{companyNameResolved}</h1>
-                        {COMPANY.addressLines.map((l, i) => (
-                            <p key={i} className="text-[10px] text-gray-600">{l}</p>
-                        ))}
+                    <div className="flex items-start gap-2">
+                        <img src="/images/logo_ssi_new.png" alt="" className="h-10 w-10 object-contain shrink-0" />
+                        <div>
+                            <h1 className="text-base font-bold text-amber-700">{companyNameResolved}</h1>
+                            {COMPANY.addressLines.map((l, i) => (
+                                <p key={i} className="text-[10px] text-gray-600">{l}</p>
+                            ))}
+                        </div>
                     </div>
                     <div className="text-right">
-                        <h2 className="text-2xl font-extrabold tracking-tight text-amber-600">{COMPANY.brand}</h2>
-                        <p className="text-[10px] text-gray-500 -mt-1">{COMPANY.brandTagline}</p>
+                        <h2 className="text-2xl font-extrabold tracking-tight text-amber-600">{BRAND.brand}</h2>
+                        <p className="text-[10px] text-gray-500 -mt-1">{BRAND.tagline}</p>
                     </div>
                 </div>
 
                 <h2 className="text-center text-base font-bold uppercase tracking-wide my-3">Service Contract</h2>
                 <p className="mb-2">Tanggal: <span className="font-medium">{fmtShort(contract.created_at ?? contract.start_date)}</span></p>
 
-                {/* Dua kotak "Diisi Oleh Internal U-Scent" */}
+                {/* Dua kotak "Diisi Oleh Internal" */}
                 <div className="grid grid-cols-2 gap-3 mb-3">
                     <table className="w-full border-collapse">
                         <tbody>
                             <tr>
-                                <td className="border border-gray-500 bg-amber-100 text-center font-bold text-[10px] px-2 py-1" colSpan={4}>
-                                    Diisi Oleh Internal U-Scent
+                                <td className="border border-gray-500 bg-amber-100 text-center font-bold text-[10px] px-2 py-1" colSpan={internalOptions.length}>
+                                    Diisi Oleh Internal {BRAND.internalLabel}
                                 </td>
                             </tr>
                             <tr>
-                                {[
-                                    { label: 'Contract', on: true },
-                                    { label: 'Job', on: false },
-                                    { label: 'Trial', on: false },
-                                    { label: 'Other', on: false },
-                                ].map(o => (
+                                {internalOptions.map(o => (
                                     <td key={o.label} className="border border-gray-500 px-2 py-1 whitespace-nowrap">
                                         <span className="inline-block w-3 h-3 border border-gray-600 text-center leading-3 mr-1 align-middle">
-                                            {o.on ? '✓' : ' '}
+                                            {o.on ? '✓' : ' '}
                                         </span>
                                         {o.label}
                                     </td>
@@ -168,7 +213,7 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
                         <tbody>
                             <tr>
                                 <td className="border border-gray-500 bg-amber-100 text-center font-bold text-[10px] px-2 py-1" colSpan={3}>
-                                    Diisi Oleh Internal U-Scent
+                                    Diisi Oleh Internal {BRAND.internalLabel}
                                 </td>
                             </tr>
                             <InfoRow label="Nomor Contract/Job" value={contract.contract_number} />
@@ -177,131 +222,237 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
                     </table>
                 </div>
 
-                {/* Kolom kiri & kanan */}
-                <div className="grid grid-cols-2 gap-3 items-start">
-                    {/* Kiri */}
-                    <div>
-                        <SectionTitle>Kontak & Alamat Pengiriman Invoice</SectionTitle>
-                        <table className="w-full border-collapse">
-                            <tbody>
-                                <InfoRow label="Alamat" value={<span className="whitespace-pre-line">{custAddress || workAddress}</span>} />
-                                <InfoRow label="PIC Penagihan" value={customer.name} />
-                                <InfoRow label="Jabatan" value={customer.jabatan_kontak} />
-                                <InfoRow label="Nomor Telepon" value={customer.phone} />
-                                <InfoRow label="Nomor HP" value={customer.phone} />
-                                <InfoRow label="Email" value={customer.email} />
-                            </tbody>
-                        </table>
-                    </div>
+                {isPest ? (
+                    /* ── Pest Control: 2x2 — Alamat Pekerjaan / Identitas Pelanggan / Invoice / Perjanjian ── */
+                    <div className="grid grid-cols-2 gap-3 items-start">
+                        <div>
+                            <SectionTitle>Kontak & Alamat Pekerjaan</SectionTitle>
+                            <table className="w-full border-collapse">
+                                <tbody>
+                                    <InfoRow label="Alamat" value={<span className="whitespace-pre-line">{workAddress || custAddress}</span>} />
+                                    <InfoRow label="PIC Servis" value={work.pic} />
+                                    <InfoRow label="Jabatan" value={customer.jabatan_kontak} />
+                                    <InfoRow label="Nomor Telepon" value={work.phone} />
+                                    <InfoRow label="Nomor HP" value={work.phone} />
+                                    <InfoRow label="Email" value={work.email} />
+                                </tbody>
+                            </table>
+                        </div>
 
-                    {/* Kanan */}
-                    <div>
-                        <SectionTitle>Identitas Pelanggan</SectionTitle>
-                        <table className="w-full border-collapse">
-                            <tbody>
-                                <InfoRow label="Nama Perusahaan" hint="(Untuk Badan Usaha PT/CV/Usaha Perorangan)" value={customer.company_name || customer.name} />
-                                <InfoRow label="Nama Perwakilan/Kuasa" value={customer.name} />
-                                <InfoRow label="Alamat" value={<span className="whitespace-pre-line">{custAddress}</span>} />
-                                <InfoRow label="Jabatan" value={customer.jabatan_kontak} />
-                                <InfoRow label="Nomor Telepon" value={customer.phone} />
-                                <InfoRow label="Nomor HP" value={customer.phone} />
-                                <InfoRow label="E-mail" value={customer.email} />
-                                <InfoRow label="Nomor NPWP - KTP" value={customer.npwp} />
-                            </tbody>
-                        </table>
+                        <div>
+                            <SectionTitle>Identitas Pelanggan</SectionTitle>
+                            <table className="w-full border-collapse">
+                                <tbody>
+                                    <InfoRow label="Nama Perusahaan" hint="(Untuk Badan Usaha PT/CV/Usaha Perorangan)" value={customer.company_name || customer.name} />
+                                    <InfoRow label="Nama Perwakilan/Kuasa" value={customer.name} />
+                                    <InfoRow label="Alamat" value={<span className="whitespace-pre-line">{custAddress}</span>} />
+                                    <InfoRow label="Jabatan" value={customer.jabatan_kontak} />
+                                    <InfoRow label="Nomor Telepon" value={customer.phone} />
+                                    <InfoRow label="Nomor HP" value={customer.phone} />
+                                    <InfoRow label="E-mail" value={customer.email} />
+                                    <InfoRow label="Nomor NPWP - KTP" value={customer.npwp} />
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div>
+                            <SectionTitle>Kontak & Alamat Pengiriman Invoice</SectionTitle>
+                            <table className="w-full border-collapse">
+                                <tbody>
+                                    <InfoRow label="Alamat" value={<span className="whitespace-pre-line">{custAddress || workAddress}</span>} />
+                                    <InfoRow label="PIC Penagihan" value={customer.name} />
+                                    <InfoRow label="Jabatan" value={customer.jabatan_kontak} />
+                                    <InfoRow label="Nomor Telepon" value={customer.phone} />
+                                    <InfoRow label="Nomor HP" value={customer.phone} />
+                                    <InfoRow label="Email" value={customer.email} />
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div>
+                            <SectionTitle>Perjanjian</SectionTitle>
+                            <div className="border border-gray-500 px-2 py-1.5 mt-0.5">
+                                <PerjanjianItems months={months} start={contract.start_date} end={contract.end_date} paymentTerms={paymentTerms} />
+                            </div>
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    /* ── Scenting: 2 kolom — Invoice / Identitas Pelanggan ── */
+                    <div className="grid grid-cols-2 gap-3 items-start">
+                        <div>
+                            <SectionTitle>Kontak & Alamat Pengiriman Invoice</SectionTitle>
+                            <table className="w-full border-collapse">
+                                <tbody>
+                                    <InfoRow label="Alamat" value={<span className="whitespace-pre-line">{custAddress || workAddress}</span>} />
+                                    <InfoRow label="PIC Penagihan" value={customer.name} />
+                                    <InfoRow label="Jabatan" value={customer.jabatan_kontak} />
+                                    <InfoRow label="Nomor Telepon" value={customer.phone} />
+                                    <InfoRow label="Nomor HP" value={customer.phone} />
+                                    <InfoRow label="Email" value={customer.email} />
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div>
+                            <SectionTitle>Identitas Pelanggan</SectionTitle>
+                            <table className="w-full border-collapse">
+                                <tbody>
+                                    <InfoRow label="Nama Perusahaan" hint="(Untuk Badan Usaha PT/CV/Usaha Perorangan)" value={customer.company_name || customer.name} />
+                                    <InfoRow label="Nama Perwakilan/Kuasa" value={customer.name} />
+                                    <InfoRow label="Alamat" value={<span className="whitespace-pre-line">{custAddress}</span>} />
+                                    <InfoRow label="Jabatan" value={customer.jabatan_kontak} />
+                                    <InfoRow label="Nomor Telepon" value={customer.phone} />
+                                    <InfoRow label="Nomor HP" value={customer.phone} />
+                                    <InfoRow label="E-mail" value={customer.email} />
+                                    <InfoRow label="Nomor NPWP - KTP" value={customer.npwp} />
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
 
                 {/* Biaya pelayanan pekerjaan */}
                 <SectionTitle>Biaya Pelayanan Pekerjaan</SectionTitle>
-                <table className="w-full border-collapse text-center">
-                    <thead>
-                        <tr className="bg-amber-100">
-                            <th className="border border-gray-500 px-2 py-1">PRODUCT NAME</th>
-                            <th className="border border-gray-500 px-2 py-1 w-12">QTY</th>
-                            <th className="border border-gray-500 px-2 py-1 w-28">LOKASI</th>
-                            <th className="border border-gray-500 px-2 py-1 w-28">UNIT PRICE</th>
-                            <th className="border border-gray-500 px-2 py-1 w-32">TOTAL PRICE /BULAN</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {allServices.length === 0 && (
-                            <tr><td colSpan={5} className="border border-gray-500 px-2 py-2 text-gray-400">Belum ada produk.</td></tr>
-                        )}
-                        {premises.map((prem: any, pi: number) => {
-                            const svcs = prem.services ?? [];
-                            if (svcs.length === 0) return null;
-                            return (
-                                <Fragment key={pi}>
-                                    <tr className="bg-gray-100">
-                                        <td className="border border-gray-500 px-2 py-1 text-left font-semibold" colSpan={5}>
-                                            Premis: {prem.location || '—'}
-                                            {prem.address && <span className="font-normal text-gray-600"> — {prem.address}</span>}
-                                            {prem.pic && <span className="font-normal text-gray-600"> | PIC: {prem.pic}</span>}
-                                            {prem.phone && <span className="font-normal text-gray-600"> | Telp: {prem.phone}</span>}
-                                        </td>
-                                    </tr>
-                                    {svcs.map((svc: any, i: number) => (
-                                        <Fragment key={i}>
-                                            <tr>
-                                                <td className="border border-gray-500 px-2 py-1 text-left">
-                                                    {svc.product?.name ?? '—'}
-                                                    {productUnit(svc.product) && <span className="text-gray-500"> {productUnit(svc.product)}</span>}
+                {isPest ? (
+                    <table className="w-full border-collapse text-center">
+                        <thead>
+                            <tr className="bg-amber-100">
+                                <th className="border border-gray-500 px-2 py-1">JENIS LAYANAN</th>
+                                <th className="border border-gray-500 px-2 py-1">CAKUPAN HAMA</th>
+                                <th className="border border-gray-500 px-2 py-1 w-32">SUB TOTAL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {allServices.length === 0 && (
+                                <tr><td colSpan={3} className="border border-gray-500 px-2 py-2 text-gray-400">Belum ada produk.</td></tr>
+                            )}
+                            {premises.map((prem: any, pi: number) => {
+                                const svcs = prem.services ?? [];
+                                if (svcs.length === 0) return null;
+                                return (
+                                    <Fragment key={pi}>
+                                        {premises.length > 1 && (
+                                            <tr className="bg-gray-100">
+                                                <td className="border border-gray-500 px-2 py-1 text-left font-semibold" colSpan={3}>
+                                                    Premis: {prem.location || '—'}
+                                                    {prem.address && <span className="font-normal text-gray-600"> — {prem.address}</span>}
                                                 </td>
-                                                <td className="border border-gray-500 px-2 py-1">{svc.quantity}</td>
-                                                <td className="border border-gray-500 px-2 py-1">{svc.location || '—'}</td>
-                                                <td className="border border-gray-500 px-2 py-1 text-right">{fmtRp(svc.unit_price)}</td>
-                                                <td className="border border-gray-500 px-2 py-1 text-right">{fmtRp(svc.total_price)}</td>
                                             </tr>
-                                            {(svc.sub_products ?? svc.subProducts ?? []).length > 0 && (
+                                        )}
+                                        {svcs.map((svc: any, i: number) => (
+                                            <tr key={i}>
+                                                <td className="border border-gray-500 px-2 py-1 text-left">{svc.product?.name ?? '—'}</td>
+                                                <td className="border border-gray-500 px-2 py-1 text-left">{svc.location || '—'}</td>
+                                                <td className="border border-gray-500 px-2 py-1 text-right">{fmtRp(lineContractTotal(svc))}</td>
+                                            </tr>
+                                        ))}
+                                    </Fragment>
+                                );
+                            })}
+                            <tr className="font-bold bg-amber-50">
+                                <td className="border border-gray-500 px-2 py-1 text-right" colSpan={2}>TOTAL HARGA</td>
+                                <td className="border border-gray-500 px-2 py-1 text-right">{fmtRp(grandContractTotal)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                ) : (
+                    <table className="w-full border-collapse text-center">
+                        <thead>
+                            <tr className="bg-amber-100">
+                                <th className="border border-gray-500 px-2 py-1">PRODUCT NAME</th>
+                                <th className="border border-gray-500 px-2 py-1 w-12">QTY</th>
+                                <th className="border border-gray-500 px-2 py-1 w-28">LOKASI</th>
+                                <th className="border border-gray-500 px-2 py-1 w-28">UNIT PRICE</th>
+                                <th className="border border-gray-500 px-2 py-1 w-32">TOTAL PRICE /BULAN</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {allServices.length === 0 && (
+                                <tr><td colSpan={5} className="border border-gray-500 px-2 py-2 text-gray-400">Belum ada produk.</td></tr>
+                            )}
+                            {premises.map((prem: any, pi: number) => {
+                                const svcs = prem.services ?? [];
+                                if (svcs.length === 0) return null;
+                                return (
+                                    <Fragment key={pi}>
+                                        <tr className="bg-gray-100">
+                                            <td className="border border-gray-500 px-2 py-1 text-left font-semibold" colSpan={5}>
+                                                Premis: {prem.location || '—'}
+                                                {prem.address && <span className="font-normal text-gray-600"> — {prem.address}</span>}
+                                                {prem.pic && <span className="font-normal text-gray-600"> | PIC: {prem.pic}</span>}
+                                                {prem.phone && <span className="font-normal text-gray-600"> | Telp: {prem.phone}</span>}
+                                            </td>
+                                        </tr>
+                                        {svcs.map((svc: any, i: number) => (
+                                            <Fragment key={i}>
                                                 <tr>
-                                                    <td className="border border-gray-500 px-2 py-1 text-left" colSpan={5}>
-                                                        <span className="text-[9px] font-semibold text-gray-500">Sub Produk: </span>
-                                                        <span className="text-[9px] text-gray-700">
-                                                            {(svc.sub_products ?? svc.subProducts).map((sp: any) =>
-                                                                `${sp.product?.name ?? '—'} (${sp.quantity} ${productUnit(sp.product)})`).join(', ')}
-                                                        </span>
+                                                    <td className="border border-gray-500 px-2 py-1 text-left">
+                                                        {svc.product?.name ?? '—'}
+                                                        {productUnit(svc.product) && <span className="text-gray-500"> {productUnit(svc.product)}</span>}
                                                     </td>
+                                                    <td className="border border-gray-500 px-2 py-1">{svc.quantity}</td>
+                                                    <td className="border border-gray-500 px-2 py-1">{svc.location || '—'}</td>
+                                                    <td className="border border-gray-500 px-2 py-1 text-right">{fmtRp(svc.unit_price)}</td>
+                                                    <td className="border border-gray-500 px-2 py-1 text-right">{fmtRp(svc.total_price)}</td>
                                                 </tr>
-                                            )}
-                                        </Fragment>
-                                    ))}
-                                </Fragment>
-                            );
-                        })}
-                        <tr className="font-bold bg-amber-50">
-                            <td className="border border-gray-500 px-2 py-1 text-right" colSpan={4}>TOTAL /BULAN</td>
-                            <td className="border border-gray-500 px-2 py-1 text-right">{fmtRp(grandMonthly)}</td>
-                        </tr>
-                    </tbody>
-                </table>
+                                                {(svc.sub_products ?? svc.subProducts ?? []).length > 0 && (
+                                                    <tr>
+                                                        <td className="border border-gray-500 px-2 py-1 text-left" colSpan={5}>
+                                                            <span className="text-[9px] font-semibold text-gray-500">Sub Produk: </span>
+                                                            <span className="text-[9px] text-gray-700">
+                                                                {(svc.sub_products ?? svc.subProducts).map((sp: any) =>
+                                                                    `${sp.product?.name ?? '—'} (${sp.quantity} ${productUnit(sp.product)})`).join(', ')}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </Fragment>
+                                        ))}
+                                    </Fragment>
+                                );
+                            })}
+                            <tr className="font-bold bg-amber-50">
+                                <td className="border border-gray-500 px-2 py-1 text-right" colSpan={4}>TOTAL /BULAN</td>
+                                <td className="border border-gray-500 px-2 py-1 text-right">{fmtRp(grandMonthly)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                )}
 
-                {/* Keterangan & Perjanjian — sejajar */}
-                <div className="grid grid-cols-2 gap-3 mt-2 items-start">
-                    {/* Keterangan */}
-                    <div>
+                {/* Keterangan & Perjanjian */}
+                {isPest ? (
+                    <div className="mt-2">
                         <p className="underline font-medium">Keterangan:</p>
                         <ul className="text-[10px] text-gray-700 mt-0.5 space-y-0.5">
                             <li>*Harga sudah termasuk Pajak</li>
-                            <li>*Sistem pembayaran per bulan</li>
-                            <li>*Servis dan refill oil aroma 1x / Bulan dan respon keluhan 1x24 Jam</li>
+                            <li>*Sistem pembayaran full payment / per bulan</li>
+                            <li>*Respon keluhan 1x24 Jam</li>
                             {contract.notes && <li className="whitespace-pre-line">*{contract.notes}</li>}
                         </ul>
                     </div>
+                ) : (
+                    <div className="grid grid-cols-2 gap-3 mt-2 items-start">
+                        <div>
+                            <p className="underline font-medium">Keterangan:</p>
+                            <ul className="text-[10px] text-gray-700 mt-0.5 space-y-0.5">
+                                <li>*Harga sudah termasuk Pajak</li>
+                                <li>*Sistem pembayaran per bulan</li>
+                                <li>*Servis dan refill oil aroma 1x / Bulan dan respon keluhan 1x24 Jam</li>
+                                {contract.notes && <li className="whitespace-pre-line">*{contract.notes}</li>}
+                            </ul>
+                        </div>
 
-                    {/* Perjanjian */}
-                    <div>
-                        <p className="underline font-medium">Perjanjian:</p>
-                        <div className="border border-gray-500 px-2 py-1.5 mt-0.5">
-                            <ol className="list-decimal ml-4 space-y-1">
-                                <li>Jangka waktu kontrak adalah {months} Bulan.</li>
-                                <li>Dimulai pada tanggal {fmtShort(contract.start_date)} s/d {fmtShort(contract.end_date)}, atau terhitung mulai tanggal pertama pekerjaan dilakukan.</li>
-                                <li>Ketentuan Pembayaran maksimal {paymentTerms} hari setelah invoice diterima.</li>
-                                <li>Durasi dan nominal kontrak dapat berubah sewaktu-waktu sesuai dengan kesepakatan bersama.</li>
-                            </ol>
+                        <div>
+                            <p className="underline font-medium">Perjanjian:</p>
+                            <div className="border border-gray-500 px-2 py-1.5 mt-0.5">
+                                <PerjanjianItems
+                                    months={months} start={contract.start_date} end={contract.end_date} paymentTerms={paymentTerms}
+                                    extra="Durasi dan nominal kontrak dapat berubah sewaktu-waktu sesuai dengan kesepakatan bersama."
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 <p className="text-justify mt-4">
                     Dengan ini kami menegaskan telah membaca dan setuju dengan syarat ketentuan umum dan ketentuan khusus dan
@@ -314,13 +465,13 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
                         <p>{companyNameResolved},</p>
                         <div className="h-16" />
                         <p className="font-medium underline">{contract.sales_employee?.name ?? '(______________)'}</p>
-                        <p className="text-gray-600">{COMPANY.signerTitle}</p>
+                        <p className="text-gray-600">{BRAND.signerTitle}</p>
                     </div>
                     <div>
                         <p>Pelanggan,</p>
                         <div className="h-16" />
                         <p className="font-medium underline">{customer.name ?? '(______________)'}</p>
-                        <p className="text-gray-600">{customer.jabatan_kontak ?? ' '}</p>
+                        <p className="text-gray-600">{customer.jabatan_kontak ?? ' '}</p>
                     </div>
                 </div>
             </div>
@@ -328,15 +479,18 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
             {/* ===================== HALAMAN 2 ===================== */}
             <div className="max-w-[800px] mx-auto bg-white shadow print:shadow-none px-10 py-8 print:p-0 mt-8 print:mt-0 break-before-page">
                 <div className="flex items-start justify-between border-b-2 border-amber-600 pb-3 mb-4">
-                    <div>
-                        <h1 className="text-base font-bold text-amber-700">{companyNameResolved}</h1>
-                        {COMPANY.addressLines.map((l, i) => (
-                            <p key={i} className="text-[10px] text-gray-600">{l}</p>
-                        ))}
+                    <div className="flex items-start gap-2">
+                        <img src="/images/logo_ssi_new.png" alt="" className="h-10 w-10 object-contain shrink-0" />
+                        <div>
+                            <h1 className="text-base font-bold text-amber-700">{companyNameResolved}</h1>
+                            {COMPANY.addressLines.map((l, i) => (
+                                <p key={i} className="text-[10px] text-gray-600">{l}</p>
+                            ))}
+                        </div>
                     </div>
                     <div className="text-right">
-                        <h2 className="text-2xl font-extrabold tracking-tight text-amber-600">{COMPANY.brand}</h2>
-                        <p className="text-[10px] text-gray-500 -mt-1">{COMPANY.brandTagline}</p>
+                        <h2 className="text-2xl font-extrabold tracking-tight text-amber-600">{BRAND.brand}</h2>
+                        <p className="text-[10px] text-gray-500 -mt-1">{BRAND.tagline}</p>
                     </div>
                 </div>
 

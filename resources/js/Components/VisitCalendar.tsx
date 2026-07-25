@@ -7,6 +7,7 @@ export interface VisitEvent {
     date: string;                 // YYYY-MM-DD
     contract_number?: string | null;
     so_number?: string | null;
+    customer_name?: string | null;
     wo_id?: string | null;
     wo_number?: string | null;
     technician?: string | null;
@@ -67,6 +68,7 @@ const timeLabel = (e: VisitEvent) => {
 const eventTitle = (e: VisitEvent) => {
     const parts = [
         `Visit ${e.visit_number}`,
+        e.customer_name ? `Customer ${e.customer_name}` : null,
         e.contract_number ? `Kontrak ${e.contract_number}` : null,
         e.so_number ? `SO ${e.so_number}` : null,
         e.wo_number ? `WO ${e.wo_number}` : 'Belum ada WO',
@@ -96,6 +98,7 @@ function EventChip({ e, compact = false, onSelect }: { e: VisitEvent; compact?: 
             )}
             {!compact && (
                 <div className="mt-0.5 space-y-0.5">
+                    <div className="truncate">{e.customer_name ?? 'Customer: -'}</div>
                     <div className="truncate">{e.technician ?? 'Teknisi: -'}</div>
                     <div className="truncate opacity-80">{e.contract_number ?? e.so_number ?? '—'}</div>
                 </div>
@@ -142,6 +145,7 @@ function EventDialog({ e, onClose }: { e: VisitEvent; onClose: () => void }) {
                         <span className="text-xs text-gray-400">Visit ke-{e.visit_number}</span>
                     </div>
 
+                    <DetailRow label="Customer" value={e.customer_name} />
                     <DetailRow label="No. Kontrak" value={e.contract_number} />
                     <DetailRow label="No. SO" value={e.so_number} mono />
                     <DetailRow label="No. WO" value={e.wo_number} mono empty="Belum dibuatkan WO" />
@@ -172,6 +176,7 @@ export default function VisitCalendar({ events = [] }: { events: VisitEvent[] })
     const [view, setView] = useState<View>('month');
     const [cursor, setCursor] = useState<Date>(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; });
     const [technician, setTechnician] = useState<string>('');
+    const [search, setSearch] = useState<string>('');
     const [selected, setSelected] = useState<VisitEvent | null>(null);
 
     // Daftar teknisi unik untuk filter.
@@ -181,10 +186,17 @@ export default function VisitCalendar({ events = [] }: { events: VisitEvent[] })
         return Array.from(set).sort();
     }, [events]);
 
-    const filtered = useMemo(
-        () => (technician ? events.filter(e => e.technician === technician) : events),
-        [events, technician]
-    );
+    const filtered = useMemo(() => {
+        let list = technician ? events.filter(e => e.technician === technician) : events;
+        const q = search.trim().toLowerCase();
+        if (q) {
+            list = list.filter(e =>
+                (e.wo_number ?? '').toLowerCase().includes(q) ||
+                (e.customer_name ?? '').toLowerCase().includes(q)
+            );
+        }
+        return list;
+    }, [events, technician, search]);
 
     // Kelompokkan event per tanggal (YYYY-MM-DD), urut menurut jam mulai.
     const byDate = useMemo(() => {
@@ -226,6 +238,13 @@ export default function VisitCalendar({ events = [] }: { events: VisitEvent[] })
                     <h3 className="font-semibold text-gray-800">Jadwal Visit Plan</h3>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Cari No. WO / Nama Customer..."
+                        className="text-sm border rounded-md px-2 py-1.5 w-56 focus:outline-none focus:ring-2 focus:ring-red-400"
+                    />
                     {technicians.length > 0 && (
                         <select
                             value={technician}

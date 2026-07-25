@@ -105,8 +105,9 @@ class DashboardController extends Controller
 
         return SalesOrderVisitPlan::whereNotNull('visit_date')
             ->with([
-                'salesOrder:id,contract_id,so_number',
+                'salesOrder:id,contract_id,so_number,customer_id',
                 'salesOrder.contract:id,contract_number',
+                'salesOrder.customer:id,name',
             ])
             ->orderBy('visit_date')
             ->get(['id', 'sales_order_id', 'visit_number', 'visit_date'])
@@ -118,6 +119,7 @@ class DashboardController extends Controller
                     'date'            => $plan->visit_date?->format('Y-m-d'),
                     'contract_number' => $plan->salesOrder?->contract?->contract_number,
                     'so_number'       => $plan->salesOrder?->so_number,
+                    'customer_name'   => $plan->salesOrder?->customer?->name,
                     'wo_id'           => $wo?->id,
                     'wo_number'       => $wo?->wo_number,
                     'technician'      => $wo?->technician?->name,

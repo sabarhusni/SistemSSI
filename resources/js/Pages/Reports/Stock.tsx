@@ -1,15 +1,26 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
-import { fmt, fmtNum, SummaryCard, FilterBar, FilterSelect, ReportTable, statusBadge, applyFilters } from './_shared';
+import { fmt, fmtNum, SummaryCard, FilterBar, FilterSelect, ReportTable, statusBadge, applyFilters, exportToExcel } from './_shared';
 
 export default function Stock({ stocks, summary, categories, filters }: any) {
     const [f, setF] = useState({ product_type: filters?.product_type ?? '', category_id: filters?.category_id ?? '', search: filters?.search ?? '' });
 
+    const handleExport = () => exportToExcel('Stock_Report', [{
+        name: 'Stock',
+        headers: ['Product', 'Category', 'Unit', 'Current Stock', 'Minimum Stock', 'Location', 'Stock Value', 'Status'],
+        rows: (stocks ?? []).map((s: any) => [
+            s.product?.name ?? '-', s.product?.category?.name ?? '-',
+            s.product?.unit_of_measure?.symbol ?? s.product?.unit ?? '-',
+            Number(s.quantity ?? 0), Number(s.minimum_stock ?? 0), s.warehouse_location ?? '-',
+            Number(s.quantity ?? 0) * Number(s.product?.cost ?? 0), s.status,
+        ]),
+    }]);
+
     return (
         <AppLayout header="Stock Report">
             <Head title="Stock Report" />
-            <FilterBar onApply={() => applyFilters('/reports/stock', f)}>
+            <FilterBar onApply={() => applyFilters('/reports/stock', f)} onExport={handleExport}>
                 <div className="flex flex-col gap-1">
                     <label className="text-xs font-medium text-gray-500">Search Product</label>
                     <input

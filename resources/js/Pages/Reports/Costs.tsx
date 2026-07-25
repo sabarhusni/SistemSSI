@@ -1,13 +1,21 @@
 import AppLayout from '@/Layouts/AppLayout';
 import { Head } from '@inertiajs/react';
 import { useState } from 'react';
-import { fmt, fmtDate, SummaryCard, FilterBar, FilterDate, ReportTable, applyFilters } from './_shared';
+import { fmt, fmtDate, SummaryCard, FilterBar, FilterDate, ReportTable, applyFilters, exportToExcel } from './_shared';
 
 export default function Costs({ rows, byCategory, summary, filters }: any) {
     const today = new Date().toISOString().slice(0, 10);
     const firstDay = today.slice(0, 8) + '01';
 
     const [f, setF] = useState({ from: filters?.from ?? firstDay, to: filters?.to ?? today });
+
+    const handleExport = () => exportToExcel('Costs_Report', [{
+        name: 'Costs',
+        headers: ['Date', 'Category', 'Source', 'Description', 'Amount'],
+        rows: (rows ?? []).map((r: any) => [
+            r.date, r.category, r.source, r.description ?? '-', Number(r.amount ?? 0),
+        ]),
+    }]);
 
     const categoryColors: Record<string, string> = {
         'Pembelian Barang': 'bg-blue-100 text-blue-700',
@@ -18,7 +26,7 @@ export default function Costs({ rows, byCategory, summary, filters }: any) {
     return (
         <AppLayout header="Costs Report">
             <Head title="Costs Report" />
-            <FilterBar onApply={() => applyFilters('/reports/costs', f)}>
+            <FilterBar onApply={() => applyFilters('/reports/costs', f)} onExport={handleExport}>
                 <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
                 <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
             </FilterBar>
