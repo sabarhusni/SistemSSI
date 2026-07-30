@@ -112,11 +112,13 @@ function servicesFromItems(items: any[], taxRate: number): any[] {
 }
 
 // Ratakan struktur bersarang menjadi baris flat untuk disimpan.
-// (product_id, month) dijaga unik dengan menjumlahkan quantity bila duplikat.
+// (product_id, month, parent_product_id) dijaga unik dengan menjumlahkan quantity bila
+// duplikat — parent_product_id disertakan agar produk yang sama tetap bisa jadi
+// sub-produk pada lebih dari satu Service Item dalam bulan yang sama.
 function flattenServices(services: any[]): any[] {
     const map = new Map<string, any>();
     const push = (row: any) => {
-        const key = `${row.product_id}-${row.month}`;
+        const key = `${row.product_id}-${row.month}-${row.parent_product_id ?? ''}`;
         const existing = map.get(key);
         if (existing) {
             existing.quantity = Number(existing.quantity || 0) + Number(row.quantity || 0);
@@ -198,6 +200,10 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
     // Settlement Amount: total invoice yang sudah dibayar (payment Verified) untuk
     // kontrak DAN No SO ini (dari backend) — 0 untuk SO baru yang belum punya invoice.
     const settlementAmountNum = Number(settlementAmount ?? 0);
+    // Kategori produk yang ditampilkan pada picker mengikuti Tipe Layanan yang dipilih.
+    const serviceCategory = effectiveServiceType === 'pest_control' ? 'Pest Control'
+        : effectiveServiceType === 'scenting' ? 'Scenting'
+        : undefined;
     const premiseOptions   = selectedContract?.premises ?? [];
     const selectedPremise  = premiseOptions.find((p: any) => String(p.id) === String(data.contract_premise_id));
     const getProduct       = (id: string) => products?.find((p: any) => p.id === id);
@@ -264,9 +270,16 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
             };
             setServices(services);
         } else {
-            updateSubProduct(svcIdx, subIdx, 'product_id', product.id);
-            updateSubProduct(svcIdx, subIdx, 'uom', productUomLabel(product));
-            updateSubProduct(svcIdx, subIdx, 'uom_id', productUomId(product));
+            const services = [...data.services];
+            const subs = [...(services[svcIdx].sub_products ?? [])];
+            subs[subIdx] = {
+                ...subs[subIdx],
+                product_id: product.id,
+                uom:        productUomLabel(product),
+                uom_id:     productUomId(product),
+            };
+            services[svcIdx] = { ...services[svcIdx], sub_products: subs };
+            setServices(services);
         }
         setPickerTarget(null);
     };
@@ -544,7 +557,9 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
                     extraLabel="Sales Price"
                     extraKey="sales_price"
                     extraFormat="currency"
-                    typeFilter="goods"
+                    typeFilter={pickerTarget.subIdx !== undefined ? 'goods' : 'service'}
+                    categoryFilter={pickerTarget.subIdx === undefined ? serviceCategory : undefined}
+                    allowTypeToggle={pickerTarget.subIdx === undefined}
                 />
             )}
 

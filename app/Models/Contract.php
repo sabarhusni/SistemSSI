@@ -13,9 +13,15 @@ class Contract extends Model
 
     protected $fillable = [
         'customer_id', 'contract_number', 'start_date', 'end_date', 'duration_months',
-        'contract_value', 'invoice_frequency', 'status', 'service_type', 'notes',
+        'contract_value', 'is_manual_contract_value', 'invoice_frequency', 'status',
+        'service_type', 'is_unique_pest', 'notes',
         'sales_type', 'sales_name', 'lead_name',
         'sales_employee_id', 'lead_employee_id',
+    ];
+
+    protected $casts = [
+        'is_unique_pest'           => 'boolean',
+        'is_manual_contract_value' => 'boolean',
     ];
 
     public function customer() { return $this->belongsTo(Customer::class); }

@@ -17,8 +17,6 @@ const SERVICE_TYPES = [
     { value: 'scenting',     label: 'Scenting' },
 ];
 
-const emptySub = () => ({ product_id: '', quantity_used: 1, uom: '', method_of_application: '' });
-
 const emptyMaterial = (month = 1) => ({
     product_id:   '',
     month,
@@ -208,11 +206,6 @@ export default function Form({ workOrder, technicians, products, contracts, next
     const addMaterialToMonth = (month: number) => setMaterials([...data.materials, emptyMaterial(month)]);
     const removeMaterial = (i: number) => setMaterials(data.materials.filter((_: any, idx: number) => idx !== i));
 
-    const addSubProduct = (matIdx: number) => {
-        const m = [...data.materials];
-        m[matIdx] = { ...m[matIdx], sub_products: [...(m[matIdx].sub_products ?? []), emptySub()] };
-        setMaterials(m);
-    };
     const updateSubProduct = (matIdx: number, subIdx: number, field: string, value: any) => {
         const m = [...data.materials];
         const subs = [...(m[matIdx].sub_products ?? [])];
@@ -473,7 +466,6 @@ export default function Form({ workOrder, technicians, products, contracts, next
                         <td colSpan={5} className="px-4 py-2">
                             <div className="flex items-center justify-between mb-1">
                                 <span className="text-xs font-semibold text-blue-700">Sub Product</span>
-                                <button type="button" onClick={() => addSubProduct(idx)} className="text-xs text-blue-600 hover:underline">+ Add Sub Product</button>
                             </div>
                             {(mat.sub_products ?? []).length === 0 && (
                                 <p className="text-xs text-blue-400 italic">No sub product yet.</p>
@@ -632,20 +624,20 @@ export default function Form({ workOrder, technicians, products, contracts, next
                         )}
                     </FormField>
 
-                    <FormField label="Referensi Bulan" error={errors.month}>
+                    <FormField label="Visit Plan" error={errors.month}>
                         <select
                             className={inputCls}
                             value={data.month}
                             onChange={e => handleSelectMonth(+e.target.value)}
                             disabled={!linkedSO}
                         >
-                            <option value="">{linkedSO ? '— Pilih Bulan —' : 'Pilih SO terlebih dahulu'}</option>
+                            <option value="">{linkedSO ? '— Select Visit Plan —' : 'Pilih SO terlebih dahulu'}</option>
                             {soItemMonths.map((m: number) => {
                                 const ok = m === selectedMonth || (activeMonth != null && m === activeMonth);
                                 const reason = activeMonth != null && m > activeMonth ? 'belum giliran' : 'selesai';
                                 return (
                                     <option key={m} value={m} disabled={!ok}>
-                                        Bulan {m}{!ok ? ` — ${reason}` : ''}
+                                        Visit ke-{m}{!ok ? ` — ${reason}` : ''}
                                     </option>
                                 );
                             })}
@@ -748,7 +740,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
                             <h3 className="font-semibold text-gray-700">Material Used</h3>
                             {selectedMonth && (
                                 <span className="text-xs text-gray-400">
-                                    Qty default sub-produk = Qty SO ÷ jumlah visit plan (Bulan {selectedMonth}, SO {linkedSO?.so_number})
+                                    Qty default sub-produk = Qty SO ÷ jumlah visit plan (Visit Ke-{selectedMonth}, SO {linkedSO?.so_number})
                                 </span>
                             )}
                         </div>
@@ -772,7 +764,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
                                         >
                                             <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
                                                 <span className="text-gray-400 w-3 inline-block">{isCollapsed ? '▶' : '▼'}</span>
-                                                Bulan {month}
+                                                Visit Ke-{month}
                                                 <span className="text-xs font-normal text-gray-400">({rows.length} item)</span>
                                             </span>
                                         </button>
@@ -793,9 +785,6 @@ export default function Form({ workOrder, technicians, products, contracts, next
                                                         {renderMaterialRows(rows)}
                                                     </tbody>
                                                 </table>
-                                                <div className="px-4 py-2 bg-gray-50 border-t">
-                                                    <button type="button" onClick={() => addMaterialToMonth(month)} className="text-xs text-red-600 hover:underline">+ Tambah Product (Bulan {month})</button>
-                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -804,7 +793,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
                         </div>
                     </div>
 
-                    <FormField label="Technician Notes">
+                    <FormField label="Technician Notes / Recommendation" error={errors.technician_notes}>
                         <textarea rows={3} className={inputCls} value={data.technician_notes} onChange={e => setData('technician_notes', e.target.value)} />
                     </FormField>
                     </fieldset>

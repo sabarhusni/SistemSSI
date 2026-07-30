@@ -49,9 +49,11 @@ export default function Form({ contract, customers, products, employees, taxType
         end_date:             contract?.end_date             ?? '',
         duration_months:      contract?.duration_months ?? (contract ? monthsBetween(contract.start_date, contract.end_date) : ''),
         contract_value:       contract?.contract_value       ?? '',
+        is_manual_contract_value: contract?.is_manual_contract_value ?? false,
         invoice_frequency:    contract?.invoice_frequency    ?? 1,
         status:               contract?.status               ?? 'draft',
         service_type:         contract?.service_type         ?? '',
+        is_unique_pest:       contract?.is_unique_pest       ?? false,
         notes:                contract?.notes                ?? '',
         sales_type:           contract?.sales_type           ?? '',
         sales_employee_id:    contract?.sales_employee_id    ?? '',
@@ -95,6 +97,9 @@ export default function Form({ contract, customers, products, employees, taxType
         : data.service_type === 'scenting' ? 'Scenting'
         : undefined;
 
+    // Ubah Nilai Kontrak hanya berlaku untuk kontrak Pest Control dengan Hama Unik.
+    const canManualContractValue = data.service_type === 'pest_control' && data.is_unique_pest;
+
     // Per-line tax, honoring global tax type (exclude: added on top | include: embedded).
     const lineTax = (sub: number, rate: number) =>
         rate <= 0 ? 0
@@ -118,10 +123,13 @@ export default function Form({ contract, customers, products, employees, taxType
 
     // Ganti Services (Pest Control/Scenting) → produk yang sudah dipilih tidak lagi
     // relevan dengan kategori baru, jadi reset ke satu baris produk kosong per premis.
+    // Ubah Nilai Kontrak hanya berlaku untuk Pest Control + Hama Unik, jadi ikut direset.
     const handleServiceTypeChange = (val: string) => {
         setData({
             ...data,
             service_type: val,
+            is_unique_pest: val === 'pest_control' ? data.is_unique_pest : false,
+            is_manual_contract_value: val === 'pest_control' ? data.is_manual_contract_value : false,
             premises: data.premises.map((p: any) => ({ ...p, products: [emptyProduct()] })),
         });
     };
@@ -210,12 +218,31 @@ export default function Form({ contract, customers, products, employees, taxType
     const months          = Number(data.duration_months) || 0;
     const computedValue   = grandMonthly * months;
 
-    // Contract Value auto-fills: grand total (incl. tax) × duration in months.
+    // Contract Value auto-fills: grand total (incl. tax) × duration in months — unless
+    // manually overridden (Ubah Nilai Kontrak only applies to Pest Control + Hama Unik).
     useEffect(() => {
+        if (canManualContractValue && data.is_manual_contract_value) return;
         if (computedValue !== (parseFloat(data.contract_value) || 0)) {
             setData('contract_value', computedValue);
         }
-    }, [computedValue]);
+    }, [computedValue, data.is_manual_contract_value, canManualContractValue]);
+
+    // When Contract Value is overridden manually, every product line (across all premises)
+    // gets an equal share: (Contract Value ÷ Duration Months) ÷ jumlah produk. Visit
+    // frequency is not counted. Re-runs whenever a product is added/removed so all rows
+    // (old and new) stay in sync with the new per-product share.
+    useEffect(() => {
+        if (!canManualContractValue || !data.is_manual_contract_value || !months) return;
+        const count = allProducts.length;
+        if (!count) return;
+        const newUnitPrice = (parseFloat(data.contract_value) || 0) / months / count;
+        const changed = allProducts.some((p: any) => Math.abs((p.unit_price || 0) - newUnitPrice) > 0.0001);
+        if (!changed) return;
+        setPremises(data.premises.map((p: any) => ({
+            ...p,
+            products: (p.products ?? []).map((prod: any) => recalcProduct({ ...prod, unit_price: newUnitPrice })),
+        })));
+    }, [data.is_manual_contract_value, data.contract_value, months, canManualContractValue, allProducts.length]);
 
     // Incentive calculations
     const contractVal = parseFloat(data.contract_value) || 0;
@@ -312,6 +339,22 @@ export default function Form({ contract, customers, products, employees, taxType
                             ))}
                         </div>
                     </FormField>
+
+                    {data.service_type === 'pest_control' && (
+                        <label className="flex items-center gap-2 -mt-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={data.is_unique_pest}
+                                onChange={e => setData({
+                                    ...data,
+                                    is_unique_pest: e.target.checked,
+                                    is_manual_contract_value: e.target.checked ? data.is_manual_contract_value : false,
+                                })}
+                                className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                            />
+                            <span className="text-sm text-gray-700">Hama Unik</span>
+                        </label>
+                    )}
 
                     <FormField label="Customer" error={errors.customer_id} required>
                         <button
@@ -443,10 +486,26 @@ export default function Form({ contract, customers, products, employees, taxType
                                                                 </td>
                                                                 <td className="px-3 py-2 text-gray-500 text-xs">{productUnit(selectedProduct) || '—'}</td>
                                                                 <td className="px-3 py-2">
-                                                                    <input type="number" min={1} className={inputCls} value={prod.quantity} onChange={e => updateProduct(pi, di, 'quantity', +e.target.value)} />
+                                                                    <input
+                                                                        type="number"
+                                                                        min={1}
+                                                                        className={inputCls + (data.is_manual_contract_value ? ' bg-gray-50' : '')}
+                                                                        value={prod.quantity}
+                                                                        onChange={e => updateProduct(pi, di, 'quantity', +e.target.value)}
+                                                                        disabled={data.is_manual_contract_value}
+                                                                        title={data.is_manual_contract_value ? 'Qty dikunci selama Ubah Nilai Kontrak aktif' : undefined}
+                                                                    />
                                                                 </td>
                                                                 <td className="px-3 py-2">
-                                                                    <input type="number" className={inputCls} value={prod.unit_price} onChange={e => updateProduct(pi, di, 'unit_price', +e.target.value)} placeholder={selectedProduct?.sales_price ?? ''} />
+                                                                    <input
+                                                                        type="number"
+                                                                        className={inputCls + (data.is_manual_contract_value ? ' bg-gray-50' : '')}
+                                                                        value={prod.unit_price}
+                                                                        onChange={e => updateProduct(pi, di, 'unit_price', +e.target.value)}
+                                                                        placeholder={selectedProduct?.sales_price ?? ''}
+                                                                        readOnly={data.is_manual_contract_value}
+                                                                        title={data.is_manual_contract_value ? 'Dihitung otomatis dari Contract Value ÷ Duration Months ÷ jumlah produk' : undefined}
+                                                                    />
                                                                 </td>
                                                                 <td className="px-3 py-2">
                                                                     <input type="number" min={0} max={100} step="0.1" className={inputCls} value={prod.tax_rate} onChange={e => updateProduct(pi, di, 'tax_rate', +e.target.value)} placeholder="0" />
@@ -543,12 +602,37 @@ export default function Form({ contract, customers, products, employees, taxType
                                 <span>Total (per month, incl. tax)</span><span className="text-emerald-700">{fmt(grandMonthly)}</span>
                             </div>
                             <div className="pt-2 border-t border-emerald-200">
+                                {canManualContractValue && (
+                                    <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={data.is_manual_contract_value}
+                                            onChange={e => setData('is_manual_contract_value', e.target.checked)}
+                                            className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                                        />
+                                        <span className="text-sm text-gray-700">Ubah Nilai Kontrak</span>
+                                    </label>
+                                )}
                                 <FormField label="Contract Value (Rp)" error={errors.contract_value} required>
-                                    <input type="number" className={inputCls + ' bg-white'} value={data.contract_value} readOnly tabIndex={-1} />
+                                    <input
+                                        type="number"
+                                        className={inputCls + (data.is_manual_contract_value ? '' : ' bg-white')}
+                                        value={data.contract_value}
+                                        onChange={e => setData('contract_value', e.target.value === '' ? '' : +e.target.value)}
+                                        readOnly={!data.is_manual_contract_value}
+                                        tabIndex={data.is_manual_contract_value ? undefined : -1}
+                                    />
                                 </FormField>
-                                <p className="text-xs text-emerald-700 mt-1">
-                                    {fmt(grandMonthly)} (per month, incl. tax) × {months || 0} month{months === 1 ? '' : 's'} = <strong>{fmt(computedValue)}</strong>
-                                </p>
+                                {data.is_manual_contract_value ? (
+                                    <p className="text-xs text-emerald-700 mt-1">
+                                        Sales price tiap produk dihitung ulang: {fmt(parseFloat(data.contract_value) || 0)} ÷ {months || 0} bulan ÷ {allProducts.length} produk = <strong>{fmt(months && allProducts.length ? (parseFloat(data.contract_value) || 0) / months / allProducts.length : 0)}</strong> / bulan / produk.
+                                        {(!months || !allProducts.length) && <span className="text-amber-600"> Isi Duration Months &amp; tambahkan produk agar sales price bisa dihitung ulang.</span>}
+                                    </p>
+                                ) : (
+                                    <p className="text-xs text-emerald-700 mt-1">
+                                        {fmt(grandMonthly)} (per month, incl. tax) × {months || 0} month{months === 1 ? '' : 's'} = <strong>{fmt(computedValue)}</strong>
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </div>

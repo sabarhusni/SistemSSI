@@ -78,6 +78,35 @@ class ContractController extends Controller
     }
 
     /**
+     * When the contract value is overridden manually, every product line (across all
+     * premises) gets an equal share: (contract value ÷ duration in months) ÷ number of
+     * products. Visit frequency is not taken into account.
+     */
+    private function applyManualContractValue(array $premises, float $contractValue, int $months): array
+    {
+        $productCount = 0;
+        foreach ($premises as $premise) {
+            foreach (($premise['products'] ?? []) as $prod) {
+                if (empty($prod['product_id'])) continue;
+                $productCount++;
+            }
+        }
+        if ($productCount <= 0) return $premises;
+
+        $unitPrice = $contractValue / max($months, 1) / $productCount;
+        foreach ($premises as &$premise) {
+            foreach (($premise['products'] ?? []) as &$prod) {
+                if (empty($prod['product_id'])) continue;
+                $prod['unit_price'] = $unitPrice;
+            }
+            unset($prod);
+        }
+        unset($premise);
+
+        return $premises;
+    }
+
+    /**
      * Validation rules shared by store/update (the unique rule differs per caller).
      */
     private function rules(string $contractNumberUnique): array
@@ -91,6 +120,9 @@ class ContractController extends Controller
             'invoice_frequency'      => 'required|integer|min:1',
             'status'                 => 'required|in:draft,active,completed,cancelled',
             'service_type'           => 'required|in:pest_control,scenting',
+            'is_unique_pest'         => 'nullable|boolean',
+            'is_manual_contract_value' => 'nullable|boolean',
+            'contract_value'         => 'nullable|numeric|min:0',
             'notes'                  => 'nullable|string',
             'sales_type'             => 'nullable|in:canvas,lead',
             'sales_name'             => 'nullable|string|max:100',
@@ -194,7 +226,16 @@ class ContractController extends Controller
         }
 
         $taxType = Setting::get('tax_type', 'exclude');
-        $data['contract_value'] = $this->computeContractValue($data['premises'] ?? [], (int) $data['duration_months'], $taxType);
+        // Ubah Nilai Kontrak only applies to Pest Control contracts with Hama Unik checked.
+        $data['is_manual_contract_value'] = ($data['is_manual_contract_value'] ?? false)
+            && $data['service_type'] === 'pest_control'
+            && ($data['is_unique_pest'] ?? false);
+        if ($data['is_manual_contract_value']) {
+            $data['contract_value'] = (float) ($data['contract_value'] ?? 0);
+            $data['premises'] = $this->applyManualContractValue($data['premises'] ?? [], $data['contract_value'], (int) $data['duration_months']);
+        } else {
+            $data['contract_value'] = $this->computeContractValue($data['premises'] ?? [], (int) $data['duration_months'], $taxType);
+        }
 
         DB::transaction(function () use ($data, $taxType) {
             $contract = Contract::create(collect($data)->except('premises')->toArray());
@@ -234,7 +275,16 @@ class ContractController extends Controller
         }
 
         $taxType = Setting::get('tax_type', 'exclude');
-        $data['contract_value'] = $this->computeContractValue($data['premises'] ?? [], (int) $data['duration_months'], $taxType);
+        // Ubah Nilai Kontrak only applies to Pest Control contracts with Hama Unik checked.
+        $data['is_manual_contract_value'] = ($data['is_manual_contract_value'] ?? false)
+            && $data['service_type'] === 'pest_control'
+            && ($data['is_unique_pest'] ?? false);
+        if ($data['is_manual_contract_value']) {
+            $data['contract_value'] = (float) ($data['contract_value'] ?? 0);
+            $data['premises'] = $this->applyManualContractValue($data['premises'] ?? [], $data['contract_value'], (int) $data['duration_months']);
+        } else {
+            $data['contract_value'] = $this->computeContractValue($data['premises'] ?? [], (int) $data['duration_months'], $taxType);
+        }
 
         DB::transaction(function () use ($data, $contract, $taxType) {
             $contract->update(collect($data)->except('premises')->toArray());

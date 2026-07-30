@@ -253,9 +253,11 @@ function PestRow({ label, value }: { label: string; value: any }) {
 // diisi manual — tidak ada penambahan skema database untuk atribut tersebut.
 function PestControlServiceReport({ workOrder, companyName }: any) {
     const premise = workOrder.sales_order?.premise ?? null;
-    const services: any[] = premise?.services ?? [];
     const customer = workOrder.contract?.customer ?? {};
+    // Baris tanpa parent_product_id = produk jasa (Referensi Bulan); dengan parent_product_id = consumable/pestisida.
     const materials: any[] = workOrder.materials ?? [];
+    const serviceMaterials = materials.filter((m: any) => !m.parent_product_id);
+    const consumableMaterials = materials.filter((m: any) => m.parent_product_id);
     const visitTypes: string[] = workOrder.visit_types ?? [];
     const purpose = visitTypes.length ? visitTypes.map(v => purposeLabel[v] ?? v).join(', ') : '—';
     const companyNameResolved = companyName || COMPANY.name;
@@ -307,14 +309,14 @@ function PestControlServiceReport({ workOrder, companyName }: any) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {services.length === 0 && (
+                                {serviceMaterials.length === 0 && (
                                     <tr><td colSpan={3} className="border border-gray-400 px-2 py-2 text-center text-gray-400">—</td></tr>
                                 )}
-                                {services.map((svc: any, i: number) => (
+                                {serviceMaterials.map((m: any, i: number) => (
                                     <tr key={i}>
-                                        <td className="border border-gray-400 px-2 py-1">{svc.product?.description || svc.product?.name || '—'}</td>
-                                        <td className="border border-gray-400 px-2 py-1 text-center">{svc.quantity ?? '—'}</td>
-                                        <td className="border border-gray-400 px-2 py-1 text-center">{svc.visit_frequency ?? '—'}</td>
+                                        <td className="border border-gray-400 px-2 py-1">{m.product?.name || '—'}</td>
+                                        <td className="border border-gray-400 px-2 py-1 text-center">{m.quantity_used ?? '—'}</td>
+                                        <td className="border border-gray-400 px-2 py-1 text-center">—</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -340,12 +342,12 @@ function PestControlServiceReport({ workOrder, companyName }: any) {
                         </tr>
                     </thead>
                     <tbody>
-                        {materials.length === 0 && (
+                        {consumableMaterials.length === 0 && (
                             <tr><td colSpan={7} className="border border-gray-400 px-2 py-3 text-gray-400">No material.</td></tr>
                         )}
-                        {materials.map((m: any, i: number) => (
+                        {consumableMaterials.map((m: any, i: number) => (
                             <tr key={i}>
-                                <td className="border border-gray-400 px-2 py-1">&nbsp;</td>
+                                <td className="border border-gray-400 px-2 py-1 text-left">{m.product?.description || '—'}</td>
                                 <td className="border border-gray-400 px-2 py-1 text-left">{m.product?.name ?? '—'}</td>
                                 <td className="border border-gray-400 px-2 py-1">&nbsp;</td>
                                 <td className="border border-gray-400 px-2 py-1">&nbsp;</td>
@@ -354,39 +356,6 @@ function PestControlServiceReport({ workOrder, companyName }: any) {
                                 <td className="border border-gray-400 px-2 py-1">{m.quantity_used} {m.uom || m.product?.unit || ''}</td>
                             </tr>
                         ))}
-                    </tbody>
-                </table>
-
-                <p className="font-semibold underline mb-1">Precautionary Statement</p>
-                <table className="w-full border-collapse text-center mb-3">
-                    <tbody>
-                        <tr>
-                            <td className="border border-gray-400 px-2 py-1 bg-gray-50"></td>
-                            <td className="border border-gray-400 px-2 py-1 font-medium">Class 1a</td>
-                            <td className="border border-gray-400 px-2 py-1 font-medium">Class 1b</td>
-                            <td className="border border-gray-400 px-2 py-1 font-medium">Class 2</td>
-                            <td className="border border-gray-400 px-2 py-1 font-medium">Class 3</td>
-                            <td className="border border-gray-400 px-2 py-1 font-medium">Class 4</td>
-                        </tr>
-                        <tr>
-                            <td className="border border-gray-400 px-2 py-1 font-medium bg-gray-50">Colour Band</td>
-                            <td className="border border-gray-400 px-2 py-1">Black</td>
-                            <td className="border border-gray-400 px-2 py-1">Red</td>
-                            <td className="border border-gray-400 px-2 py-1">Yellow</td>
-                            <td className="border border-gray-400 px-2 py-1">Blue</td>
-                            <td className="border border-gray-400 px-2 py-1">Nil</td>
-                        </tr>
-                        <tr>
-                            <td className="border border-gray-400 px-2 py-1 font-medium bg-gray-50">Warning</td>
-                            <td className="border border-gray-400 px-2 py-1">VERY HIGHLY POISONOUS<br />Symbol of skull &amp; Crossbones</td>
-                            <td className="border border-gray-400 px-2 py-1">HIGHLY POISONOUS<br />Symbol of skull &amp; Crossbones</td>
-                            <td className="border border-gray-400 px-2 py-1">POISONOUS</td>
-                            <td className="border border-gray-400 px-2 py-1">HARMFUL</td>
-                            <td className="border border-gray-400 px-2 py-1">Nil</td>
-                        </tr>
-                        <tr>
-                            <td colSpan={6} className="border border-gray-400 px-2 py-1 font-semibold">KEEP AWAY FROM FOODSTUFF AND CHILDREN</td>
-                        </tr>
                     </tbody>
                 </table>
 
@@ -412,27 +381,9 @@ function PestControlServiceReport({ workOrder, companyName }: any) {
                     </tbody>
                 </table>
 
-                <h3 className="font-bold border-b border-gray-800 mb-1">D. RECOMMENDATIONS</h3>
-                <table className="w-full border-collapse mb-3">
-                    <thead>
-                        <tr className="bg-gray-100 text-left">
-                            <th className="border border-gray-400 px-2 py-1 w-32">Type</th>
-                            <th className="border border-gray-400 px-2 py-1">Recommendations</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {[0, 1].map(i => (
-                            <tr key={i}>
-                                <td className="border border-gray-400 px-2 py-2">&nbsp;</td>
-                                <td className="border border-gray-400 px-2 py-2">&nbsp;</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-
-                <h3 className="font-bold border-b border-gray-800 mb-1">E. SERVICE VISIT NOTES</h3>
-                <div className="border border-gray-400 px-2 py-2 min-h-[50px] whitespace-pre-line mb-2">
-                    {workOrder.technician_notes || ''}
+                <h3 className="font-bold border-b border-gray-800 mb-1">D. TECHNICIAN NOTES / RECOMMENDATION</h3>
+                <div className="border border-gray-400 px-2 py-2 mb-3 min-h-[3rem] whitespace-pre-line">
+                    {workOrder.technician_notes || <span className="text-gray-400">&nbsp;</span>}
                 </div>
 
                 <PestFooter companyNameResolved={companyNameResolved} />
