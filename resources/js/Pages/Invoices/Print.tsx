@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { useEffect } from 'react';
+import { Fragment, useEffect, useMemo } from 'react';
 
 const fmt = (n: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(Number(n) || 0);
@@ -27,7 +27,24 @@ export default function Print({ invoice, companyName }: any) {
     }, []);
 
     const items: any[] = invoice.items ?? [];
-    const premise = invoice.sales_order?.premise ?? null;
+    const woRefs = (invoice.work_orders ?? []).map((w: any) => w.wo_number).join(', ');
+
+    // Kontrak pest hama unik ditagih sebagai 1 baris nilai lump-sum — kolom Visit ke
+    // & Unit tidak relevan (tidak terikat visit/bulan atau satuan produk tertentu).
+    const isUniquePest = invoice.contract?.service_type === 'pest_control' && !!invoice.contract?.is_unique_pest;
+    const colCount = isUniquePest ? 5 : 7;
+
+    // Grouping tampilan item per premis (Lokasi + Alamat) — header ditampilkan sekali
+    // per grup, baris item di bawahnya tidak mengulang kolom Lokasi/Alamat.
+    const premiseGroups = useMemo(() => {
+        const map = new Map<string, { location: string; address: string; rows: any[] }>();
+        items.forEach((it: any) => {
+            const key = `${it.premise_location || ''}|${it.premise_address || ''}`;
+            if (!map.has(key)) map.set(key, { location: it.premise_location, address: it.premise_address, rows: [] });
+            map.get(key)!.rows.push(it);
+        });
+        return Array.from(map.values());
+    }, [items]);
 
     const subtotal = items.reduce((s: number, it: any) => s + (Number(it.subtotal) || Number(it.quantity) * Number(it.unit_price) || 0), 0);
     const taxAmount = items.reduce((s: number, it: any) => s + (Number(it.tax_amount) || 0), 0);
@@ -55,9 +72,12 @@ export default function Print({ invoice, companyName }: any) {
             <div className="max-w-3xl mx-auto bg-white shadow print:shadow-none p-10 print:p-0 text-gray-900">
 
                 <div className="flex items-start justify-between border-b-2 border-gray-800 pb-4 mb-6">
-                    <div>
-                        <h1 className="text-xl font-bold uppercase tracking-wide">{companyName || 'Company'}</h1>
-                        <p className="text-sm text-gray-500 mt-1">Tax Invoice Document</p>
+                    <div className="flex items-start gap-3">
+                        <img src="/images/logo_ssi_new.png" alt="" className="h-12 w-12 object-contain shrink-0" />
+                        <div>
+                            <h1 className="text-xl font-bold uppercase tracking-wide">{companyName || 'Company'}</h1>
+                            <p className="text-sm text-gray-500 mt-1">Tax Invoice Document</p>
+                        </div>
                     </div>
                     <div className="text-right">
                         <h2 className="text-lg font-bold uppercase">Invoice</h2>
@@ -72,17 +92,13 @@ export default function Print({ invoice, companyName }: any) {
                         <p className="font-semibold text-gray-900">{invoice.customer?.name ?? '—'}</p>
                         {invoice.customer?.address && <p className="text-sm text-gray-600">{invoice.customer.address}</p>}
                         {invoice.customer?.phone && <p className="text-sm text-gray-600">Phone: {invoice.customer.phone}</p>}
-                        {premise && (
-                            <p className="text-sm text-gray-600 mt-2">
-                                Lokasi: {premise.location ?? '—'}{premise.pic ? ` (PIC: ${premise.pic})` : ''}
-                            </p>
-                        )}
                     </div>
                     <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-400 mb-2">Details</h3>
                         <Row label="Invoice Date" value={fmtDate(invoice.invoice_date)} />
                         <Row label="Due Date" value={fmtDate(invoice.due_date)} />
                         <Row label="Contract No." value={invoice.contract?.contract_number} />
+                        <Row label="Referensi No WO" value={woRefs || '—'} />
                     </div>
                 </div>
 
@@ -91,28 +107,43 @@ export default function Print({ invoice, companyName }: any) {
                         <tr className="text-left">
                             <th className="border border-gray-300 px-2 py-1.5 w-8 text-center">#</th>
                             <th className="border border-gray-300 px-2 py-1.5">Description</th>
-                            <th className="border border-gray-300 px-2 py-1.5 w-14 text-center">Bulan</th>
+                            {!isUniquePest && <th className="border border-gray-300 px-2 py-1.5 w-20 text-center">Visit ke</th>}
                             <th className="border border-gray-300 px-2 py-1.5 w-16 text-center">Qty</th>
-                            <th className="border border-gray-300 px-2 py-1.5 w-16">Unit</th>
+                            {!isUniquePest && <th className="border border-gray-300 px-2 py-1.5 w-16">Unit</th>}
                             <th className="border border-gray-300 px-2 py-1.5 w-32 text-right">Unit Price</th>
                             <th className="border border-gray-300 px-2 py-1.5 w-32 text-right">Subtotal</th>
                         </tr>
                     </thead>
                     <tbody>
                         {items.length === 0 && (
-                            <tr><td colSpan={7} className="border border-gray-300 px-2 py-3 text-center text-gray-400">No items.</td></tr>
+                            <tr><td colSpan={colCount} className="border border-gray-300 px-2 py-3 text-center text-gray-400">No items.</td></tr>
                         )}
-                        {items.map((it: any, i: number) => (
-                            <tr key={i}>
-                                <td className="border border-gray-300 px-2 py-1.5 text-center">{i + 1}</td>
-                                <td className="border border-gray-300 px-2 py-1.5">{it.product?.name ?? it.description ?? '—'}</td>
-                                <td className="border border-gray-300 px-2 py-1.5 text-center">{it.month ?? 1}</td>
-                                <td className="border border-gray-300 px-2 py-1.5 text-center">{it.quantity}</td>
-                                <td className="border border-gray-300 px-2 py-1.5">{it.uom || it.product?.unit || '—'}</td>
-                                <td className="border border-gray-300 px-2 py-1.5 text-right whitespace-nowrap">{fmt(it.unit_price)}</td>
-                                <td className="border border-gray-300 px-2 py-1.5 text-right whitespace-nowrap">{fmt(it.subtotal || Number(it.quantity) * Number(it.unit_price))}</td>
-                            </tr>
-                        ))}
+                        {(() => {
+                            let counter = 0;
+                            return premiseGroups.map((group, gi) => (
+                                <Fragment key={gi}>
+                                    <tr>
+                                        <td colSpan={colCount} className="border border-gray-300 bg-gray-50 px-2 py-1.5 text-xs font-semibold">
+                                            {group.location || '—'}{group.address ? ` — ${group.address}` : ''}
+                                        </td>
+                                    </tr>
+                                    {group.rows.map((it: any) => {
+                                        counter++;
+                                        return (
+                                            <tr key={counter}>
+                                                <td className="border border-gray-300 px-2 py-1.5 text-center">{counter}</td>
+                                                <td className="border border-gray-300 px-2 py-1.5">{it.product?.name ?? it.description ?? '—'}</td>
+                                                {!isUniquePest && <td className="border border-gray-300 px-2 py-1.5 text-center">Visit ke-{it.month ?? 1}</td>}
+                                                <td className="border border-gray-300 px-2 py-1.5 text-center">{it.quantity}</td>
+                                                {!isUniquePest && <td className="border border-gray-300 px-2 py-1.5">{it.uom || it.product?.unit || '—'}</td>}
+                                                <td className="border border-gray-300 px-2 py-1.5 text-right whitespace-nowrap">{fmt(it.unit_price)}</td>
+                                                <td className="border border-gray-300 px-2 py-1.5 text-right whitespace-nowrap">{fmt(it.subtotal || Number(it.quantity) * Number(it.unit_price))}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                </Fragment>
+                            ));
+                        })()}
                     </tbody>
                 </table>
 
@@ -147,7 +178,7 @@ export default function Print({ invoice, companyName }: any) {
                 <div className="grid grid-cols-2 gap-8 mt-16 text-sm">
                     <div className="text-center">
                         <p className="text-gray-500 mb-16">Customer</p>
-                        <p className="border-t border-gray-400 pt-1">{premise?.pic ?? invoice.customer?.name ?? '(______________)'}</p>
+                        <p className="border-t border-gray-400 pt-1">{invoice.customer?.name ?? '(______________)'}</p>
                     </div>
                     <div className="text-center">
                         <p className="text-gray-500 mb-16">{companyName || 'Company'}</p>

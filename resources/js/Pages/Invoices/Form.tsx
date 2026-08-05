@@ -1,9 +1,9 @@
 import AppLayout from '@/Layouts/AppLayout';
 import FormField, { inputCls } from '@/Components/FormField';
 import ContractPickerModal from '@/Components/ContractPickerModal';
-import SalesOrderRefPickerModal from '@/Components/SalesOrderRefPickerModal';
+import WorkOrderRefPickerModal from '@/Components/WorkOrderRefPickerModal';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 
 const fmt = (n: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
@@ -12,6 +12,9 @@ const emptyItem = (month = 1) => ({
     product_id:     '',
     description:    '',
     month,
+    work_order_id:     null,
+    premise_location:  '',
+    premise_address:   '',
     quantity:       1,
     uom:            '',
     uom_conversion: 1,
@@ -35,6 +38,9 @@ const itemFromSO = (it: any, taxType: string) => recalcItem({
     product_id:     it.product_id     ?? '',
     description:    it.product?.name  ?? it.description ?? '',
     month:          Number(it.month) || 1,
+    work_order_id:    it.work_order_id    ?? null,
+    premise_location: it.premise_location ?? '',
+    premise_address:  it.premise_address  ?? '',
     quantity:       Number(it.quantity ?? 1),
     uom:            it.uom            ?? '',
     uom_conversion: it.uom_conversion ?? 1,
@@ -42,40 +48,73 @@ const itemFromSO = (it: any, taxType: string) => recalcItem({
     tax_rate:       Number(it.tax_rate ?? 0),
 }, taxType);
 
-// Bangun item invoice dari item INDUK (jasa) SO untuk tiap bulan yang sudah
-// memiliki Work Order berstatus Completed. Qty mengikuti SO (tidak dijumlah antar-visit).
-// Produk SO-bulan yang sudah pernah ditagih (invoicedKeys) tidak ditampilkan lagi.
-function itemsFromCompletedWOs(so: any, invoicedKeys: string[] = [], taxType: string = 'exclude'): any[] {
-    const wos = (so.work_orders ?? []).filter((w: any) => w.status === 'completed');
+// Baris ringkasan invoice untuk kontrak pest hama unik: nilai diambil dari input
+// "Nilai Tagihan" (bukan dijumlah dari item Sales Order).
+const pestUnikItem = (nilaiTagihan: number, contract: any, taxType: string) => recalcItem({
+    product_id:     '',
+    description:    `Jasa Pest Control - ${contract?.contract_number ?? ''}`,
+    month:          1,
+    work_order_id:    null,
+    premise_location: '',
+    premise_address:  '',
+    quantity:       1,
+    uom:            '',
+    uom_conversion: 1,
+    unit_price:     nilaiTagihan,
+    tax_rate:       0,
+}, taxType);
 
-    // Bulan yang sudah punya WO Completed (diambil dari material WO tsb).
-    const completedMonths = new Set<number>();
-    for (const wo of wos) {
-        for (const mat of (wo.materials ?? [])) {
-            completedMonths.add(Number(mat.month) || 1);
-        }
+// Bangun item invoice dari item INDUK (jasa) SO milik masing-masing WO terpilih —
+// satu WorkOrder = satu SO + satu bulan/visit, jadi bulan yang dicari langsung dari
+// wo.month (bukan lagi dari WorkOrderMaterial). Qty mengikuti SO (tidak dijumlah
+// antar-visit). Produk SO-bulan yang sudah pernah ditagih (invoicedKeys) tidak
+// ditampilkan lagi. excludeSoMonthKeys men-dedupe terhadap item yang sudah ada
+// (mis. WO redo yang merujuk visit bulan yang sama dengan WO lain yang sudah dipilih).
+function itemsFromSelectedWOs(
+    selectedWoIds: string[],
+    invoiceableWos: any[],
+    invoicedKeys: Record<string, string[]> = {},
+    taxType: string = 'exclude',
+    excludeSoMonthKeys: Set<string> = new Set(),
+): any[] {
+    const seen = new Set(excludeSoMonthKeys);
+    const rows: any[] = [];
+
+    for (const woId of selectedWoIds) {
+        const wo = invoiceableWos.find((w: any) => w.id === woId);
+        if (!wo) continue;
+
+        const month = Number(wo.month) || 1;
+        const key   = `${wo.sales_order_id}|${month}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const invoiced = new Set(invoicedKeys?.[wo.sales_order_id] ?? []);
+        const soItems = (wo._so?.items ?? []).filter(
+            (it: any) => !it.parent_product_id && (Number(it.month) || 1) === month
+                && !invoiced.has(`${it.product_id}|${month}`)
+        );
+        soItems.forEach((it: any) => rows.push({
+            ...itemFromSO(it, taxType),
+            work_order_id:    wo.id,
+            premise_location: wo.premise?.location ?? '',
+            premise_address:  wo.premise?.address  ?? '',
+        }));
     }
 
-    const invoiced = new Set(invoicedKeys);
-    const rows = (so.items ?? [])
-        .filter((it: any) => !it.parent_product_id && completedMonths.has(Number(it.month) || 1))
-        .filter((it: any) => !invoiced.has(`${it.product_id}|${Number(it.month) || 1}`))
-        .map((it: any) => itemFromSO(it, taxType))
-        .sort((a: any, b: any) => a.month - b.month);
-
-    return rows;
+    return rows.sort((a: any, b: any) => a.month - b.month);
 }
 
-export default function Form({ invoice, contracts, products, nextNumber, invoicedKeys = {}, taxType = 'exclude' }: any) {
+export default function Form({ invoice, contracts, products, nextNumber, invoicedKeys = {}, taxType = 'exclude', invoicedTotalsByContract = {} }: any) {
     const editing = !!invoice;
     // Invoice yang sudah lunas (paid) hanya bisa dilihat, tidak dapat diubah.
     const locked = editing && invoice?.status === 'paid';
     const lockCls = locked ? ' bg-gray-100 cursor-not-allowed' : '';
 
     const { data, setData, post, put, processing, errors } = useForm<any>({
-        contract_id:    invoice?.contract_id    ?? '',
-        customer_id:    invoice?.customer_id    ?? '',
-        sales_order_id: invoice?.sales_order_id ?? '',
+        contract_id:     invoice?.contract_id     ?? '',
+        customer_id:     invoice?.customer_id     ?? '',
+        work_order_ids:  invoice?.work_orders?.map((w: any) => w.id) ?? [],
         invoice_number: invoice?.invoice_number ?? nextNumber ?? '',
         invoice_date:   invoice?.invoice_date   ?? '',
         due_date:       invoice?.due_date        ?? '',
@@ -85,35 +124,80 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
     });
 
     const [contractPickerOpen, setContractPickerOpen] = useState(false);
-    const [soPickerOpen, setSoPickerOpen] = useState(false);
+    const [woPickerOpen, setWoPickerOpen] = useState(false);
 
     const selectedContract = contracts?.find((c: any) => String(c.id) === String(data.contract_id));
-    // SO layak tagih (confirmed + ada WO completed) pada kontrak terpilih.
-    const invoiceableSOs   = selectedContract?.sales_orders ?? [];
-    const linkedSO         = invoiceableSOs.find((s: any) => String(s.id) === String(data.sales_order_id)) ?? null;
-    const selectedPremise  = linkedSO?.premise ?? null;
     const getProduct       = (id: string) => products?.find((p: any) => p.id === id);
 
-    // Pilih kontrak: reset SO & item — item terisi setelah SO dipilih.
+    // WO layak tagih (completed) pada kontrak terpilih, di-flatten dari tiap SO
+    // beserta info SO/premis induknya — dipakai picker & derivasi item.
+    const invoiceableWos = useMemo(() => {
+        const rows: any[] = [];
+        (selectedContract?.sales_orders ?? []).forEach((so: any) => {
+            (so.work_orders ?? []).forEach((wo: any) => {
+                rows.push({ ...wo, so_number: so.so_number, premise: so.premise, sales_order_id: so.id, _so: so });
+            });
+        });
+        return rows;
+    }, [selectedContract]);
+
+    const linkedWos = invoiceableWos.filter((w: any) => data.work_order_ids.includes(w.id));
+
+    // Kontrak pest hama unik: nilai invoice diambil dari nilai kontrak, bukan item SO.
+    const isUniquePest    = selectedContract?.service_type === 'pest_control' && !!selectedContract?.is_unique_pest;
+    const alreadyInvoiced = Number(invoicedTotalsByContract?.[selectedContract?.id]) || 0;
+    const remainingBalance = Math.max(0, (Number(selectedContract?.contract_value) || 0) - alreadyInvoiced);
+
+    // Pilih kontrak: reset WO & item. Kontrak pest hama unik langsung menghasilkan
+    // 1 baris ringkasan senilai sisa kontrak — tidak perlu memilih referensi apa pun.
+    // Kontrak biasa: item terisi setelah WO dipilih.
     const handleSelectContract = (contract: any) => {
+        const uniquePest = contract.service_type === 'pest_control' && !!contract.is_unique_pest;
+        const invoicedTotal = Number(invoicedTotalsByContract?.[contract.id]) || 0;
+        const remaining     = Math.max(0, (Number(contract.contract_value) || 0) - invoicedTotal);
+
         setData({
             ...data,
             contract_id:    contract.id,
             customer_id:    contract.customer_id ?? '',
-            sales_order_id: '',
-            items:          [],
+            work_order_ids: [],
+            items:          uniquePest ? [pestUnikItem(remaining, contract, taxType)] : [],
         });
     };
 
-    // Pilih SO referensi: item invoice terisi dari item induk (jasa) SO untuk bulan ber-WO Completed.
-    const handleSelectSO = (so: any) => {
-        setData({
-            ...data,
-            sales_order_id: so.id,
-            items:          itemsFromCompletedWOs(so, invoicedKeys?.[so.id] ?? [], taxType),
-        });
-        setSoPickerOpen(false);
+    // Konfirmasi Referensi No WO (multi-select, kontrak normal saja — kontrak pest
+    // hama unik tidak menampilkan picker ini sama sekali): item untuk WO yang masih
+    // terpilih dipertahankan, item baru ditambahkan dari WO yang baru dipilih.
+    const handleConfirmWOs = (ids: string[]) => {
+        const keep = data.items.filter((it: any) => it.work_order_id && ids.includes(it.work_order_id));
+        const keptSoMonthKeys = new Set<string>(
+            keep.map((it: any) => {
+                const wo = invoiceableWos.find((w: any) => w.id === it.work_order_id);
+                return wo ? `${wo.sales_order_id}|${Number(wo.month) || 1}` : null;
+            }).filter((k: string | null): k is string => k !== null)
+        );
+        const newIds = ids.filter((id: string) => !data.work_order_ids.includes(id));
+        const added  = itemsFromSelectedWOs(newIds, invoiceableWos, invoicedKeys, taxType, keptSoMonthKeys);
+
+        setData({ ...data, work_order_ids: ids, items: [...keep, ...added] });
+        setWoPickerOpen(false);
     };
+
+    const handleNilaiTagihanChange = (value: number) => {
+        setData('items', [recalcItem({ ...(data.items[0] ?? {}), unit_price: value }, taxType)]);
+    };
+
+    // Grouping tampilan item per premis (Lokasi + Alamat) — header ditampilkan sekali
+    // per grup, baris item di bawahnya tidak mengulang kolom Lokasi/Alamat.
+    const premiseGroups = useMemo(() => {
+        const map = new Map<string, { location: string; address: string; rows: { item: any; idx: number }[] }>();
+        data.items.forEach((item: any, idx: number) => {
+            const key = `${item.premise_location || ''}|${item.premise_address || ''}`;
+            if (!map.has(key)) map.set(key, { location: item.premise_location, address: item.premise_address, rows: [] });
+            map.get(key)!.rows.push({ item, idx });
+        });
+        return Array.from(map.values());
+    }, [data.items]);
 
     const subtotalAll = data.items.reduce((s: number, it: any) => s + (it.subtotal   || 0), 0);
     const taxAll      = data.items.reduce((s: number, it: any) => s + (it.tax_amount || 0), 0);
@@ -139,12 +223,13 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
                 />
             )}
 
-            {soPickerOpen && (
-                <SalesOrderRefPickerModal
-                    salesOrders={invoiceableSOs}
+            {!isUniquePest && woPickerOpen && (
+                <WorkOrderRefPickerModal
+                    workOrders={invoiceableWos}
                     customerName={selectedContract?.customer?.name}
-                    onSelect={handleSelectSO}
-                    onClose={() => setSoPickerOpen(false)}
+                    selectedIds={data.work_order_ids}
+                    onConfirm={handleConfirmWOs}
+                    onClose={() => setWoPickerOpen(false)}
                 />
             )}
 
@@ -210,123 +295,144 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
                                 }
                             </div>
                         </FormField>
-                        <FormField label="Referensi SO (Confirmed)" error={errors.sales_order_id}>
-                            <button
-                                type="button"
-                                disabled={!selectedContract || locked}
-                                onClick={() => setSoPickerOpen(true)}
-                                className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition disabled:bg-gray-50 disabled:cursor-not-allowed"
-                            >
-                                {linkedSO
-                                    ? <span className="text-gray-800 font-mono text-xs">{linkedSO.so_number}</span>
-                                    : <span className="text-gray-400">{selectedContract ? '— Pilih SO —' : 'Pilih kontrak terlebih dahulu'}</span>
-                                }
-                            </button>
-                        </FormField>
+                        {!isUniquePest && (
+                            <FormField label="Referensi No WO (Completed)" error={errors.work_order_ids}>
+                                <button
+                                    type="button"
+                                    disabled={!selectedContract || locked}
+                                    onClick={() => setWoPickerOpen(true)}
+                                    className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition disabled:bg-gray-50 disabled:cursor-not-allowed"
+                                >
+                                    {linkedWos.length > 0
+                                        ? <span className="text-gray-800 font-mono text-xs">{linkedWos.map((w: any) => w.wo_number).join(', ')}</span>
+                                        : <span className="text-gray-400">{selectedContract ? '— Pilih WO —' : 'Pilih kontrak terlebih dahulu'}</span>
+                                    }
+                                </button>
+                            </FormField>
+                        )}
                     </div>
 
-                    {selectedPremise && (
-                        <div className="grid grid-cols-3 gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs">
-                            <div><span className="text-gray-500 block">Premis Lokasi</span><span className="text-gray-800 font-medium">{selectedPremise.location ?? '—'}</span></div>
-                            <div><span className="text-gray-500 block">Premis Alamat</span><span className="text-gray-800 font-medium">{selectedPremise.address ?? '—'}</span></div>
-                            <div><span className="text-gray-500 block">Premis PIC</span><span className="text-gray-800 font-medium">{selectedPremise.pic ?? '—'}</span></div>
+                    {isUniquePest && (
+                        <div className="grid grid-cols-3 gap-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
+                            <FormField label="Total Nilai Kontrak">
+                                <div className={`${inputCls} bg-white`}>{fmt(Number(selectedContract?.contract_value) || 0)}</div>
+                            </FormField>
+                            <FormField label="Sudah Ditagih Sebelumnya">
+                                <div className={`${inputCls} bg-white`}>{fmt(alreadyInvoiced)}</div>
+                            </FormField>
+                            <FormField label="Nilai Tagihan" required>
+                                <input type="number" className={inputCls + lockCls} disabled={locked || !data.items[0]}
+                                    value={data.items[0]?.unit_price ?? ''}
+                                    onChange={e => handleNilaiTagihanChange(+e.target.value || 0)} />
+                            </FormField>
                         </div>
                     )}
 
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="font-semibold text-gray-700">Invoice Items</h3>
-                            <span className="text-xs text-gray-400">Item diambil otomatis dari Sales Order — tidak dapat diubah.</span>
-                        </div>
-                        <div className="border rounded-lg overflow-x-auto mb-2">
-                            <table className="w-full text-sm min-w-[820px]">
-                                <thead className="bg-gray-50 border-b">
-                                    <tr className="text-left text-gray-600 text-xs">
-                                        <th className="px-3 py-2">Product</th>
-                                        <th className="px-3 py-2 w-20 text-center">Bulan</th>
-                                        <th className="px-3 py-2 w-20">Qty</th>
-                                        <th className="px-3 py-2 w-24">Unit</th>
-                                        <th className="px-3 py-2 w-36">Unit Price</th>
-                                        <th className="px-3 py-2 w-20 text-center">Tax %</th>
-                                        <th className="px-3 py-2 w-36 text-right">Subtotal</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {data.items.length === 0 && (
-                                        <tr>
-                                            <td colSpan={7} className="px-3 py-4 text-center text-gray-400 text-sm">
-                                                {data.sales_order_id
-                                                    ? 'Tidak ada produk service yang dapat ditagih — semua bulan sudah ditagih atau belum ada Work Order Completed.'
-                                                    : 'Pilih Kontrak lalu Referensi SO untuk mengisi item otomatis.'}
-                                            </td>
+                    {!isUniquePest && (
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="font-semibold text-gray-700">Invoice Items</h3>
+                                <span className="text-xs text-gray-400">
+                                    Item diambil otomatis dari Work Order — tidak dapat diubah.
+                                </span>
+                            </div>
+                            <div className="border rounded-lg overflow-x-auto mb-2">
+                                <table className="w-full text-sm min-w-[820px]">
+                                    <thead className="bg-gray-50 border-b">
+                                        <tr className="text-left text-gray-600 text-xs">
+                                            <th className="px-3 py-2">Product</th>
+                                            <th className="px-3 py-2 w-24 text-center">Visit ke</th>
+                                            <th className="px-3 py-2 w-20">Qty</th>
+                                            <th className="px-3 py-2 w-24">Unit</th>
+                                            <th className="px-3 py-2 w-36">Unit Price</th>
+                                            <th className="px-3 py-2 w-20 text-center">Tax %</th>
+                                            <th className="px-3 py-2 w-36 text-right">Subtotal</th>
                                         </tr>
-                                    )}
-                                    {data.items.map((item: any, i: number) => {
-                                        const selected = getProduct(item.product_id);
-                                        const displayName = selected?.name ?? item.description;
-                                        return (
-                                            <tr key={i} className="align-middle">
-                                                <td className="px-3 py-2">
-                                                    <button
-                                                        type="button"
-                                                        disabled
-                                                        className="w-full text-left px-3 py-1.5 border rounded-md text-sm bg-gray-100 cursor-not-allowed transition"
-                                                    >
-                                                        {displayName
-                                                            ? <span className="text-gray-800">{displayName}</span>
-                                                            : <span className="text-gray-400">—</span>
-                                                        }
-                                                    </button>
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <input type="number" disabled readOnly
-                                                        className={inputCls + ' text-center bg-gray-100 cursor-not-allowed'}
-                                                        value={item.month ?? 1} />
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <input type="number" disabled readOnly
-                                                        className={inputCls + ' bg-gray-100 cursor-not-allowed'}
-                                                        value={item.quantity} />
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <input disabled readOnly
-                                                        className={inputCls + ' bg-gray-100 cursor-not-allowed'}
-                                                        value={item.uom} />
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <input type="number" disabled readOnly
-                                                        className={inputCls + ' bg-gray-100 cursor-not-allowed'}
-                                                        value={item.unit_price} />
-                                                </td>
-                                                <td className="px-3 py-2">
-                                                    <input type="number" disabled readOnly
-                                                        className={inputCls + ' bg-gray-100 cursor-not-allowed'}
-                                                        value={item.tax_rate} />
-                                                </td>
-                                                <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
-                                                    {fmt(item.subtotal || 0)}
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {data.items.length === 0 && (
+                                            <tr>
+                                                <td colSpan={7} className="px-3 py-4 text-center text-gray-400 text-sm">
+                                                    {data.work_order_ids.length > 0
+                                                        ? 'Tidak ada produk service yang dapat ditagih — semua bulan sudah ditagih.'
+                                                        : 'Pilih Kontrak lalu Referensi No WO untuk mengisi item otomatis.'}
                                                 </td>
                                             </tr>
-                                        );
-                                    })}
-                                </tbody>
-                                <tfoot className="bg-gray-50 border-t text-sm">
-                                    <tr>
-                                        <td colSpan={6} className="px-3 py-2 text-right text-gray-600">{taxType === 'include' ? 'Pre-Tax Amount' : 'Subtotal'}</td>
-                                        <td className="px-3 py-2 text-right text-gray-700 whitespace-nowrap">{fmt(baseAmount)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td colSpan={6} className="px-3 py-2 text-right text-gray-600">Tax Amount</td>
-                                        <td className="px-3 py-2 text-right text-amber-600 whitespace-nowrap">{fmt(taxAll)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td colSpan={6} className="px-3 py-2 text-right font-semibold text-gray-700">{taxType === 'exclude' ? 'Grand Total (incl. Tax)' : 'Total'}</td>
-                                        <td className="px-3 py-2 text-right font-bold text-emerald-700 whitespace-nowrap">{fmt(grandTotal)}</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                                        )}
+                                        {premiseGroups.map((group, gi) => (
+                                            <Fragment key={`grp-${gi}`}>
+                                                <tr className="bg-gray-100">
+                                                    <td colSpan={7} className="px-3 py-1.5 text-xs font-semibold text-gray-600">
+                                                        {group.location || '—'}{group.address ? ` — ${group.address}` : ''}
+                                                    </td>
+                                                </tr>
+                                                {group.rows.map(({ item, idx }) => {
+                                                    const selected = getProduct(item.product_id);
+                                                    const displayName = selected?.name ?? item.description;
+                                                    return (
+                                                        <tr key={idx} className="align-middle">
+                                                            <td className="px-3 py-2">
+                                                                <button
+                                                                    type="button"
+                                                                    disabled
+                                                                    className="w-full text-left px-3 py-1.5 border rounded-md text-sm bg-gray-100 cursor-not-allowed transition"
+                                                                >
+                                                                    {displayName
+                                                                        ? <span className="text-gray-800">{displayName}</span>
+                                                                        : <span className="text-gray-400">—</span>
+                                                                    }
+                                                                </button>
+                                                            </td>
+                                                            <td className="px-3 py-2 text-center text-xs text-gray-600 whitespace-nowrap">
+                                                                Visit ke-{item.month ?? 1}
+                                                            </td>
+                                                            <td className="px-3 py-2">
+                                                                <input type="number" disabled readOnly
+                                                                    className={inputCls + ' bg-gray-100 cursor-not-allowed'}
+                                                                    value={item.quantity} />
+                                                            </td>
+                                                            <td className="px-3 py-2">
+                                                                <input disabled readOnly
+                                                                    className={inputCls + ' bg-gray-100 cursor-not-allowed'}
+                                                                    value={item.uom} />
+                                                            </td>
+                                                            <td className="px-3 py-2">
+                                                                <input type="number" disabled readOnly
+                                                                    className={inputCls + ' bg-gray-100 cursor-not-allowed'}
+                                                                    value={item.unit_price} />
+                                                            </td>
+                                                            <td className="px-3 py-2">
+                                                                <input type="number" disabled readOnly
+                                                                    className={inputCls + ' bg-gray-100 cursor-not-allowed'}
+                                                                    value={item.tax_rate} />
+                                                            </td>
+                                                            <td className="px-3 py-2 text-right font-medium whitespace-nowrap">
+                                                                {fmt(item.subtotal || 0)}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </Fragment>
+                                        ))}
+                                    </tbody>
+                                    <tfoot className="bg-gray-50 border-t text-sm">
+                                        <tr>
+                                            <td colSpan={6} className="px-3 py-2 text-right text-gray-600">{taxType === 'include' ? 'Pre-Tax Amount' : 'Subtotal'}</td>
+                                            <td className="px-3 py-2 text-right text-gray-700 whitespace-nowrap">{fmt(baseAmount)}</td>
+                                        </tr>
+                                        <tr>
+                                            <td colSpan={6} className="px-3 py-2 text-right text-gray-600">Tax Amount</td>
+                                            <td className="px-3 py-2 text-right text-amber-600 whitespace-nowrap">{fmt(taxAll)}</td>
+                                        </tr>
+                                        <tr>
+                                            <td colSpan={6} className="px-3 py-2 text-right font-semibold text-gray-700">{taxType === 'exclude' ? 'Grand Total (incl. Tax)' : 'Total'}</td>
+                                            <td className="px-3 py-2 text-right font-bold text-emerald-700 whitespace-nowrap">{fmt(grandTotal)}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     <FormField label="Notes">
                         <textarea rows={2} className={inputCls + lockCls} value={data.notes} disabled={locked}

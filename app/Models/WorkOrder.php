@@ -27,6 +27,7 @@ class WorkOrder extends Model
     public function salesOrderVisitPlan() { return $this->belongsTo(SalesOrderVisitPlan::class); }
     public function technician() { return $this->belongsTo(Employee::class, 'technician_id'); }
     public function materials() { return $this->hasMany(WorkOrderMaterial::class); }
+    public function invoices()  { return $this->belongsToMany(Invoice::class, 'invoice_work_orders')->using(InvoiceWorkOrder::class)->withTimestamps(); }
 
     /**
      * Work Order yang masih "aktif" (belum Completed/Cancelled) pada satu Sales Order

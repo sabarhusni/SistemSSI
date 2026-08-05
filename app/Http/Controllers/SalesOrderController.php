@@ -164,8 +164,9 @@ class SalesOrderController extends Controller
             'taxRateSo'  => (float) Setting::get('tax_rate_so', 11),
             // Settlement Amount: total paid_amount invoice (sudah dibayar via payment Verified)
             // yang cocok dengan kontrak DAN No SO ini — bukan akumulasi seluruh SO pada kontrak.
+            // Dibaca langsung dari invoice_work_orders.sales_order_id (diisi saat WO dipilih di invoice).
             'settlementAmount' => (float) Invoice::where('contract_id', $salesOrder->contract_id)
-                ->where('sales_order_id', $salesOrder->id)
+                ->whereHas('invoiceWorkOrders', fn($q) => $q->where('sales_order_id', $salesOrder->id))
                 ->sum('paid_amount'),
         ]);
     }

@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\Contract;
 use App\Models\Product;
-use App\Models\SalesOrder;
 use App\Models\Setting;
 use App\Models\WorkOrder;
 use Illuminate\Http\Request;
@@ -21,19 +21,19 @@ class InvoiceController extends Controller
         $sortBy   = in_array($request->sort_by, $sortable) ? $request->sort_by : 'created_at';
         $sortDir  = $request->sort_dir === 'asc' ? 'asc' : 'desc';
 
-        $query = Invoice::with(['customer', 'contract', 'salesOrder'])
+        $query = Invoice::with(['customer', 'contract', 'workOrders'])
             ->when($request->search, fn($q, $s) => $q->where('invoice_number', 'ilike', "%$s%")
                 ->orWhereHas('customer', fn($cq) => $cq->where('name', 'ilike', "%$s%")))
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->when($request->contract_id, fn($q, $v) => $q->where('contract_id', $v))
-            ->when($request->sales_order_id, fn($q, $v) => $q->where('sales_order_id', $v))
+            ->when($request->work_order_id, fn($q, $v) => $q->whereHas('workOrders', fn($sq) => $sq->where('work_orders.id', $v)))
             ->orderBy($sortBy, $sortDir);
 
         return Inertia::render('Invoices/Index', [
-            'invoices'    => $query->paginate(15)->withQueryString(),
-            'filters'     => $request->only('search', 'status', 'contract_id', 'sales_order_id', 'sort_by', 'sort_dir'),
-            'contracts'   => Contract::whereHas('invoices')->orderBy('contract_number')->get(['id', 'contract_number']),
-            'salesOrders' => SalesOrder::whereHas('invoices')->orderBy('so_number')->get(['id', 'so_number']),
+            'invoices'   => $query->paginate(15)->withQueryString(),
+            'filters'    => $request->only('search', 'status', 'contract_id', 'work_order_id', 'sort_by', 'sort_dir'),
+            'contracts'  => Contract::whereHas('invoices')->orderBy('contract_number')->get(['id', 'contract_number']),
+            'workOrders' => WorkOrder::whereHas('invoices')->orderBy('wo_number')->get(['id', 'wo_number']),
         ]);
     }
 
@@ -52,27 +52,44 @@ class InvoiceController extends Controller
      * Hanya SO berstatus confirmed yang memiliki minimal satu Work Order Completed
      * yang layak ditagih. Closure dipakai ulang pada filter kontrak & eager-load SO.
      */
-    private function invoiceableSoQuery(): \Closure
+    private function invoiceableWoQuery(): \Closure
     {
         return fn($q) => $q->where('status', 'confirmed')
             ->whereHas('workOrders', fn($w) => $w->where('status', 'completed'));
     }
 
     /**
+     * Resolve work_order_id → sales_order_id untuk item yang disubmit (satu query),
+     * dipakai validasi duplikat & WO aktif yang tetap dikelompokkan per SO+bulan
+     * (WorkOrderMaterial tidak menyimpan harga, jadi SO tetap jadi acuan produk/harga).
+     */
+    private function soIdsByWorkOrder(array $items): array
+    {
+        $woIds = collect($items)->pluck('work_order_id')->filter()->unique()->values();
+        if ($woIds->isEmpty()) {
+            return [];
+        }
+        return WorkOrder::whereIn('id', $woIds)->pluck('sales_order_id', 'id')->toArray();
+    }
+
+    /**
      * Peta produk SO per bulan yang sudah pernah ditagih (status draft/sent/paid),
-     * dikelompokkan per sales_order_id: ['so-id' => ['product-id|month', ...]].
+     * dikelompokkan per sales_order_id (diresolve lewat relasi workOrder milik tiap
+     * invoice item, karena item kini menyimpan work_order_id, bukan sales_order_id
+     * langsung): ['so-id' => ['product-id|month', ...]].
      * Dipakai form invoice untuk menyembunyikan item SO-bulan yang sudah ditagih.
      * Invoice yang sedang diedit dikecualikan agar itemnya sendiri tetap dapat dimuat ulang.
      */
     private function invoicedKeysBySo(?string $exceptInvoiceId = null): array
     {
-        return Invoice::whereIn('status', ['draft', 'sent', 'paid'])
-            ->whereNotNull('sales_order_id')
-            ->when($exceptInvoiceId, fn($q) => $q->where('id', '!=', $exceptInvoiceId))
-            ->with('items:id,invoice_id,product_id,month')
-            ->get(['id', 'sales_order_id'])
-            ->groupBy('sales_order_id')
-            ->map(fn($invs) => $invs->flatMap(fn($inv) => $inv->items)
+        return InvoiceItem::whereHas('invoice', fn($q) => $q->whereIn('status', ['draft', 'sent', 'paid'])
+                ->when($exceptInvoiceId, fn($q2) => $q2->where('id', '!=', $exceptInvoiceId)))
+            ->whereNotNull('work_order_id')
+            ->with('workOrder:id,sales_order_id')
+            ->get(['id', 'work_order_id', 'product_id', 'month'])
+            ->filter(fn($it) => $it->workOrder)
+            ->groupBy(fn($it) => $it->workOrder->sales_order_id)
+            ->map(fn($items) => $items
                 ->map(fn($it) => $it->product_id . '|' . (int) ($it->month ?? 1))
                 ->unique()->values()->all())
             ->toArray();
@@ -80,46 +97,55 @@ class InvoiceController extends Controller
 
     /**
      * Tolak bila ada item (produk SO per bulan) yang sudah pernah ditagih pada invoice
-     * lain dengan No SO yang sama (status draft/sent/paid). Invoice yang sedang diedit
-     * dikecualikan. Mengembalikan pesan error, atau null bila tidak ada duplikat.
+     * lain dengan SO yang sama (status draft/sent/paid). Dicek per sales_order_id hasil
+     * resolve dari work_order_id masing-masing item yang disubmit — item tanpa
+     * work_order_id (baris ringkasan kontrak pest hama unik) dilewati karena tidak
+     * terikat produk/bulan SO tertentu. Invoice yang sedang diedit dikecualikan.
+     * Mengembalikan pesan error, atau null bila tidak ada duplikat.
      */
-    private function duplicateInvoicedError(?string $salesOrderId, array $items, ?string $exceptInvoiceId = null): ?string
+    private function duplicateInvoicedError(array $items, ?string $exceptInvoiceId = null): ?string
     {
-        if (empty($salesOrderId)) {
-            return null;
+        $invoicedBySo = $this->invoicedKeysBySo($exceptInvoiceId);
+        $soIdByWo     = $this->soIdsByWorkOrder($items);
+        $dupMonths    = collect();
+
+        $bySo = collect($items)
+            ->filter(fn($it) => !empty($it['work_order_id']) && isset($soIdByWo[$it['work_order_id']]))
+            ->groupBy(fn($it) => $soIdByWo[$it['work_order_id']]);
+
+        foreach ($bySo as $soId => $soItems) {
+            $invoicedSet = array_flip($invoicedBySo[$soId] ?? []);
+            if (empty($invoicedSet)) {
+                continue;
+            }
+            $dupMonths = $dupMonths->merge(
+                $soItems->filter(fn($it) => isset($invoicedSet[($it['product_id'] ?? '') . '|' . (int) ($it['month'] ?? 1)]))
+                    ->pluck('month')->map(fn($m) => (int) ($m ?? 1))
+            );
         }
 
-        $invoiced = $this->invoicedKeysBySo($exceptInvoiceId)[$salesOrderId] ?? [];
-        if (empty($invoiced)) {
-            return null;
-        }
-
-        $invoicedSet = array_flip($invoiced);
-        $dupMonths   = collect($items)
-            ->filter(fn($it) => isset($invoicedSet[($it['product_id'] ?? '') . '|' . (int) ($it['month'] ?? 1)]))
-            ->pluck('month')->map(fn($m) => (int) ($m ?? 1))->unique()->sort()->values();
-
+        $dupMonths = $dupMonths->unique()->sort()->values();
         if ($dupMonths->isEmpty()) {
             return null;
         }
 
         return 'Invoice tidak dapat diproses: produk service untuk bulan '
-            . $dupMonths->join(', ') . ' pada SO ini sudah pernah ditagih di invoice lain.';
+            . $dupMonths->join(', ') . ' pada SO terkait sudah pernah ditagih di invoice lain.';
     }
 
     public function create()
     {
-        $invoiceableSo = $this->invoiceableSoQuery();
+        $invoiceableWo = $this->invoiceableWoQuery();
 
         return Inertia::render('Invoices/Form', [
-            'contracts'  => Contract::whereHas('salesOrders', $invoiceableSo)
+            'contracts'  => Contract::whereHas('salesOrders', $invoiceableWo)
                 ->with([
                     'customer',
-                    'salesOrders' => fn($q) => $invoiceableSo($q)->orderBy('so_number')
+                    'salesOrders' => fn($q) => $invoiceableWo($q)->orderBy('so_number')
                         ->with([
                             'items.product',
                             'premise',
-                            'workOrders' => fn($w) => $w->where('status', 'completed')->with('materials:id,work_order_id,month'),
+                            'workOrders' => fn($w) => $w->where('status', 'completed')->orderBy('wo_number'),
                         ]),
                 ])
                 ->whereIn('status', ['active', 'completed'])
@@ -129,43 +155,76 @@ class InvoiceController extends Controller
             'nextNumber'    => $this->generateNextNumber(),
             'invoicedKeys'  => $this->invoicedKeysBySo(),
             'taxType'       => Setting::get('tax_type', 'exclude'),
+            'invoicedTotalsByContract' => $this->invoicedTotalsByContract(),
         ]);
     }
 
     /**
      * Invoice tidak boleh diproses bila produk service per bulan yang ditagih
      * masih punya Work Order aktif (Pending/In Progress) pada SO yang sama.
-     * Mengembalikan pesan error bila ada WO aktif, atau null bila layak ditagih.
+     * Dicek per sales_order_id hasil resolve dari work_order_id masing-masing item
+     * yang disubmit — item tanpa work_order_id (baris ringkasan kontrak pest hama
+     * unik) dilewati. Mengembalikan pesan error bila ada WO aktif, atau null bila
+     * layak ditagih.
      */
-    private function activeWorkOrderError(?string $salesOrderId, array $items): ?string
+    private function activeWorkOrderError(array $items): ?string
     {
-        $months    = collect($items)->pluck('month')->map(fn($m) => (int) ($m ?? 1))->all();
-        $activeWos = WorkOrder::activeForSalesOrderMonths($salesOrderId, $months);
+        $soIdByWo = $this->soIdsByWorkOrder($items);
+        $active   = collect();
 
-        if ($activeWos->isEmpty()) {
+        $bySo = collect($items)
+            ->filter(fn($it) => !empty($it['work_order_id']) && isset($soIdByWo[$it['work_order_id']]))
+            ->groupBy(fn($it) => $soIdByWo[$it['work_order_id']]);
+
+        foreach ($bySo as $soId => $soItems) {
+            $months = $soItems->pluck('month')->map(fn($m) => (int) ($m ?? 1))->all();
+            $active = $active->merge(WorkOrder::activeForSalesOrderMonths($soId, $months));
+        }
+
+        if ($active->isEmpty()) {
             return null;
         }
 
         return 'Invoice tidak dapat diproses: masih ada Work Order aktif ('
-            . $activeWos->pluck('wo_number')->join(', ')
+            . $active->pluck('wo_number')->unique()->join(', ')
             . ') untuk bulan layanan yang ditagih. Selesaikan Work Order tersebut terlebih dahulu.';
+    }
+
+    /**
+     * Total invoice (draft/sent/paid) per kontrak, dipakai form invoice untuk
+     * menghitung default "Nilai Tagihan" (sisa belum ditagih) pada kontrak pest
+     * hama unik. Invoice yang sedang diedit dikecualikan.
+     */
+    private function invoicedTotalsByContract(?string $exceptInvoiceId = null): array
+    {
+        return Invoice::whereIn('status', ['draft', 'sent', 'paid'])
+            ->whereNotNull('contract_id')
+            ->when($exceptInvoiceId, fn($q) => $q->where('id', '!=', $exceptInvoiceId))
+            ->selectRaw('contract_id, SUM(total_amount) as total')
+            ->groupBy('contract_id')
+            ->pluck('total', 'contract_id')
+            ->toArray();
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'contract_id'    => 'nullable|uuid|exists:contracts,id',
-            'customer_id'    => 'nullable|uuid|exists:customers,id',
-            'sales_order_id' => 'nullable|uuid|exists:sales_orders,id',
+            'contract_id'        => 'nullable|uuid|exists:contracts,id',
+            'customer_id'        => 'nullable|uuid|exists:customers,id',
+            'work_order_ids'     => 'nullable|array',
+            'work_order_ids.*'   => 'uuid|exists:work_orders,id',
             'invoice_number' => ['required', 'string', 'max:50', Rule::unique('invoices', 'invoice_number')->whereNull('deleted_at')],
             'invoice_date'   => 'required|date',
             'due_date'       => 'required|date|after_or_equal:invoice_date',
             'status'         => 'required|in:draft,sent,paid,cancelled',
             'notes'          => 'nullable|string',
-            'items'                  => 'required|array|min:1',
-            'items.*.product_id'     => 'nullable|uuid|exists:products,id',
-            'items.*.description'    => 'nullable|string|max:255',
-            'items.*.month'          => 'nullable|integer|min:1',
+            'items'                     => 'required|array|min:1',
+            'items.*.product_id'        => 'nullable|uuid|exists:products,id',
+            'items.*.description'       => 'nullable|string|max:255',
+            'items.*.month'             => 'nullable|integer|min:1',
+            'items.*.work_order_id'     => 'nullable|uuid|exists:work_orders,id',
+            'items.*.premise_location'  => 'nullable|string|max:255',
+            'items.*.premise_address'   => 'nullable|string|max:255',
             'items.*.quantity'       => 'required|numeric|min:0',
             'items.*.uom'            => 'nullable|string|max:50',
             'items.*.uom_conversion' => 'nullable|numeric|min:0',
@@ -177,11 +236,11 @@ class InvoiceController extends Controller
             $data['invoice_number'] = $this->generateNextNumber();
         }
 
-        if ($error = $this->activeWorkOrderError($data['sales_order_id'] ?? null, $data['items'])) {
+        if ($error = $this->activeWorkOrderError($data['items'])) {
             return back()->withErrors(['items' => $error])->withInput();
         }
 
-        if ($error = $this->duplicateInvoicedError($data['sales_order_id'] ?? null, $data['items'])) {
+        if ($error = $this->duplicateInvoicedError($data['items'])) {
             return back()->withErrors(['items' => $error])->withInput();
         }
 
@@ -196,17 +255,27 @@ class InvoiceController extends Controller
             [$subtotal, $tax, $total, $itemTax] = $this->computeTotals($data['items'], $taxType);
 
             $invoice = Invoice::create(array_merge(
-                collect($data)->except('items')->toArray(),
+                collect($data)->except(['items', 'work_order_ids'])->toArray(),
                 ['subtotal' => $subtotal, 'tax' => $tax, 'total_amount' => $total]
             ));
+
+            $soByWo = WorkOrder::whereIn('id', $data['work_order_ids'] ?? [])->pluck('sales_order_id', 'id');
+            $invoice->workOrders()->sync(
+                collect($data['work_order_ids'] ?? [])
+                    ->mapWithKeys(fn($id) => [$id => ['sales_order_id' => $soByWo[$id] ?? null]])
+                    ->all()
+            );
 
             foreach ($data['items'] as $item) {
                 $sub = $item['quantity'] * $item['unit_price'];
                 $taxAmt = $itemTax($sub, (float) ($item['tax_rate'] ?? 0));
                 $invoice->items()->create([
-                    'product_id'     => $item['product_id']     ?? null,
-                    'description'    => $item['description']    ?? null,
-                    'month'          => $item['month']          ?? 1,
+                    'product_id'       => $item['product_id']       ?? null,
+                    'description'      => $item['description']      ?? null,
+                    'month'            => $item['month']            ?? 1,
+                    'work_order_id'    => $item['work_order_id']    ?? null,
+                    'premise_location' => $item['premise_location'] ?? null,
+                    'premise_address'  => $item['premise_address']  ?? null,
                     'quantity'       => $item['quantity'],
                     'uom'            => $item['uom']            ?? null,
                     'uom_conversion' => $item['uom_conversion'] ?? 1,
@@ -223,19 +292,19 @@ class InvoiceController extends Controller
 
     public function edit(Invoice $invoice)
     {
-        $invoiceableSo = $this->invoiceableSoQuery();
+        $invoiceableWo = $this->invoiceableWoQuery();
 
         return Inertia::render('Invoices/Form', [
-            'invoice'   => $invoice->load('items.product'),
+            'invoice'   => $invoice->load('items.product', 'workOrders'),
             // Sertakan kontrak yang punya SO layak tagih, atau kontrak invoice ini sendiri.
-            'contracts' => Contract::where(fn($q) => $q->whereHas('salesOrders', $invoiceableSo)
+            'contracts' => Contract::where(fn($q) => $q->whereHas('salesOrders', $invoiceableWo)
                     ->orWhere('id', $invoice->contract_id))
                 ->with([
                     'customer',
                     'salesOrders' => fn($q) => $q->orderBy('so_number')->with([
                         'items.product',
                         'premise',
-                        'workOrders' => fn($w) => $w->where('status', 'completed')->with('materials.product'),
+                        'workOrders' => fn($w) => $w->where('status', 'completed')->orderBy('wo_number'),
                     ]),
                 ])
                 ->orderBy('contract_number')->get(),
@@ -243,6 +312,7 @@ class InvoiceController extends Controller
                 ->get(['id', 'code', 'name', 'unit', 'sales_price']),
             'invoicedKeys' => $this->invoicedKeysBySo($invoice->id),
             'taxType'      => Setting::get('tax_type', 'exclude'),
+            'invoicedTotalsByContract' => $this->invoicedTotalsByContract($invoice->id),
         ]);
     }
 
@@ -254,18 +324,22 @@ class InvoiceController extends Controller
         }
 
         $data = $request->validate([
-            'contract_id'    => 'nullable|uuid|exists:contracts,id',
-            'customer_id'    => 'nullable|uuid|exists:customers,id',
-            'sales_order_id' => 'nullable|uuid|exists:sales_orders,id',
+            'contract_id'        => 'nullable|uuid|exists:contracts,id',
+            'customer_id'        => 'nullable|uuid|exists:customers,id',
+            'work_order_ids'     => 'nullable|array',
+            'work_order_ids.*'   => 'uuid|exists:work_orders,id',
             'invoice_number' => ['required', 'string', 'max:50', Rule::unique('invoices', 'invoice_number')->ignore($invoice->id)->whereNull('deleted_at')],
             'invoice_date'   => 'required|date',
             'due_date'       => 'required|date|after_or_equal:invoice_date',
             'status'         => 'required|in:draft,sent,paid,cancelled',
             'notes'          => 'nullable|string',
-            'items'                  => 'required|array|min:1',
-            'items.*.product_id'     => 'nullable|uuid|exists:products,id',
-            'items.*.description'    => 'nullable|string|max:255',
-            'items.*.month'          => 'nullable|integer|min:1',
+            'items'                     => 'required|array|min:1',
+            'items.*.product_id'        => 'nullable|uuid|exists:products,id',
+            'items.*.description'       => 'nullable|string|max:255',
+            'items.*.month'             => 'nullable|integer|min:1',
+            'items.*.work_order_id'     => 'nullable|uuid|exists:work_orders,id',
+            'items.*.premise_location'  => 'nullable|string|max:255',
+            'items.*.premise_address'   => 'nullable|string|max:255',
             'items.*.quantity'       => 'required|numeric|min:0',
             'items.*.uom'            => 'nullable|string|max:50',
             'items.*.uom_conversion' => 'nullable|numeric|min:0',
@@ -273,11 +347,11 @@ class InvoiceController extends Controller
             'items.*.tax_rate'       => 'nullable|numeric|min:0|max:100',
         ]);
 
-        if ($error = $this->activeWorkOrderError($data['sales_order_id'] ?? null, $data['items'])) {
+        if ($error = $this->activeWorkOrderError($data['items'])) {
             return back()->withErrors(['items' => $error])->withInput();
         }
 
-        if ($error = $this->duplicateInvoicedError($data['sales_order_id'] ?? null, $data['items'], $invoice->id)) {
+        if ($error = $this->duplicateInvoicedError($data['items'], $invoice->id)) {
             return back()->withErrors(['items' => $error])->withInput();
         }
 
@@ -291,18 +365,28 @@ class InvoiceController extends Controller
             [$subtotal, $tax, $total, $itemTax] = $this->computeTotals($data['items'], $taxType);
 
             $invoice->update(array_merge(
-                collect($data)->except('items')->toArray(),
+                collect($data)->except(['items', 'work_order_ids'])->toArray(),
                 ['subtotal' => $subtotal, 'tax' => $tax, 'total_amount' => $total]
             ));
+
+            $soByWo = WorkOrder::whereIn('id', $data['work_order_ids'] ?? [])->pluck('sales_order_id', 'id');
+            $invoice->workOrders()->sync(
+                collect($data['work_order_ids'] ?? [])
+                    ->mapWithKeys(fn($id) => [$id => ['sales_order_id' => $soByWo[$id] ?? null]])
+                    ->all()
+            );
 
             $invoice->items()->forceDelete();
             foreach ($data['items'] as $item) {
                 $sub = $item['quantity'] * $item['unit_price'];
                 $taxAmt = $itemTax($sub, (float) ($item['tax_rate'] ?? 0));
                 $invoice->items()->create([
-                    'product_id'     => $item['product_id']     ?? null,
-                    'description'    => $item['description']    ?? null,
-                    'month'          => $item['month']          ?? 1,
+                    'product_id'       => $item['product_id']       ?? null,
+                    'description'      => $item['description']      ?? null,
+                    'month'            => $item['month']            ?? 1,
+                    'work_order_id'    => $item['work_order_id']    ?? null,
+                    'premise_location' => $item['premise_location'] ?? null,
+                    'premise_address'  => $item['premise_address']  ?? null,
                     'quantity'       => $item['quantity'],
                     'uom'            => $item['uom']            ?? null,
                     'uom_conversion' => $item['uom_conversion'] ?? 1,
@@ -359,7 +443,7 @@ class InvoiceController extends Controller
         $invoice->load([
             'customer',
             'contract',
-            'salesOrder.premise',
+            'workOrders:id,wo_number',
             'items.product',
         ]);
 

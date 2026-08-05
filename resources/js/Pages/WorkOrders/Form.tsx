@@ -361,7 +361,9 @@ export default function Form({ workOrder, technicians, products, contracts, next
         });
     };
 
-    const handleSelectSO = (so: any) => {
+    const handleSelectSO = (ids: string[]) => {
+        const so = confirmedSOs.find((s: any) => s.id === ids[0]);
+        if (!so) { setSoPickerOpen(false); return; }
         setData({
             ...data,
             sales_order_id:            so.id,
@@ -545,7 +547,8 @@ export default function Form({ workOrder, technicians, products, contracts, next
                 <SalesOrderRefPickerModal
                     salesOrders={confirmedSOs}
                     customerName={selectedContract?.customer?.name}
-                    onSelect={handleSelectSO}
+                    selectedIds={data.sales_order_id ? [data.sales_order_id] : []}
+                    onConfirm={handleSelectSO}
                     onClose={() => setSoPickerOpen(false)}
                 />
             )}

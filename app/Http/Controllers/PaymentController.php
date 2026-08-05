@@ -46,27 +46,38 @@ class PaymentController extends Controller
      */
     private function activeWorkOrderError(?string $invoiceId): ?string
     {
-        $invoice = Invoice::with('items:id,invoice_id,month')->find($invoiceId);
+        $invoice = Invoice::with('items:id,invoice_id,work_order_id,month')->find($invoiceId);
         if (!$invoice) {
             return null;
         }
 
-        $months    = $invoice->items->pluck('month')->map(fn($m) => (int) ($m ?? 1))->all();
-        $activeWos = WorkOrder::activeForSalesOrderMonths($invoice->sales_order_id, $months);
+        $items    = $invoice->items->filter(fn($it) => !empty($it->work_order_id));
+        $soIdByWo = WorkOrder::whereIn('id', $items->pluck('work_order_id')->unique())
+            ->pluck('sales_order_id', 'id');
+
+        $activeWos = collect();
+        foreach ($items->filter(fn($it) => $soIdByWo->has($it->work_order_id))
+                 ->groupBy(fn($it) => $soIdByWo[$it->work_order_id]) as $soId => $soItems) {
+            $months    = $soItems->pluck('month')->map(fn($m) => (int) ($m ?? 1))->all();
+            $activeWos = $activeWos->merge(WorkOrder::activeForSalesOrderMonths($soId, $months));
+        }
 
         if ($activeWos->isEmpty()) {
             return null;
         }
 
         return 'Pembayaran tidak dapat diproses: Invoice ' . $invoice->invoice_number
-            . ' masih memiliki Work Order aktif (' . $activeWos->pluck('wo_number')->join(', ')
+            . ' masih memiliki Work Order aktif (' . $activeWos->pluck('wo_number')->unique()->join(', ')
             . ') untuk bulan layanan yang ditagih. Selesaikan Work Order tersebut terlebih dahulu.';
     }
 
     /**
-     * Invoice yang sudah punya Payment berstatus received/verified tidak boleh
-     * dibayar lagi. Payment yang sedang diedit dikecualikan. Mengembalikan pesan
-     * error bila invoice sudah terbayar, atau null bila masih layak dibayar.
+     * Invoice yang total pembayaran verified-nya sudah mencapai nilai invoice
+     * (lunas) tidak boleh dibayar lagi. Pembayaran verified sebagian (partial)
+     * tetap boleh menerima pembayaran berikutnya. Payment yang sedang diedit
+     * dikecualikan dari perhitungan agar tidak menghitung dirinya sendiri.
+     * Mengembalikan pesan error bila invoice sudah lunas, atau null bila masih
+     * layak dibayar.
      */
     private function alreadyPaidError(?string $invoiceId, ?string $exceptPaymentId = null): ?string
     {
@@ -75,17 +86,17 @@ class PaymentController extends Controller
             return null;
         }
 
-        $exists = $invoice->payments()
-            ->whereIn('status', ['received', 'verified'])
+        $paidVerified = (float) $invoice->payments()
+            ->where('status', 'verified')
             ->when($exceptPaymentId, fn($q) => $q->where('id', '!=', $exceptPaymentId))
-            ->exists();
+            ->sum('amount');
 
-        if (!$exists) {
+        if ((float) $invoice->total_amount <= 0 || $paidVerified < (float) $invoice->total_amount) {
             return null;
         }
 
         return 'Pembayaran tidak dapat diproses: Invoice ' . $invoice->invoice_number
-            . ' sudah memiliki pembayaran berstatus Received/Verified.';
+            . ' sudah lunas (total pembayaran verified telah mencapai nilai invoice).';
     }
 
     /**
@@ -118,9 +129,12 @@ class PaymentController extends Controller
     public function create()
     {
         return Inertia::render('Payments/Form', [
+            // Invoice berstatus 'sent' mencakup yang sudah punya pembayaran verified
+            // sebagian (partial) — invoice hanya berpindah ke 'paid' bila paid_amount
+            // sudah mencapai total_amount (lihat syncInvoice()), jadi filter status
+            // saja sudah cukup untuk mengecualikan invoice yang benar-benar lunas.
             'invoices'     => Invoice::with('customer')
                 ->where('status', 'sent')
-                ->whereDoesntHave('payments', fn($q) => $q->whereIn('status', ['received', 'verified']))
                 ->orderBy('invoice_number')->get(),
             'bankAccounts' => BankAccount::where('status', 'active')->orderBy('bank_name')->get(),
             'nextNumber'   => $this->generateNextNumber(),

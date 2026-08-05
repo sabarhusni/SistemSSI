@@ -25,5 +25,4 @@ class SalesOrder extends Model
     public function items() { return $this->hasMany(SalesOrderItem::class); }
     public function visitPlans() { return $this->hasMany(SalesOrderVisitPlan::class)->orderBy('visit_number'); }
     public function workOrders() { return $this->hasMany(WorkOrder::class); }
-    public function invoices() { return $this->hasMany(Invoice::class); }
 }
