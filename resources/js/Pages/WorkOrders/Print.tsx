@@ -93,9 +93,12 @@ export default function Print({ workOrder, companyName }: any) {
             <div className="max-w-3xl mx-auto bg-white shadow print:shadow-none p-10 print:p-0 text-gray-900">
 
                 <div className="flex items-start justify-between border-b-2 border-gray-800 pb-4 mb-6">
-                    <div>
-                        <h1 className="text-xl font-bold uppercase tracking-wide">{companyName || 'Company'}</h1>
-                        <p className="text-sm text-gray-500 mt-1">Work Service Order Document</p>
+                    <div className="flex items-start gap-3">
+                        <img src="/images/logo_ssi_new.png" alt="" className="h-12 w-12 object-contain shrink-0" />
+                        <div>
+                            <h1 className="text-xl font-bold uppercase tracking-wide">{companyName || 'Company'}</h1>
+                            <p className="text-sm text-gray-500 mt-1">Work Service Order Document</p>
+                        </div>
                     </div>
                     <div className="text-right">
                         <h2 className="text-lg font-bold uppercase">Service Report</h2>
