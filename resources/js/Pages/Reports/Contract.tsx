@@ -18,11 +18,11 @@ export default function Contract({ contracts, summary, customers, filters }: any
 
     const handleExport = () => exportToExcel('Laporan_Kontrak', [{
         name: 'Kontrak',
-        headers: ['No. Kontrak', 'Customer', 'Mulai', 'Selesai', 'Durasi (bln)', 'Sales', 'Nilai', 'SO', 'WO', 'Tertagih', 'Status'],
+        headers: ['No. Kontrak', 'Customer', 'Mulai', 'Selesai', 'Durasi (bln)', 'Sales', 'Nilai', 'SO', 'WO', 'Jml Invoice', 'Tertagih', 'Nilai Paid', 'Status'],
         rows: (contracts ?? []).map((c: any) => [
             c.contract_number, c.customer?.name ?? '-', c.start_date, c.end_date, c.duration_months ?? '',
             salesName(c), Number(c.contract_value ?? 0), c.sales_orders_count ?? 0, c.work_orders_count ?? 0,
-            Number(c.invoices_sum_total_amount ?? 0), c.status,
+            c.invoices_count ?? 0, Number(c.invoices_sum_total_amount ?? 0), Number(c.invoices_sum_paid_amount ?? 0), c.status,
         ]),
     }]);
 
@@ -45,15 +45,16 @@ export default function Contract({ contracts, summary, customers, filters }: any
                 </FilterSelect>
             </FilterBar>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                 <SummaryCard label="Total Kontrak" value={fmtNum(summary?.total_contracts)} color="gray" />
                 <SummaryCard label="Kontrak Aktif" value={fmtNum(summary?.by_status?.active ?? 0)} color="emerald" />
                 <SummaryCard label="Nilai Kontrak" value={fmt(summary?.total_value)} color="blue" />
                 <SummaryCard label="Total Tertagih" value={fmt(summary?.total_invoiced)} color="amber" />
+                <SummaryCard label="Total Nilai Paid" value={fmt(summary?.total_paid)} color="emerald" />
             </div>
 
             <ReportTable
-                headers={['No. Kontrak', 'Customer', 'Periode', 'Durasi', 'Sales', 'Nilai', 'SO', 'WO', 'Tertagih', 'Status']}
+                headers={['No. Kontrak', 'Customer', 'Periode', 'Durasi', 'Sales', 'Nilai', 'SO', 'WO', 'Jml Invoice', 'Tertagih', 'Nilai Paid', 'Status']}
                 empty={!contracts?.length}
             >
                 {contracts?.map((c: any) => (
@@ -68,7 +69,9 @@ export default function Contract({ contracts, summary, customers, filters }: any
                         <td className="px-4 py-2 text-right">{fmt(c.contract_value)}</td>
                         <td className="px-4 py-2 text-center">{c.sales_orders_count ?? 0}</td>
                         <td className="px-4 py-2 text-center">{c.work_orders_count ?? 0}</td>
+                        <td className="px-4 py-2 text-center">{c.invoices_count ?? 0}</td>
                         <td className="px-4 py-2 text-right">{fmt(c.invoices_sum_total_amount)}</td>
+                        <td className="px-4 py-2 text-right text-emerald-700">{fmt(c.invoices_sum_paid_amount)}</td>
                         <td className="px-4 py-2">{statusBadge(c.status)}</td>
                     </tr>
                 ))}
@@ -77,7 +80,9 @@ export default function Contract({ contracts, summary, customers, filters }: any
                         <td colSpan={5} className="px-4 py-2 text-right">Total</td>
                         <td className="px-4 py-2 text-right text-blue-700">{fmt(summary?.total_value)}</td>
                         <td colSpan={2}></td>
+                        <td className="px-4 py-2 text-center">{contracts.reduce((s: number, c: any) => s + (c.invoices_count ?? 0), 0)}</td>
                         <td className="px-4 py-2 text-right text-amber-700">{fmt(summary?.total_invoiced)}</td>
+                        <td className="px-4 py-2 text-right text-emerald-700">{fmt(summary?.total_paid)}</td>
                         <td></td>
                     </tr>
                 )}

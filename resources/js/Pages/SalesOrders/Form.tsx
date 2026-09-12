@@ -59,12 +59,13 @@ const emptyService = (taxRate = 0, month = 1) => ({
 });
 
 // Susun service items (beserta sub produk bersarang) dari premis terpilih,
-// direplikasi per bulan sejumlah periode kontrak (duration_months).
-function servicesFromPremise(premise: any, durationMonths: number, taxRate: number): any[] {
+// direplikasi sejumlah `periods` — jumlah bulan (mode duration) atau jumlah
+// visit (mode visit); kolom `month` dipakai generik sebagai index periode.
+function servicesFromPremise(premise: any, periods: number, taxRate: number): any[] {
     const services = premise?.services ?? [];
     if (!services.length) return [];
 
-    const periods = Number(durationMonths) > 0 ? Number(durationMonths) : 1;
+    periods = Number(periods) > 0 ? Number(periods) : 1;
     const result: any[] = [];
 
     for (let month = 1; month <= periods; month++) {
@@ -160,7 +161,7 @@ function flattenServices(services: any[]): any[] {
     return Array.from(map.values());
 }
 
-export default function Form({ salesOrder, contracts, products, uoms = [], nextNumber, taxType = 'exclude', taxRateSo = 11, workOrders = [], usedPremiseIds = [], woUsage = {}, settlementAmount = 0 }: any) {
+export default function Form({ salesOrder, contracts, products, uoms = [], nextNumber, taxType = 'exclude', taxRateSo = 11, workOrders = [], usedPremiseIds = [], woUsage = {} }: any) {
     const editing = !!salesOrder;
 
     const { data, setData, post, put, transform, processing, errors } = useForm<any>({
@@ -192,14 +193,15 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
     const [serviceType, setServiceType] = useState<string>('');
 
     const selectedContract = contracts?.find((c: any) => String(c.id) === String(data.contract_id));
+    // Contract Value Mode menentukan skema Service Items: 'visit' → per kunjungan
+    // (sejumlah Visit Frequency premis), 'duration' → skema lama per bulan.
+    const soMode      = selectedContract?.contract_value_mode === 'visit' ? 'visit' : 'duration';
+    const periodLabel = soMode === 'visit' ? 'Visit' : 'Bulan';
     const effectiveServiceType = editing ? (selectedContract?.service_type ?? '') : serviceType;
     const filteredContracts = useMemo(
         () => (contracts ?? []).filter((c: any) => !effectiveServiceType || c.service_type === effectiveServiceType),
         [contracts, effectiveServiceType]
     );
-    // Settlement Amount: total invoice yang sudah dibayar (payment Verified) untuk
-    // kontrak DAN No SO ini (dari backend) — 0 untuk SO baru yang belum punya invoice.
-    const settlementAmountNum = Number(settlementAmount ?? 0);
     // Kategori produk yang ditampilkan pada picker mengikuti Tipe Layanan yang dipilih.
     const serviceCategory = effectiveServiceType === 'pest_control' ? 'Pest Control'
         : effectiveServiceType === 'scenting' ? 'Scenting'
@@ -310,13 +312,17 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
         });
     };
 
-    // Memilih premis: item service terisi dari produk premis × durasi kontrak (per bulan),
-    // dan visit plan dibuat sebanyak visit frequency premis.
+    // Memilih premis: item service terisi dari produk premis, direplikasi sesuai mode
+    // kontrak — per bulan (duration_months) untuk mode duration, atau per visit
+    // (visit_frequency premis) untuk mode visit. Visit plan tetap dari visit frequency premis.
     const handleSelectPremise = (premise: any) => {
+        const periods = soMode === 'visit'
+            ? (Number(premise.visit_frequency) || 1)
+            : (Number(selectedContract?.duration_months) || 1);
         setData({
             ...data,
             contract_premise_id: premise.id,
-            services:            servicesFromPremise(premise, selectedContract?.duration_months, taxRateSo),
+            services:            servicesFromPremise(premise, periods, taxRateSo),
             visit_plans:         makeVisitPlans(Number(premise.visit_frequency) || 0),
         });
     };
@@ -325,10 +331,6 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
         const plans = [...data.visit_plans];
         plans[i] = { ...plans[i], [field]: value };
         setData('visit_plans', plans);
-    };
-    const addVisitPlan = () => {
-        const maxNo = data.visit_plans.reduce((m: number, p: any) => Math.max(m, Number(p.visit_number) || 0), 0);
-        setData('visit_plans', [...data.visit_plans, { visit_number: maxNo + 1, visit_date: '', quantity: '' }]);
     };
     const removeVisitPlan = (i: number) =>
         setData('visit_plans', data.visit_plans.filter((_: any, idx: number) => idx !== i));
@@ -361,9 +363,6 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
         });
         return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
     })();
-
-    // Rencana kunjungan diambil dari visit frequency premis (tanpa dikalikan durasi).
-    const visitFreq = Number(selectedPremise?.visit_frequency) || 0;
 
     // ── Data Work Order (untuk validasi & info pada form edit) ──────────────
     // Bulan diambil dari Referensi Bulan WO (wo.month); fallback ke bulan kontrak
@@ -400,9 +399,17 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
         [woInfo],
     );
 
-    // Req 3: bulan terkunci bila jumlah WO ≥ jumlah tanggal visit plan pada bulan itu.
-    // Menambah tanggal visit baru pada bulan tsb membuka kembali kunci (woCount < visitCount).
+    // Req 3: bulan/visit terkunci bila jumlah WO ≥ jumlah tanggal visit yang relevan.
+    // Menambah tanggal visit baru membuka kembali kunci (woCount < visitCount).
+    // Mode visit: cocokkan langsung ke visit_plan dengan visit_number sama (tanpa
+    // pemetaan kalender, karena jumlah visit bisa beda dari jumlah bulan kontrak).
     const monthLocked = (month: number): boolean => {
+        if (soMode === 'visit') {
+            const plan = data.visit_plans.find((v: any) => Number(v.visit_number) === month);
+            if (!plan?.visit_date) return false;
+            const woCount = (woByMonth[month] ?? []).length;
+            return woCount >= 1;
+        }
         const visitCount = visitDatesForMonth(data.visit_plans, selectedContract, month).length;
         if (visitCount === 0) return false;
         const woCount = (woByMonth[month] ?? []).length;
@@ -692,7 +699,7 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
                         </div>
 
                         {groups.length === 0 && (
-                            <p className="text-sm text-gray-400 italic mb-2">Belum ada item. Pilih kontrak lalu pilih premis untuk mengisi otomatis, atau tambah periode bulan.</p>
+                            <p className="text-sm text-gray-400 italic mb-2">Belum ada item. Pilih kontrak lalu pilih premis untuk mengisi otomatis, atau tambah periode {periodLabel.toLowerCase()}.</p>
                         )}
 
                         <div className="space-y-3">
@@ -712,7 +719,7 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
                                         >
                                             <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-gray-700">
                                                 <span className="text-gray-400 w-3 inline-block">{isCollapsed ? '▶' : '▼'}</span>
-                                                Bulan {month}
+                                                {periodLabel} {month}
                                                 <span className="text-xs font-normal text-gray-400">({rows.length} item)</span>
                                                 {locked && (
                                                     <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-gray-200 text-gray-600">🔒 Terkunci</span>
@@ -732,8 +739,8 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
                                                 {locked && (
                                                     <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 text-xs text-amber-700">
                                                         {completedLocked
-                                                            ? 'Bulan ini sudah memiliki Work Order berstatus Completed. Item service tidak dapat diubah.'
-                                                            : 'Semua tanggal visit bulan ini sudah memiliki Work Order. Item terkunci — tambahkan tanggal visit baru pada Visit Plan untuk membukanya.'}
+                                                            ? `${periodLabel} ini sudah memiliki Work Order berstatus Completed. Item service tidak dapat diubah.`
+                                                            : `Semua tanggal visit ${periodLabel.toLowerCase()} ini sudah memiliki Work Order. Item terkunci — tambahkan tanggal visit baru pada Visit Plan untuk membukanya.`}
                                                     </div>
                                                 )}
                                                 <table className="w-full text-sm min-w-[820px]">
@@ -765,7 +772,7 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
                             })}
                         </div>
 
-                        <button type="button" onClick={addPeriod} className="mt-3 text-sm text-red-600 hover:underline">+ Tambah Periode Bulan</button>
+                        <button type="button" onClick={addPeriod} className="mt-3 text-sm text-red-600 hover:underline">+ Tambah {periodLabel === 'Visit' ? 'Visit' : 'Periode Bulan'}</button>
 
                         <div className="mt-4 flex flex-col items-end gap-1 text-sm">
                             <div className="flex w-72 justify-between text-gray-600">
@@ -780,14 +787,6 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
                                 <span>{taxType === 'exclude' ? 'Grand Total (incl. Tax)' : 'Total'}</span>
                                 <span className="text-emerald-700">{fmt(grandTotal)}</span>
                             </div>
-                            <div className="flex w-72 justify-between text-gray-600 border-t pt-1 mt-1">
-                                <span title="Total invoice SO ini yang sudah dibayar (payment Verified)">Settlement Amount</span>
-                                <span className="text-blue-700 font-medium">{fmt(settlementAmountNum)}</span>
-                            </div>
-                            <div className="flex w-72 justify-between font-semibold text-gray-900">
-                                <span title="Grand Total dikurangi Settlement Amount">Sisa Nilai Pekerjaan</span>
-                                <span className="text-rose-700">{fmt(grandTotal - settlementAmountNum)}</span>
-                            </div>
                         </div>
                     </div>
 
@@ -797,22 +796,6 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
                             <h3 className="font-semibold text-gray-700">Visit Plan</h3>
                             <div className="flex items-center gap-3">
                                 <span className="text-xs text-gray-400">{data.visit_plans.length} kunjungan</span>
-                                <button
-                                    type="button"
-                                    onClick={addVisitPlan}
-                                    className="text-xs text-red-600 hover:underline"
-                                >
-                                    + Tambah Visit
-                                </button>
-                                {visitFreq > 0 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setData('visit_plans', makeVisitPlans(visitFreq))}
-                                        className="text-xs text-red-600 hover:underline"
-                                    >
-                                        ↻ Generate dari Visit Frequency ({visitFreq}×)
-                                    </button>
-                                )}
                             </div>
                         </div>
                         <p className="text-xs text-gray-400 mb-2">Tanggal kosong otomatis diisi tanggal 1 pada bulan sesuai urutan visit saat disimpan.</p>

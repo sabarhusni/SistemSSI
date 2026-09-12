@@ -18,6 +18,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Models\WorkOrderMaterial;
 use App\Models\ProductCategory;
+use App\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -35,6 +36,7 @@ class ReportController extends Controller
         $contracts = Contract::with(['customer', 'salesEmployee'])
             ->withCount(['salesOrders', 'workOrders', 'invoices'])
             ->withSum('invoices', 'total_amount')
+            ->withSum('invoices', 'paid_amount')
             ->where('start_date', '<=', $to)
             ->where(fn($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $from))
             ->when($request->customer_id, fn($q, $v) => $q->where('customer_id', $v))
@@ -46,6 +48,7 @@ class ReportController extends Controller
             'total_contracts' => $contracts->count(),
             'total_value'     => $contracts->sum('contract_value'),
             'total_invoiced'  => $contracts->sum('invoices_sum_total_amount'),
+            'total_paid'      => $contracts->sum('invoices_sum_paid_amount'),
             'by_status'       => $contracts->groupBy('status')->map->count(),
         ];
 
@@ -69,20 +72,32 @@ class ReportController extends Controller
             ->when($request->status,        fn($q, $v) => $q->where('status', $v))
             ->orderBy('visit_date')
             ->get()
-            ->map(fn($wo) => [
-                'id'              => $wo->id,
-                'wo_number'       => $wo->wo_number,
-                'visit_date'      => $wo->visit_date?->format('Y-m-d'),
-                'status'          => $wo->status,
-                'service_area'    => $wo->service_area,
-                'time_in'         => $wo->time_in ? substr($wo->time_in, 0, 5) : null,
-                'time_out'        => $wo->time_out ? substr($wo->time_out, 0, 5) : null,
-                'technician'      => $wo->technician?->name,
-                'contract_number' => $wo->contract?->contract_number,
-                'so_number'       => $wo->salesOrder?->so_number,
-                'material_count'  => $wo->materials->count(),
-                'material_cost'   => $wo->materials->sum(fn($m) => $m->quantity_used * ($m->product?->cost ?? 0)),
-            ]);
+            ->map(function ($wo) {
+                // Hanya produk tipe goods yang dihitung sebagai biaya material (service bukan material fisik).
+                $goodsMaterials = $wo->materials->filter(fn($m) => ($m->product?->product_type ?? 'goods') === 'goods');
+
+                return [
+                    'id'              => $wo->id,
+                    'wo_number'       => $wo->wo_number,
+                    'visit_date'      => $wo->visit_date?->format('Y-m-d'),
+                    'status'          => $wo->status,
+                    'service_area'    => $wo->service_area,
+                    'time_in'         => $wo->time_in ? substr($wo->time_in, 0, 5) : null,
+                    'time_out'        => $wo->time_out ? substr($wo->time_out, 0, 5) : null,
+                    'technician'      => $wo->technician?->name,
+                    'contract_number' => $wo->contract?->contract_number,
+                    'so_number'       => $wo->salesOrder?->so_number,
+                    'material_count'  => $goodsMaterials->count(),
+                    'material_cost'   => $goodsMaterials->sum(fn($m) => $m->quantity_used * ($m->product?->cost ?? 0)),
+                    'materials'       => $goodsMaterials->values()->map(fn($m) => [
+                        'product_name'  => $m->product?->name ?? '—',
+                        'quantity_used' => (float) $m->quantity_used,
+                        'uom'           => $m->uom,
+                        'unit_cost'     => (float) ($m->product?->cost ?? 0),
+                        'cost'          => $m->quantity_used * ($m->product?->cost ?? 0),
+                    ]),
+                ];
+            });
 
         $summary = [
             'total_orders'        => $orders->count(),
@@ -98,34 +113,33 @@ class ReportController extends Controller
         ]);
     }
 
-    /* ── Pajak (PPN dari Invoice) ── */
+    /* ── Pajak (PPN dari Sales Order) ── */
     public function tax(Request $request)
     {
         $from = $request->from ?? now()->startOfYear()->toDateString();
         $to   = $request->to   ?? now()->endOfYear()->toDateString();
 
-        // Laporan pajak keluaran: faktur (invoice) selain yang dibatalkan.
-        $invoices = Invoice::with('customer')
-            ->whereBetween('invoice_date', [$from, $to])
-            ->where('status', '!=', 'cancelled')
+        // Laporan pajak keluaran diambil dari Sales Order (selain yang dibatalkan).
+        $orders = SalesOrder::with('customer')
+            ->whereBetween('order_date', [$from, $to])
+            ->whereNotIn('status', ['cancelled'])
             ->when($request->status,      fn($q, $v) => $q->where('status', $v))
             ->when($request->customer_id, fn($q, $v) => $q->where('customer_id', $v))
-            ->orderBy('invoice_date')
+            ->orderBy('order_date')
             ->get()
-            ->map(fn($inv) => [
-                'id'             => $inv->id,
-                'invoice_number' => $inv->invoice_number,
-                'invoice_date'   => $inv->invoice_date,
-                'customer'       => $inv->customer?->name,
-                'dpp'            => (float) $inv->subtotal,
-                'tax_rate'       => (float) $inv->tax_rate,
-                'tax'            => (float) $inv->tax,
-                'total'          => (float) $inv->total_amount,
-                'status'         => $inv->status,
+            ->map(fn($so) => [
+                'id'         => $so->id,
+                'so_number'  => $so->so_number,
+                'order_date' => $so->order_date,
+                'customer'   => $so->customer?->name,
+                'dpp'        => (float) $so->total_amount - (float) $so->tax_amount,
+                'tax'        => (float) $so->tax_amount,
+                'total'      => (float) $so->total_amount,
+                'status'     => $so->status,
             ]);
 
-        $byMonth = collect($invoices)
-            ->groupBy(fn($i) => substr((string) $i['invoice_date'], 0, 7))
+        $byMonth = collect($orders)
+            ->groupBy(fn($o) => substr((string) $o['order_date'], 0, 7))
             ->map(fn($g, $month) => [
                 'month' => $month,
                 'count' => $g->count(),
@@ -137,14 +151,14 @@ class ReportController extends Controller
             ->values();
 
         $summary = [
-            'total_invoices' => $invoices->count(),
-            'total_dpp'      => $invoices->sum('dpp'),
-            'total_tax'      => $invoices->sum('tax'),
-            'total'          => $invoices->sum('total'),
+            'total_orders' => $orders->count(),
+            'total_dpp'    => $orders->sum('dpp'),
+            'total_tax'    => $orders->sum('tax'),
+            'total'        => $orders->sum('total'),
         ];
 
         return Inertia::render('Reports/Tax', [
-            'invoices'  => $invoices,
+            'orders'    => $orders,
             'byMonth'   => $byMonth,
             'summary'   => $summary,
             'customers' => Customer::where('status', 'active')->orderBy('name')->get(['id', 'name']),
@@ -409,9 +423,10 @@ class ReportController extends Controller
                 'amount'      => $item->subtotal,
             ]));
 
-        // 3. Work order material costs
+        // 3. Work order material costs (hanya produk tipe goods, service bukan material fisik)
         $woCosts = WorkOrderMaterial::with(['product', 'workOrder'])
             ->whereHas('workOrder', fn($q) => $q->whereBetween('visit_date', [$from, $to]))
+            ->whereHas('product', fn($q) => $q->where('product_type', 'goods'))
             ->get()
             ->map(fn($m) => [
                 'date'        => $m->workOrder?->visit_date,
@@ -443,19 +458,21 @@ class ReportController extends Controller
         $to   = $request->to   ?? now()->toDateString();
         $rate = (float) ($request->rate ?? 5); // persentase insentif
 
-        $orders = SalesOrder::with(['salesPerson', 'customer'])
+        // Sales person diambil dari Employee yang ditunjuk sebagai sales pada Contract SO
+        // terkait (Contract::salesEmployee), bukan dari sales_person_id milik SO itu sendiri.
+        $orders = SalesOrder::with(['contract.salesEmployee', 'customer'])
             ->whereNotIn('status', ['cancelled'])
             ->whereBetween('order_date', [$from, $to])
-            ->when($request->user_id, fn($q, $v) => $q->where('sales_person_id', $v))
+            ->when($request->employee_id, fn($q, $v) => $q->whereHas('contract', fn($cq) => $cq->where('sales_employee_id', $v)))
             ->orderBy('order_date')
             ->get();
 
-        $byPerson = $orders->groupBy('sales_person_id')->map(function ($personOrders) use ($rate) {
-            $person     = $personOrders->first()->salesPerson;
+        $byPerson = $orders->groupBy(fn($o) => $o->contract?->sales_employee_id ?? 'none')->map(function ($personOrders) use ($rate) {
+            $employee   = $personOrders->first()->contract?->salesEmployee;
             $totalSales = $personOrders->sum('total_amount');
             return [
-                'person_id'   => $person?->id,
-                'person_name' => $person?->name ?? '(Tidak ada sales)',
+                'person_id'   => $employee?->id,
+                'person_name' => $employee?->name ?? '(Tidak ada sales)',
                 'order_count' => $personOrders->count(),
                 'total_sales' => $totalSales,
                 'insentif'    => round($totalSales * $rate / 100),
@@ -476,8 +493,61 @@ class ReportController extends Controller
                 'total_insentif' => $byPerson->sum('insentif'),
                 'rate'          => $rate,
             ],
-            'users'   => User::where('status', 'active')->orderBy('name')->get(['id', 'name']),
-            'filters' => $request->only('from', 'to', 'user_id', 'rate'),
+            'employees' => Employee::where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'filters'   => $request->only('from', 'to', 'employee_id', 'rate'),
+        ]);
+    }
+
+    /* ── Invoices ── */
+    public function invoices(Request $request)
+    {
+        $from = $request->from ?? now()->startOfYear()->toDateString();
+        $to   = $request->to   ?? now()->endOfYear()->toDateString();
+
+        $invoices = Invoice::with(['customer', 'contract', 'payments' => fn($q) => $q->where('status', 'verified')])
+            ->whereBetween('invoice_date', [$from, $to])
+            ->when($request->customer_id,     fn($q, $v) => $q->where('customer_id', $v))
+            ->when($request->status,          fn($q, $v) => $q->where('status', $v))
+            ->when($request->payment_method,  fn($q, $v) => $q->whereHas('payments', fn($pq) => $pq->where('status', 'verified')->where('payment_method', $v)))
+            ->orderBy('invoice_date')
+            ->get()
+            ->map(fn($inv) => [
+                'id'               => $inv->id,
+                'invoice_number'   => $inv->invoice_number,
+                'invoice_date'     => $inv->invoice_date,
+                'customer'         => $inv->customer?->name,
+                'contract_number'  => $inv->contract?->contract_number,
+                'status'           => $inv->status,
+                'total_amount'     => (float) $inv->total_amount,
+                'paid_amount'      => (float) $inv->paid_amount,
+                'payment_methods'  => $inv->payments->pluck('payment_method')->unique()->values()->all(),
+            ]);
+
+        $byMonth = $invoices
+            ->groupBy(fn($inv) => substr((string) $inv['invoice_date'], 0, 7))
+            ->map(fn($g, $month) => [
+                'month'       => $month,
+                'count'       => $g->count(),
+                'total_amount'=> $g->sum('total_amount'),
+                'paid_amount' => $g->sum('paid_amount'),
+            ])
+            ->sortKeys()
+            ->values();
+
+        $summary = [
+            'total_invoices'     => $invoices->count(),
+            'total_amount'       => $invoices->sum('total_amount'),
+            'total_paid'         => $invoices->sum('paid_amount'),
+            'total_outstanding'  => $invoices->sum('total_amount') - $invoices->sum('paid_amount'),
+            'by_status'          => $invoices->groupBy('status')->map->count(),
+        ];
+
+        return Inertia::render('Reports/Invoices', [
+            'invoices'  => $invoices,
+            'byMonth'   => $byMonth,
+            'summary'   => $summary,
+            'customers' => Customer::where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'filters'   => $request->only('from', 'to', 'customer_id', 'status', 'payment_method'),
         ]);
     }
 }

@@ -11,9 +11,9 @@ export default function Sales({ orders, summary, customers, users, filters }: an
 
     const handleExport = () => exportToExcel('Sales_Report', [{
         name: 'Sales',
-        headers: ['Order Date', 'SO No.', 'Customer', 'Sales', 'Items', 'Total', 'Status'],
+        headers: ['Order Date', 'SO No.', 'Customer', 'Items', 'Total', 'Status'],
         rows: (orders ?? []).map((o: any) => [
-            o.order_date, o.so_number, o.customer?.name ?? '-', o.sales_person?.name ?? '-',
+            o.order_date, o.so_number, o.customer?.name ?? '-',
             o.items?.length ?? 0, Number(o.total_amount ?? 0), o.status,
         ]),
     }]);
@@ -43,12 +43,12 @@ export default function Sales({ orders, summary, customers, users, filters }: an
 
             <div className="grid grid-cols-3 gap-4 mb-4">
                 <SummaryCard label="Total SO" value={summary?.total_orders?.toString() ?? '0'} color="gray" />
-                <SummaryCard label="Total Revenue" value={fmt(summary?.total_revenue)} color="emerald" />
+                <SummaryCard label="Total Sales" value={fmt(summary?.total_revenue)} color="emerald" />
                 <SummaryCard label="Average per SO" value={summary?.total_orders ? fmt((summary.total_revenue ?? 0) / summary.total_orders) : '—'} color="blue" />
             </div>
 
             <ReportTable
-                headers={['Order Date', 'SO No.', 'Customer', 'Sales', 'Items', 'Total', 'Status']}
+                headers={['Order Date', 'SO No.', 'Customer', 'Items', 'Total', 'Status']}
                 empty={!orders?.length}
             >
                 {orders?.map((o: any) => (
@@ -56,7 +56,6 @@ export default function Sales({ orders, summary, customers, users, filters }: an
                         <td className="px-4 py-2">{fmtDate(o.order_date)}</td>
                         <td className="px-4 py-2 font-medium">{o.so_number}</td>
                         <td className="px-4 py-2">{o.customer?.name ?? '—'}</td>
-                        <td className="px-4 py-2">{o.sales_person?.name ?? '—'}</td>
                         <td className="px-4 py-2 text-center">{o.items?.length ?? 0}</td>
                         <td className="px-4 py-2 text-right font-medium">{fmt(o.total_amount)}</td>
                         <td className="px-4 py-2">{statusBadge(o.status)}</td>
@@ -64,7 +63,7 @@ export default function Sales({ orders, summary, customers, users, filters }: an
                 ))}
                 {orders?.length > 0 && (
                     <tr className="bg-gray-50 font-semibold border-t">
-                        <td colSpan={5} className="px-4 py-2 text-right">Total</td>
+                        <td colSpan={4} className="px-4 py-2 text-right">Total</td>
                         <td className="px-4 py-2 text-right text-emerald-700">{fmt(summary?.total_revenue)}</td>
                         <td></td>
                     </tr>

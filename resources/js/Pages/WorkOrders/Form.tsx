@@ -361,9 +361,7 @@ export default function Form({ workOrder, technicians, products, contracts, next
         });
     };
 
-    const handleSelectSO = (ids: string[]) => {
-        const so = confirmedSOs.find((s: any) => s.id === ids[0]);
-        if (!so) { setSoPickerOpen(false); return; }
+    const handleSelectSO = (so: any) => {
         setData({
             ...data,
             sales_order_id:            so.id,
@@ -372,7 +370,6 @@ export default function Form({ workOrder, technicians, products, contracts, next
             visit_date:                '',
             materials:                 [],
         });
-        setSoPickerOpen(false);
     };
 
     // Memilih bulan referensi: material used terisi dari SEMUA item service SO pada
@@ -547,8 +544,8 @@ export default function Form({ workOrder, technicians, products, contracts, next
                 <SalesOrderRefPickerModal
                     salesOrders={confirmedSOs}
                     customerName={selectedContract?.customer?.name}
-                    selectedIds={data.sales_order_id ? [data.sales_order_id] : []}
-                    onConfirm={handleSelectSO}
+                    selectedId={data.sales_order_id}
+                    onSelect={handleSelectSO}
                     onClose={() => setSoPickerOpen(false)}
                 />
             )}

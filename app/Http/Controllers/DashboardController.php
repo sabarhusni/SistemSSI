@@ -7,6 +7,7 @@ use App\Models\Customer;
 use App\Models\SalesOrder;
 use App\Models\SalesOrderVisitPlan;
 use App\Models\Invoice;
+use App\Models\Payment;
 use App\Models\WorkOrder;
 use Carbon\Carbon;
 use Inertia\Inertia;
@@ -20,12 +21,14 @@ class DashboardController extends Controller
         $stats = [
             'total_customers' => Customer::count(),
             'total_active_contracts' => Contract::where('status', 'active')->count(),
-            'total_sales_orders' => SalesOrder::whereMonth('created_at', $currentMonth->month)->count(),
-            'total_service_orders' => WorkOrder::whereMonth('created_at', $currentMonth->month)->count(),
-            'revenue_this_month' => Invoice::whereMonth('created_at', $currentMonth->month)->sum('total_amount'),
+            'total_collections' => Payment::whereMonth('created_at', $currentMonth->month)
+                ->whereIn('status', ['received', 'verified'])
+                ->count(),
+            'total_invoices' => Invoice::whereMonth('created_at', $currentMonth->month)->sum('total_amount'),
+            'revenue_this_month' => SalesOrder::whereMonth('created_at', $currentMonth->month)->sum('total_amount'),
             'overdue_invoices' => Invoice::where('due_date', '<', Carbon::now())
                 ->whereIn('status', ['draft', 'sent'])
-                ->count(),
+                ->sum('total_amount'),
         ];
 
         $activeServiceOrders = WorkOrder::where('status', '!=', 'completed')
@@ -139,7 +142,7 @@ class DashboardController extends Controller
         for ($i = 11; $i >= 0; $i--) {
             $date = Carbon::now()->subMonths($i);
             $months[] = $date->format('M Y');
-            $revenues[] = Invoice::whereMonth('created_at', $date->month)
+            $revenues[] = SalesOrder::whereMonth('created_at', $date->month)
                 ->whereYear('created_at', $date->year)
                 ->sum('total_amount');
         }

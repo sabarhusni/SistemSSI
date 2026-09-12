@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\SalesOrder;
 use App\Models\Contract;
 use App\Models\ContractPremise;
-use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\Setting;
 use App\Models\UnitOfMeasure;
@@ -76,8 +75,6 @@ class SalesOrderController extends Controller
             'taxRateSo'  => (float) Setting::get('tax_rate_so', 11),
             // Premis yang sudah tersimpan di Sales Order lain tidak boleh dipilih lagi.
             'usedPremiseIds' => SalesOrder::whereNotNull('contract_premise_id')->distinct()->pluck('contract_premise_id'),
-            // SO baru belum punya invoice sendiri, sehingga belum ada Settlement Amount.
-            'settlementAmount' => 0,
         ]);
     }
 
@@ -162,12 +159,6 @@ class SalesOrderController extends Controller
             'uoms'       => UnitOfMeasure::where('status', 'active')->orderBy('name')->get(['id', 'name', 'symbol']),
             'taxType'    => Setting::get('tax_type', 'exclude'),
             'taxRateSo'  => (float) Setting::get('tax_rate_so', 11),
-            // Settlement Amount: total paid_amount invoice (sudah dibayar via payment Verified)
-            // yang cocok dengan kontrak DAN No SO ini — bukan akumulasi seluruh SO pada kontrak.
-            // Dibaca langsung dari invoice_work_orders.sales_order_id (diisi saat WO dipilih di invoice).
-            'settlementAmount' => (float) Invoice::where('contract_id', $salesOrder->contract_id)
-                ->whereHas('invoiceWorkOrders', fn($q) => $q->where('sales_order_id', $salesOrder->id))
-                ->sum('paid_amount'),
         ]);
     }
 
@@ -184,26 +175,41 @@ class SalesOrderController extends Controller
             ])->withInput();
         }
 
-        // Req 2b: status Completed hanya boleh bila tiap bulan punya Work Order Completed.
+        // Req 2b: status Completed hanya boleh bila tiap periode (bulan/visit) punya
+        // Work Order Completed. Mode visit: cocokkan langsung nomor visit pada Work
+        // Order (kolom `month`) — tanpa pemetaan kalender, karena jumlah visit bisa
+        // beda dari jumlah bulan kontrak. Mode duration: skema lama (pemetaan kalender).
         if ($data['status'] === 'completed') {
             $contract = $salesOrder->contract_id ? Contract::find($salesOrder->contract_id) : null;
-            if ($contract && $contract->start_date) {
-                $duration = (int) ($contract->duration_months ?: 1);
-                $completedMonths = $salesOrder->workOrders
-                    ->where('status', 'completed')
-                    ->filter(fn($wo) => $wo->visit_date)
-                    ->map(fn($wo) => $this->contractMonthOf($contract->start_date, $wo->visit_date, $duration))
-                    ->unique();
+            if ($contract) {
+                $completedPeriods = null;
 
-                $missing = collect($data['items'])
-                    ->map(fn($it) => (int) ($it['month'] ?? 1))
-                    ->unique()
-                    ->reject(fn($m) => $completedMonths->contains($m));
+                if (($contract->contract_value_mode ?? 'duration') === 'visit') {
+                    $completedPeriods = $salesOrder->workOrders
+                        ->where('status', 'completed')
+                        ->pluck('month')
+                        ->filter()
+                        ->unique();
+                } elseif ($contract->start_date) {
+                    $duration = (int) ($contract->duration_months ?: 1);
+                    $completedPeriods = $salesOrder->workOrders
+                        ->where('status', 'completed')
+                        ->filter(fn($wo) => $wo->visit_date)
+                        ->map(fn($wo) => $this->contractMonthOf($contract->start_date, $wo->visit_date, $duration))
+                        ->unique();
+                }
 
-                if ($missing->isNotEmpty()) {
-                    return back()->withErrors([
-                        'status' => 'Status Completed tidak dapat dipilih: belum semua bulan memiliki Work Order berstatus Completed.',
-                    ])->withInput();
+                if ($completedPeriods !== null) {
+                    $missing = collect($data['items'])
+                        ->map(fn($it) => (int) ($it['month'] ?? 1))
+                        ->unique()
+                        ->reject(fn($m) => $completedPeriods->contains($m));
+
+                    if ($missing->isNotEmpty()) {
+                        return back()->withErrors([
+                            'status' => 'Status Completed tidak dapat dipilih: belum semua periode memiliki Work Order berstatus Completed.',
+                        ])->withInput();
+                    }
                 }
             }
         }

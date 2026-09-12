@@ -44,6 +44,7 @@ Route::middleware('auth')->group(function () {
     // Operations (Modul 6-9)
     Route::resource('contracts', ContractController::class);
     Route::get('contracts/{contract}/print', [ContractController::class, 'print'])->name('contracts.print');
+    Route::patch('contracts/{contract}/cancel', [ContractController::class, 'cancel'])->name('contracts.cancel');
     Route::resource('sales-orders', SalesOrderController::class);
     Route::get('work-orders/{workOrder}/print', [WorkOrderController::class, 'print'])->name('work-orders.print');
     Route::resource('work-orders', WorkOrderController::class);
@@ -77,6 +78,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/cash-bank-ledger', [ReportController::class, 'cashBankLedger'])->name('cash-bank-ledger');
         Route::get('/costs',            [ReportController::class, 'costs'])->name('costs');
         Route::get('/insentif',         [ReportController::class, 'insentif'])->name('insentif');
+        Route::get('/invoices',         [ReportController::class, 'invoices'])->name('invoices');
     });
 
     // Karyawan

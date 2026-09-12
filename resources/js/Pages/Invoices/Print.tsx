@@ -11,6 +11,12 @@ const statusLabel: Record<string, string> = {
     draft: 'Draft', sent: 'Sent', paid: 'Paid', cancelled: 'Cancelled',
 };
 
+// Identitas brand berbeda per tipe layanan kontrak — sejalan dengan BRANDS di Contracts/Print.tsx.
+const BRANDS: Record<string, { brand: string; tagline: string }> = {
+    pest_control: { brand: 'U-PEST', tagline: 'Pest Management' },
+    scenting:     { brand: 'U-SCENT', tagline: 'Oil Aroma' },
+};
+
 function Row({ label, value }: { label: string; value: any }) {
     return (
         <div className="flex text-sm py-1">
@@ -20,7 +26,7 @@ function Row({ label, value }: { label: string; value: any }) {
     );
 }
 
-export default function Print({ invoice, companyName }: any) {
+export default function Print({ invoice, companyName, invoiceFrequency = 0, invoicePosition = null }: any) {
     useEffect(() => {
         const t = setTimeout(() => window.print(), 400);
         return () => clearTimeout(t);
@@ -28,6 +34,7 @@ export default function Print({ invoice, companyName }: any) {
 
     const items: any[] = invoice.items ?? [];
     const woRefs = (invoice.work_orders ?? []).map((w: any) => w.wo_number).join(', ');
+    const brand = BRANDS[invoice.contract?.service_type as string];
 
     // Kontrak pest hama unik ditagih sebagai 1 baris nilai lump-sum — kolom Visit ke
     // & Unit tidak relevan (tidak terikat visit/bulan atau satuan produk tertentu).
@@ -75,14 +82,19 @@ export default function Print({ invoice, companyName }: any) {
                     <div className="flex items-start gap-3">
                         <img src="/images/logo_ssi_new.png" alt="" className="h-12 w-12 object-contain shrink-0" />
                         <div>
-                            <h1 className="text-xl font-bold uppercase tracking-wide">{companyName || 'Company'}</h1>
-                            <p className="text-sm text-gray-500 mt-1">Tax Invoice Document</p>
+                            <h1 className="text-base font-bold text-amber-700">{companyName || 'Company'}</h1>
+                            <h2 className="text-lg font-bold uppercase">Invoice</h2>
                         </div>
                     </div>
                     <div className="text-right">
-                        <h2 className="text-lg font-bold uppercase">Invoice</h2>
-                        <p className="text-sm font-mono mt-1">{invoice.invoice_number}</p>
-                        <p className="text-xs text-gray-500 mt-1">Status: {statusLabel[invoice.status] ?? invoice.status}</p>
+                        {brand && (
+                            <div className="mb-1">
+                                <h2 className="text-xl font-extrabold tracking-tight text-amber-600">{brand.brand}</h2>
+                                <p className="text-[10px] text-gray-500 -mt-1">{brand.tagline}</p>
+                            </div>
+                        )}
+
+                        <p className="text-sm font-mono mt-1">No: {invoice.invoice_number}</p>
                     </div>
                 </div>
 
@@ -99,6 +111,12 @@ export default function Print({ invoice, companyName }: any) {
                         <Row label="Due Date" value={fmtDate(invoice.due_date)} />
                         <Row label="Contract No." value={invoice.contract?.contract_number} />
                         <Row label="Referensi No WO" value={woRefs || '—'} />
+                        {invoiceFrequency > 0 && invoicePosition != null && (
+                            <>
+                                <Row label="Invoice Term" value={`Ke-${invoicePosition} dari ${invoiceFrequency}`} />
+                                <Row label="Sisa Termin" value={`${Math.max(0, invoiceFrequency - invoicePosition)} termin`} />
+                            </>
+                        )}
                     </div>
                 </div>
 

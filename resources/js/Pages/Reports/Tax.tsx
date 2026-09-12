@@ -3,7 +3,7 @@ import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
 import { fmt, fmtNum, fmtDate, fmtMonth, SummaryCard, FilterBar, FilterDate, FilterSelect, ReportTable, statusBadge, applyFilters, exportToExcel } from './_shared';
 
-export default function Tax({ invoices, byMonth, summary, customers, filters }: any) {
+export default function Tax({ orders, byMonth, summary, customers, filters }: any) {
     const today = new Date().toISOString().slice(0, 10);
     const year = today.slice(0, 4);
 
@@ -16,16 +16,16 @@ export default function Tax({ invoices, byMonth, summary, customers, filters }: 
 
     const handleExport = () => exportToExcel('Laporan_Pajak', [
         {
-            name: 'Faktur',
-            headers: ['Tanggal', 'No. Faktur', 'Customer', 'DPP', 'Tarif (%)', 'PPN', 'Total', 'Status'],
-            rows: (invoices ?? []).map((inv: any) => [
-                inv.invoice_date, inv.invoice_number, inv.customer ?? '-', Number(inv.dpp ?? 0),
-                Number(inv.tax_rate ?? 0), Number(inv.tax ?? 0), Number(inv.total ?? 0), inv.status,
+            name: 'Sales Order',
+            headers: ['Tanggal', 'No. SO', 'Customer', 'DPP', 'PPN', 'Total', 'Status'],
+            rows: (orders ?? []).map((so: any) => [
+                so.order_date, so.so_number, so.customer ?? '-', Number(so.dpp ?? 0),
+                Number(so.tax ?? 0), Number(so.total ?? 0), so.status,
             ]),
         },
         {
             name: 'Rekap Bulanan',
-            headers: ['Bulan', 'Jml Faktur', 'DPP', 'PPN', 'Total'],
+            headers: ['Bulan', 'Jml SO', 'DPP', 'PPN', 'Total'],
             rows: (byMonth ?? []).map((m: any) => [
                 m.month, m.count, Number(m.dpp ?? 0), Number(m.tax ?? 0), Number(m.total ?? 0),
             ]),
@@ -45,13 +45,13 @@ export default function Tax({ invoices, byMonth, summary, customers, filters }: 
                 <FilterSelect label="Status" value={f.status} onChange={v => setF({ ...f, status: v })}>
                     <option value="">Semua Status</option>
                     <option value="draft">Draft</option>
-                    <option value="sent">Sent</option>
-                    <option value="paid">Paid</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="completed">Completed</option>
                 </FilterSelect>
             </FilterBar>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <SummaryCard label="Total Faktur" value={fmtNum(summary?.total_invoices)} color="gray" />
+                <SummaryCard label="Total SO" value={fmtNum(summary?.total_orders)} color="gray" />
                 <SummaryCard label="Total DPP" value={fmt(summary?.total_dpp)} color="blue" />
                 <SummaryCard label="Total PPN" value={fmt(summary?.total_tax)} color="amber" />
                 <SummaryCard label="Total (DPP + PPN)" value={fmt(summary?.total)} color="emerald" />
@@ -65,7 +65,7 @@ export default function Tax({ invoices, byMonth, summary, customers, filters }: 
                             <thead className="text-xs text-gray-500 border-b">
                                 <tr className="text-left">
                                     <th className="py-1.5 pr-4">Bulan</th>
-                                    <th className="py-1.5 pr-4 text-center">Faktur</th>
+                                    <th className="py-1.5 pr-4 text-center">SO</th>
                                     <th className="py-1.5 pr-4 text-right">DPP</th>
                                     <th className="py-1.5 pr-4 text-right">PPN</th>
                                     <th className="py-1.5 text-right">Total</th>
@@ -88,28 +88,26 @@ export default function Tax({ invoices, byMonth, summary, customers, filters }: 
             )}
 
             <ReportTable
-                headers={['Tanggal', 'No. Faktur', 'Customer', 'DPP', 'Tarif', 'PPN', 'Total', 'Status']}
-                empty={!invoices?.length}
+                headers={['Tanggal', 'No. SO', 'Customer', 'DPP', 'PPN', 'Total', 'Status']}
+                empty={!orders?.length}
             >
-                {invoices?.map((inv: any) => (
-                    <tr key={inv.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 whitespace-nowrap">{fmtDate(inv.invoice_date)}</td>
+                {orders?.map((so: any) => (
+                    <tr key={so.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 whitespace-nowrap">{fmtDate(so.order_date)}</td>
                         <td className="px-4 py-2 font-medium">
-                            <Link href={`/invoices/${inv.id}`} className="text-blue-600 hover:underline">{inv.invoice_number}</Link>
+                            <Link href={`/sales-orders/${so.id}`} className="text-blue-600 hover:underline">{so.so_number}</Link>
                         </td>
-                        <td className="px-4 py-2">{inv.customer ?? '—'}</td>
-                        <td className="px-4 py-2 text-right">{fmt(inv.dpp)}</td>
-                        <td className="px-4 py-2 text-center text-xs">{fmtNum(inv.tax_rate)}%</td>
-                        <td className="px-4 py-2 text-right text-amber-700 font-medium">{fmt(inv.tax)}</td>
-                        <td className="px-4 py-2 text-right font-medium">{fmt(inv.total)}</td>
-                        <td className="px-4 py-2">{statusBadge(inv.status)}</td>
+                        <td className="px-4 py-2">{so.customer ?? '—'}</td>
+                        <td className="px-4 py-2 text-right">{fmt(so.dpp)}</td>
+                        <td className="px-4 py-2 text-right text-amber-700 font-medium">{fmt(so.tax)}</td>
+                        <td className="px-4 py-2 text-right font-medium">{fmt(so.total)}</td>
+                        <td className="px-4 py-2">{statusBadge(so.status)}</td>
                     </tr>
                 ))}
-                {invoices?.length > 0 && (
+                {orders?.length > 0 && (
                     <tr className="bg-gray-50 font-semibold border-t">
                         <td colSpan={3} className="px-4 py-2 text-right">Total</td>
                         <td className="px-4 py-2 text-right text-blue-700">{fmt(summary?.total_dpp)}</td>
-                        <td></td>
                         <td className="px-4 py-2 text-right text-amber-700">{fmt(summary?.total_tax)}</td>
                         <td className="px-4 py-2 text-right text-emerald-700">{fmt(summary?.total)}</td>
                         <td></td>

@@ -32,6 +32,12 @@ const COMPANY = {
     addressLines: ['Sekedengdeur No. 15, Ujungberung', 'Kota Bandung, Jawa Barat 40167'],
 };
 
+// Identitas brand & susunan dokumen berbeda per tipe layanan (Pest Control vs Scenting).
+const BRANDS: Record<string, { brand: string; tagline: string; signerTitle: string; internalLabel: string }> = {
+    pest_control: { brand: 'U-PEST', tagline: 'Pest Management', signerTitle: 'Business Consultant', internalLabel: 'U-Pest' },
+    scenting:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Sales Consultant',    internalLabel: 'U-Scent' },
+};
+
 function Row({ label, value }: { label: string; value: any }) {
     return (
         <div className="flex text-sm py-1">
@@ -73,6 +79,8 @@ export default function Print({ workOrder, companyName }: any) {
 
     const premise = workOrder.sales_order?.premise ?? null;
 
+    const BRAND = BRANDS[workOrder.contract?.service_type] ?? BRANDS.scenting;
+
     return (
         <div className="min-h-screen bg-gray-100 print:bg-white py-8 print:py-0">
             <Head title={`Service Report ${workOrder.wo_number}`} />
@@ -96,14 +104,14 @@ export default function Print({ workOrder, companyName }: any) {
                     <div className="flex items-start gap-3">
                         <img src="/images/logo_ssi_new.png" alt="" className="h-12 w-12 object-contain shrink-0" />
                         <div>
-                            <h1 className="text-xl font-bold uppercase tracking-wide">{companyName || 'Company'}</h1>
-                            <p className="text-sm text-gray-500 mt-1">Work Service Order Document</p>
+                            <h1 className="text-base font-bold text-amber-700">{companyName || 'Company'}</h1>
+                            <h2 className="text-lg font-bold uppercase">Service Report</h2>
                         </div>
                     </div>
                     <div className="text-right">
-                        <h2 className="text-lg font-bold uppercase">Service Report</h2>
-                        <p className="text-sm font-mono mt-1">{workOrder.wo_number}</p>
-                        <p className="text-xs text-gray-500 mt-1">Status: {statusLabel[workOrder.status] ?? workOrder.status}</p>
+
+                        <h2 className="text-2xl font-extrabold tracking-tight text-amber-600">{BRAND.brand}</h2>
+                        <p className="text-[10px] text-gray-500 -mt-1">{BRAND.tagline}</p>
                     </div>
                 </div>
 
@@ -213,19 +221,19 @@ export default function Print({ workOrder, companyName }: any) {
 }
 
 // Kop surat dipakai berulang di tiap halaman Service Report Pest Control.
-function PestHeader({ companyNameResolved, woNumber }: { companyNameResolved: string; woNumber: string }) {
+function PestHeader({ companyNameResolved, woNumber, brand_name, brand_tagline }: { companyNameResolved: string; woNumber: string; brand_name: string; brand_tagline: string }) {
     return (
         <div className="flex items-start justify-between border-b-2 border-amber-600 pb-3 mb-3">
             <div className="flex items-start gap-2">
                 <img src="/images/logo_ssi_new.png" alt="" className="h-10 w-10 object-contain shrink-0" />
                 <div>
-                    <p className="text-[11px] font-bold uppercase">Service Report <span className="font-normal normal-case">(Record of Pesticides Usage)</span></p>
-                    <p className="text-[10px] text-gray-500">Report to Customer</p>
+                    <h1 className="text-base font-bold text-amber-700">{companyNameResolved || 'Company'}</h1>
+                    <h2 className="text-lg font-bold uppercase">Service Report</h2>
                 </div>
             </div>
             <div className="text-right">
-                <h2 className="text-base font-extrabold text-amber-600">{companyNameResolved}</h2>
-                <p className="text-[10px] text-gray-500">Reference No: {woNumber}</p>
+                 <h2 className="text-2xl font-extrabold tracking-tight text-amber-600">{brand_name}</h2>
+                 <p className="text-[10px] text-gray-500 -mt-1">{brand_tagline}</p>
             </div>
         </div>
     );
@@ -264,7 +272,7 @@ function PestControlServiceReport({ workOrder, companyName }: any) {
     const visitTypes: string[] = workOrder.visit_types ?? [];
     const purpose = visitTypes.length ? visitTypes.map(v => purposeLabel[v] ?? v).join(', ') : '—';
     const companyNameResolved = companyName || COMPANY.name;
-    const customerName = premise?.location || customer.company_name || customer.name;
+    const BRAND = BRANDS[workOrder.contract?.service_type] ?? BRANDS.scenting;
 
     return (
         <div className="min-h-screen bg-gray-100 print:bg-white py-8 print:py-0 text-[11px] leading-snug text-gray-900">
@@ -286,7 +294,7 @@ function PestControlServiceReport({ workOrder, companyName }: any) {
 
             {/* ===================== HALAMAN 1 ===================== */}
             <div className="max-w-[800px] mx-auto bg-white shadow print:shadow-none px-10 py-8 print:p-0">
-                <PestHeader companyNameResolved={companyNameResolved} woNumber={workOrder.wo_number} />
+                <PestHeader companyNameResolved={companyNameResolved} woNumber={workOrder.wo_number} brand_name={BRAND.brand} brand_tagline={BRAND.tagline} />
 
                 <h3 className="font-bold border-b border-gray-800 mb-1">A. CUSTOMER INFORMATION</h3>
                 <div className="grid grid-cols-2 gap-3 mb-3">
@@ -296,7 +304,7 @@ function PestControlServiceReport({ workOrder, companyName }: any) {
                             <PestRow label="Contract / Job No." value={workOrder.contract?.contract_number} />
                             <PestRow label="Service Area" value={workOrder.service_area} />
                             <PestRow label="Type of Premises" value={null} />
-                            <PestRow label="Customer Name" value={customerName} />
+                            <PestRow label="Customer Name" value={customer.name} />
                             <PestRow label="Contact Name" value={premise?.pic} />
                             <PestRow label="Contact Number" value={premise?.phone} />
                             <PestRow label="Address Site Of Application" value={premise?.address} />
@@ -394,8 +402,7 @@ function PestControlServiceReport({ workOrder, companyName }: any) {
 
             {/* ===================== HALAMAN 2 ===================== */}
             <div className="max-w-[800px] mx-auto bg-white shadow print:shadow-none px-10 py-8 print:p-0 mt-8 print:mt-0 break-before-page">
-                <PestHeader companyNameResolved={companyNameResolved} woNumber={workOrder.wo_number} />
-
+                <PestHeader companyNameResolved={companyNameResolved} woNumber={workOrder.wo_number} brand_name={BRAND.brand} brand_tagline={BRAND.tagline} />
                 <div className="grid grid-cols-2 gap-4 mt-2">
                     <div>
                         <h3 className="font-bold border-b border-gray-800 mb-1">F. APPLICATOR'S INFORMATION</h3>

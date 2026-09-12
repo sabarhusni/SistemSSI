@@ -44,6 +44,7 @@ export default function Index({ workOrders, filters, contracts = [], salesOrders
                             <th className="px-4 py-3">SO Ref.</th>
                             <th className="px-4 py-3">No Kontrak</th>
                             <th className="px-4 py-3">Tipe Service</th>
+                            <th className="px-4 py-3">Premis Lokasi</th>
                             <th className="px-4 py-3">Technician</th>
                             <SortableColumn sortKey="visit_date" label="Visit Date" {...sortProps} />
                             <th className="px-4 py-3">Time In</th>
@@ -64,6 +65,7 @@ export default function Index({ workOrders, filters, contracts = [], salesOrders
                                         {serviceTypeLabel(wo.contract?.service_type)}
                                     </span>
                                 </td>
+                                <td className="px-4 py-3">{wo.sales_order?.premise?.location ?? '-'}</td>
                                 <td className="px-4 py-3">{wo.technician?.name}</td>
                                 <td className="px-4 py-3">{fmtDate(wo.visit_date)}</td>
                                 <td className="px-4 py-3">{wo.time_in ?? '-'}</td>

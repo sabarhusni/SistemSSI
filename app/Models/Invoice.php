@@ -12,7 +12,7 @@ class Invoice extends Model
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'contract_id', 'customer_id',
+        'contract_id', 'billing_method', 'customer_id',
         'invoice_number', 'invoice_date', 'due_date',
         'tax_rate', 'subtotal', 'tax', 'total_amount', 'paid_amount',
         'status', 'notes',

@@ -2,7 +2,8 @@ import AppLayout from '@/Layouts/AppLayout';
 import FormField, { inputCls } from '@/Components/FormField';
 import ProductPickerModal from '@/Components/ProductPickerModal';
 import CustomerPickerModal from '@/Components/CustomerPickerModal';
-import { Head, Link, useForm } from '@inertiajs/react';
+import ConfirmCancelContract from '@/Components/ConfirmCancelContract';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { Fragment, useState, useEffect } from 'react';
 
 const fmt = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
@@ -34,6 +35,8 @@ function monthsBetween(start: string, end: string): number | '' {
 
 export default function Form({ contract, customers, products, employees, taxType = 'exclude', taxRateSo = 11, locked = false }: any) {
     const editing = !!contract;
+    const { auth } = usePage().props as any;
+    const canCancelContract = editing && auth?.role === 'Admin' && contract.status !== 'cancelled';
 
     const emptySub = () => ({ product_id: '', quantity: 1 });
     const emptyProduct = () => ({
@@ -50,6 +53,7 @@ export default function Form({ contract, customers, products, employees, taxType
         duration_months:      contract?.duration_months ?? (contract ? monthsBetween(contract.start_date, contract.end_date) : ''),
         contract_value:       contract?.contract_value       ?? '',
         is_manual_contract_value: contract?.is_manual_contract_value ?? false,
+        contract_value_mode:  contract?.contract_value_mode  ?? 'duration',
         invoice_frequency:    contract?.invoice_frequency    ?? 1,
         status:               contract?.status               ?? 'draft',
         service_type:         contract?.service_type         ?? '',
@@ -209,17 +213,31 @@ export default function Form({ contract, customers, products, employees, taxType
         setPremises(premises);
     };
 
-    // ── Totals (all premises → products). Visit freq is informational only. ──
+    // ── Totals (all premises → products). ──────────────────────────────────
     const allProducts = data.premises.flatMap((p: any) => p.products ?? []);
     const subtotalMonthly = allProducts.reduce((s: number, it: any) => s + (it.total_price || 0), 0);
     const taxMonthly      = allProducts.reduce((s: number, it: any) => s + (it.tax_amount  || 0), 0);
     const preTaxMonthly   = taxType === 'include' ? subtotalMonthly - taxMonthly : subtotalMonthly;
     const grandMonthly    = taxType === 'exclude' ? subtotalMonthly + taxMonthly : subtotalMonthly;
     const months          = Number(data.duration_months) || 0;
-    const computedValue   = grandMonthly * months;
 
-    // Contract Value auto-fills: grand total (incl. tax) × duration in months — unless
-    // manually overridden (Ubah Nilai Kontrak only applies to Pest Control + Hama Unik).
+    // Grand total (incl./excl. tax per taxType) for a single premise's own products.
+    const premiseGrand = (prem: any) => {
+        const prods = prem.products ?? [];
+        const sub = prods.reduce((s: number, it: any) => s + (it.total_price || 0), 0);
+        const tax = prods.reduce((s: number, it: any) => s + (it.tax_amount  || 0), 0);
+        return taxType === 'exclude' ? sub + tax : sub;
+    };
+    const totalVisitFrequency = data.premises.reduce((s: number, p: any) => s + (Number(p.visit_frequency) || 0), 0);
+
+    // Duration mode: grand total (incl. tax) × duration in months.
+    // Visit mode: Σ per premise (premise grand total × premise visit frequency).
+    const computedValue = data.contract_value_mode === 'visit'
+        ? data.premises.reduce((sum: number, p: any) => sum + premiseGrand(p) * (Number(p.visit_frequency) || 0), 0)
+        : grandMonthly * months;
+
+    // Contract Value auto-fills per the selected mode — unless manually overridden
+    // (Ubah Nilai Kontrak only applies to Pest Control + Hama Unik).
     useEffect(() => {
         if (canManualContractValue && data.is_manual_contract_value) return;
         if (computedValue !== (parseFloat(data.contract_value) || 0)) {
@@ -228,21 +246,29 @@ export default function Form({ contract, customers, products, employees, taxType
     }, [computedValue, data.is_manual_contract_value, canManualContractValue]);
 
     // When Contract Value is overridden manually, every product line (across all premises)
-    // gets an equal share: (Contract Value ÷ Duration Months) ÷ jumlah produk. Visit
-    // frequency is not counted. Re-runs whenever a product is added/removed so all rows
-    // (old and new) stay in sync with the new per-product share.
+    // gets an equal share. Mode visit: Contract Value ÷ total Visit Frequency (jumlah produk
+    // tidak lagi jadi pembagi). Mode duration: Contract Value ÷ Duration Months ÷ jumlah produk
+    // (skema lama, tidak berubah). Re-runs whenever a product is added/removed so all rows
+    // stay in sync with the new share.
     useEffect(() => {
-        if (!canManualContractValue || !data.is_manual_contract_value || !months) return;
+        if (!canManualContractValue || !data.is_manual_contract_value) return;
         const count = allProducts.length;
         if (!count) return;
-        const newUnitPrice = (parseFloat(data.contract_value) || 0) / months / count;
+        let newUnitPrice: number;
+        if (data.contract_value_mode === 'visit') {
+            if (!totalVisitFrequency) return;
+            newUnitPrice = (parseFloat(data.contract_value) || 0) / totalVisitFrequency;
+        } else {
+            if (!months) return;
+            newUnitPrice = (parseFloat(data.contract_value) || 0) / months / count;
+        }
         const changed = allProducts.some((p: any) => Math.abs((p.unit_price || 0) - newUnitPrice) > 0.0001);
         if (!changed) return;
         setPremises(data.premises.map((p: any) => ({
             ...p,
             products: (p.products ?? []).map((prod: any) => recalcProduct({ ...prod, unit_price: newUnitPrice })),
         })));
-    }, [data.is_manual_contract_value, data.contract_value, months, canManualContractValue, allProducts.length]);
+    }, [data.is_manual_contract_value, data.contract_value, data.contract_value_mode, months, totalVisitFrequency, canManualContractValue, allProducts.length]);
 
     // Incentive calculations
     const contractVal = parseFloat(data.contract_value) || 0;
@@ -438,7 +464,7 @@ export default function Form({ contract, customers, products, employees, taxType
                                         <FormField label="Email" error={errors[`premises.${pi}.email`]}>
                                             <input type="email" className={inputCls} value={prem.email} onChange={e => updatePremise(pi, 'email', e.target.value)} />
                                         </FormField>
-                                        <FormField label="Visit Frequency (per bulan)" error={errors[`premises.${pi}.visit_frequency`]}>
+                                        <FormField label="Visit Frequency" error={errors[`premises.${pi}.visit_frequency`]}>
                                             <input type="number" min={0} className={inputCls} value={prem.visit_frequency} onChange={e => updatePremise(pi, 'visit_frequency', +e.target.value)} />
                                         </FormField>
                                     </div>
@@ -504,7 +530,7 @@ export default function Form({ contract, customers, products, employees, taxType
                                                                         onChange={e => updateProduct(pi, di, 'unit_price', +e.target.value)}
                                                                         placeholder={selectedProduct?.sales_price ?? ''}
                                                                         readOnly={data.is_manual_contract_value}
-                                                                        title={data.is_manual_contract_value ? 'Dihitung otomatis dari Contract Value ÷ Duration Months ÷ jumlah produk' : undefined}
+                                                                        title={data.is_manual_contract_value ? (data.contract_value_mode === 'visit' ? 'Dihitung otomatis dari Contract Value ÷ Visit Frequency' : 'Dihitung otomatis dari Contract Value ÷ Duration Months ÷ jumlah produk') : undefined}
                                                                     />
                                                                 </td>
                                                                 <td className="px-3 py-2">
@@ -593,17 +619,34 @@ export default function Form({ contract, customers, products, employees, taxType
 
                         <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 space-y-1">
                             <div className="flex justify-between text-sm text-gray-600">
-                                <span>Pre-Tax Amount (per month)</span><span>{fmt(preTaxMonthly)}</span>
+                                <span>Pre-Tax Amount</span><span>{fmt(preTaxMonthly)}</span>
                             </div>
                             <div className="flex justify-between text-sm text-gray-600">
-                                <span>Tax Amount (per month)</span><span className="text-amber-600">{fmt(taxMonthly)}</span>
+                                <span>Tax Amount</span><span className="text-amber-600">{fmt(taxMonthly)}</span>
                             </div>
                             <div className="flex justify-between text-sm font-semibold text-gray-700">
-                                <span>Total (per month, incl. tax)</span><span className="text-emerald-700">{fmt(grandMonthly)}</span>
+                                <span>Total (incl. tax)</span><span className="text-emerald-700">{fmt(grandMonthly)}</span>
                             </div>
                             <div className="pt-2 border-t border-emerald-200">
+                                <FormField label="Metode Hitung Nilai Kontrak">
+                                    <div className="flex gap-6">
+                                        {[{ val: 'duration', label: 'Duration Months' }, { val: 'visit', label: 'Visit Frequency' }].map(opt => (
+                                            <label key={opt.val} className="flex items-center gap-2 cursor-pointer">
+                                                <input
+                                                    type="radio"
+                                                    name="contract_value_mode"
+                                                    value={opt.val}
+                                                    checked={data.contract_value_mode === opt.val}
+                                                    onChange={() => setData('contract_value_mode', opt.val)}
+                                                    className="w-4 h-4 text-red-600 focus:ring-red-500"
+                                                />
+                                                <span className="text-sm text-gray-700">{opt.label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </FormField>
                                 {canManualContractValue && (
-                                    <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                                    <label className="flex items-center gap-2 mt-2 mb-2 cursor-pointer">
                                         <input
                                             type="checkbox"
                                             checked={data.is_manual_contract_value}
@@ -624,9 +667,20 @@ export default function Form({ contract, customers, products, employees, taxType
                                     />
                                 </FormField>
                                 {data.is_manual_contract_value ? (
+                                    data.contract_value_mode === 'visit' ? (
+                                        <p className="text-xs text-emerald-700 mt-1">
+                                            Sales price tiap produk dihitung ulang: {fmt(parseFloat(data.contract_value) || 0)} ÷ {totalVisitFrequency || 0} visit = <strong>{fmt(totalVisitFrequency ? (parseFloat(data.contract_value) || 0) / totalVisitFrequency : 0)}</strong> / visit.
+                                            {!totalVisitFrequency && <span className="text-amber-600"> Isi Visit Frequency agar sales price bisa dihitung ulang.</span>}
+                                        </p>
+                                    ) : (
+                                        <p className="text-xs text-emerald-700 mt-1">
+                                            Sales price tiap produk dihitung ulang: {fmt(parseFloat(data.contract_value) || 0)} ÷ {months || 0} bulan ÷ {allProducts.length} produk = <strong>{fmt(months && allProducts.length ? (parseFloat(data.contract_value) || 0) / months / allProducts.length : 0)}</strong> / bulan / produk.
+                                            {(!months || !allProducts.length) && <span className="text-amber-600"> Isi Duration Months &amp; tambahkan produk agar sales price bisa dihitung ulang.</span>}
+                                        </p>
+                                    )
+                                ) : data.contract_value_mode === 'visit' ? (
                                     <p className="text-xs text-emerald-700 mt-1">
-                                        Sales price tiap produk dihitung ulang: {fmt(parseFloat(data.contract_value) || 0)} ÷ {months || 0} bulan ÷ {allProducts.length} produk = <strong>{fmt(months && allProducts.length ? (parseFloat(data.contract_value) || 0) / months / allProducts.length : 0)}</strong> / bulan / produk.
-                                        {(!months || !allProducts.length) && <span className="text-amber-600"> Isi Duration Months &amp; tambahkan produk agar sales price bisa dihitung ulang.</span>}
+                                        Σ premis (Total Produk premis × Visit Frequency premis) = <strong>{fmt(computedValue)}</strong>
                                     </p>
                                 ) : (
                                     <p className="text-xs text-emerald-700 mt-1">
@@ -738,6 +792,9 @@ export default function Form({ contract, customers, products, employees, taxType
                         <Link href="/contracts" className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">
                             {locked ? 'Kembali' : 'Cancel'}
                         </Link>
+                        {canCancelContract && (
+                            <ConfirmCancelContract href={`/contracts/${contract.id}/cancel`} itemName={contract.contract_number} />
+                        )}
                     </div>
                 </form>
             </div>

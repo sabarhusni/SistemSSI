@@ -5,6 +5,7 @@ import SortableColumn from '@/Components/SortableColumn';
 import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
 import ConfirmDelete from '@/Components/ConfirmDelete';
+import ConfirmCancelContract from '@/Components/ConfirmCancelContract';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { fmtDate } from '@/utils/date';
 
@@ -25,7 +26,8 @@ const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'Pest Control' : 
 const serviceTypeCls = (v: string) => v === 'pest_control' ? 'bg-amber-100 text-amber-700' : v === 'scenting' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400';
 
 export default function Index({ contracts, filters }: any) {
-    const { flash } = usePage().props as any;
+    const { flash, auth } = usePage().props as any;
+    const isAdmin = auth?.role === 'Admin';
     const sortProps = {
         currentSort: filters.sort_by ?? 'created_at',
         currentDir: filters.sort_dir ?? 'desc',
@@ -101,6 +103,9 @@ export default function Index({ contracts, filters }: any) {
                                         </span>
                                     ) : (
                                         <ConfirmDelete href={`/contracts/${c.id}`} itemName={c.contract_number} />
+                                    )}
+                                    {isAdmin && c.status !== 'cancelled' && (
+                                        <ConfirmCancelContract href={`/contracts/${c.id}/cancel`} itemName={c.contract_number} />
                                     )}
                                 </td>
                             </tr>

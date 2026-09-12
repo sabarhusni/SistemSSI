@@ -14,6 +14,9 @@ export default function WorkOrder({ orders, summary, technicians, filters }: any
         status: filters?.status ?? '',
     });
 
+    const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+    const toggleExpand = (id: string) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+
     const s = summary?.by_status ?? {};
 
     const handleExport = () => exportToExcel('Laporan_WorkOrder', [{
@@ -53,30 +56,51 @@ export default function WorkOrder({ orders, summary, technicians, filters }: any
             </div>
 
             <ReportTable
-                headers={['Visit Date', 'Jam', 'WO No.', 'Kontrak', 'SO', 'Teknisi', 'Area', 'Material', 'Biaya Material', 'Status']}
+                headers={['Visit Date', 'Jam', 'WO No.', 'Kontrak', 'SO', 'Teknisi', 'Area', 'Material', 'Biaya Material', 'Status', '']}
                 empty={!orders?.length}
             >
                 {orders?.map((o: any) => (
-                    <tr key={o.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 whitespace-nowrap">{fmtDate(o.visit_date)}</td>
-                        <td className="px-4 py-2 whitespace-nowrap text-xs tabular-nums">{o.time_in ? `${o.time_in}${o.time_out ? '–' + o.time_out : ''}` : '—'}</td>
-                        <td className="px-4 py-2 font-medium">
-                            <Link href={`/work-orders/${o.id}`} className="text-blue-600 hover:underline">{o.wo_number}</Link>
-                        </td>
-                        <td className="px-4 py-2">{o.contract_number ?? '—'}</td>
-                        <td className="px-4 py-2 font-mono text-xs">{o.so_number ?? '—'}</td>
-                        <td className="px-4 py-2">{o.technician ?? '—'}</td>
-                        <td className="px-4 py-2">{o.service_area ?? '—'}</td>
-                        <td className="px-4 py-2 text-center">{o.material_count ?? 0}</td>
-                        <td className="px-4 py-2 text-right">{fmt(o.material_cost)}</td>
-                        <td className="px-4 py-2">{statusBadge(o.status)}</td>
-                    </tr>
+                    <>
+                        <tr key={o.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-2 whitespace-nowrap">{fmtDate(o.visit_date)}</td>
+                            <td className="px-4 py-2 whitespace-nowrap text-xs tabular-nums">{o.time_in ? `${o.time_in}${o.time_out ? '–' + o.time_out : ''}` : '—'}</td>
+                            <td className="px-4 py-2 font-medium">
+                                <Link href={`/work-orders/${o.id}`} className="text-blue-600 hover:underline">{o.wo_number}</Link>
+                            </td>
+                            <td className="px-4 py-2">{o.contract_number ?? '—'}</td>
+                            <td className="px-4 py-2 font-mono text-xs">{o.so_number ?? '—'}</td>
+                            <td className="px-4 py-2">{o.technician ?? '—'}</td>
+                            <td className="px-4 py-2">{o.service_area ?? '—'}</td>
+                            <td className="px-4 py-2 text-center">{o.material_count ?? 0}</td>
+                            <td className="px-4 py-2 text-right">{fmt(o.material_cost)}</td>
+                            <td className="px-4 py-2">{statusBadge(o.status)}</td>
+                            <td className="px-4 py-2 text-center">
+                                {o.material_count > 0 && (
+                                    <button
+                                        onClick={() => toggleExpand(o.id)}
+                                        className="text-xs text-blue-600 hover:underline"
+                                    >
+                                        {expanded[o.id] ? 'Hide' : 'Detail'}
+                                    </button>
+                                )}
+                            </td>
+                        </tr>
+                        {expanded[o.id] && o.materials?.map((m: any, i: number) => (
+                            <tr key={`${o.id}-${i}`} className="bg-blue-50 text-xs">
+                                <td colSpan={6}></td>
+                                <td className="px-4 py-1.5 text-gray-600">{m.product_name}</td>
+                                <td className="px-4 py-1.5 text-center text-gray-500">{fmtNum(m.quantity_used)} {m.uom ?? ''}</td>
+                                <td className="px-4 py-1.5 text-right font-medium">{fmt(m.cost)}</td>
+                                <td colSpan={2}></td>
+                            </tr>
+                        ))}
+                    </>
                 ))}
                 {orders?.length > 0 && (
                     <tr className="bg-gray-50 font-semibold border-t">
                         <td colSpan={8} className="px-4 py-2 text-right">Total</td>
                         <td className="px-4 py-2 text-right text-red-700">{fmt(summary?.total_material_cost)}</td>
-                        <td></td>
+                        <td colSpan={2}></td>
                     </tr>
                 )}
             </ReportTable>

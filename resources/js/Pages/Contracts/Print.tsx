@@ -127,13 +127,17 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
 
     const months = contract.duration_months ?? monthsBetween(contract.start_date, contract.end_date) ?? 0;
 
-    // Pest Control ditagih untuk seluruh masa kontrak sekaligus (bukan per bulan),
-    // jadi tiap baris & total dikalikan jumlah bulan kontrak.
+    // Pest Control ditagih untuk seluruh masa kontrak sekaligus (bukan per bulan).
     const lineContractTotal = (svc: any) => {
         const monthly = taxType === 'exclude' ? Number(svc.total_price || 0) + Number(svc.tax_amount || 0) : Number(svc.total_price || 0);
-        return monthly * months;
+        return monthly;
     };
-    const grandContractTotal = Number(contract.contract_value ?? grandMonthly * months);
+    // Sub Total tiap baris = harga (per svc) × Visit Frequency premis tempat produk itu berada.
+    const lineVisitTotal = (svc: any, prem: any) => lineContractTotal(svc) * (Number(prem.visit_frequency) || 0);
+    const pestGrandTotal = premises.reduce(
+        (sum: number, prem: any) => sum + (prem.services ?? []).reduce((s: number, svc: any) => s + lineVisitTotal(svc, prem), 0),
+        0,
+    );
 
     const paymentTerms = customer.payment_terms ?? 30;
     const companyNameResolved = companyName || COMPANY.name;
@@ -319,21 +323,23 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
                             <tr className="bg-amber-100">
                                 <th className="border border-gray-500 px-2 py-1">JENIS LAYANAN</th>
                                 <th className="border border-gray-500 px-2 py-1">CAKUPAN HAMA</th>
+                                <th className="border border-gray-500 px-2 py-1 w-28">KET. VISIT</th>
                                 <th className="border border-gray-500 px-2 py-1 w-32">SUB TOTAL</th>
                             </tr>
                         </thead>
                         <tbody>
                             {allServices.length === 0 && (
-                                <tr><td colSpan={3} className="border border-gray-500 px-2 py-2 text-gray-400">Belum ada produk.</td></tr>
+                                <tr><td colSpan={4} className="border border-gray-500 px-2 py-2 text-gray-400">Belum ada produk.</td></tr>
                             )}
                             {premises.map((prem: any, pi: number) => {
                                 const svcs = prem.services ?? [];
                                 if (svcs.length === 0) return null;
+                                const visitFreq = Number(prem.visit_frequency) || 0;
                                 return (
                                     <Fragment key={pi}>
                                         {premises.length > 1 && (
                                             <tr className="bg-gray-100">
-                                                <td className="border border-gray-500 px-2 py-1 text-left font-semibold" colSpan={3}>
+                                                <td className="border border-gray-500 px-2 py-1 text-left font-semibold" colSpan={4}>
                                                     Premis: {prem.location || '—'}
                                                     {prem.address && <span className="font-normal text-gray-600"> — {prem.address}</span>}
                                                 </td>
@@ -343,15 +349,16 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
                                             <tr key={i}>
                                                 <td className="border border-gray-500 px-2 py-1 text-left">{svc.product?.name ?? '—'}</td>
                                                 <td className="border border-gray-500 px-2 py-1 text-left">{svc.location || '—'}</td>
-                                                <td className="border border-gray-500 px-2 py-1 text-right">{fmtRp(lineContractTotal(svc))}</td>
+                                                <td className="border border-gray-500 px-2 py-1">{visitFreq}x Visit</td>
+                                                <td className="border border-gray-500 px-2 py-1 text-right">{fmtRp(lineVisitTotal(svc, prem))}</td>
                                             </tr>
                                         ))}
                                     </Fragment>
                                 );
                             })}
                             <tr className="font-bold bg-amber-50">
-                                <td className="border border-gray-500 px-2 py-1 text-right" colSpan={2}>TOTAL HARGA</td>
-                                <td className="border border-gray-500 px-2 py-1 text-right">{fmtRp(grandContractTotal)}</td>
+                                <td className="border border-gray-500 px-2 py-1 text-right" colSpan={3}>TOTAL HARGA</td>
+                                <td className="border border-gray-500 px-2 py-1 text-right">{fmtRp(pestGrandTotal)}</td>
                             </tr>
                         </tbody>
                     </table>

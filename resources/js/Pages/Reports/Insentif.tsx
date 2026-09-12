@@ -3,15 +3,15 @@ import { Head } from '@inertiajs/react';
 import { useState } from 'react';
 import { fmt, fmtDate, SummaryCard, FilterBar, FilterDate, FilterSelect, ReportTable, applyFilters, exportToExcel } from './_shared';
 
-export default function Insentif({ byPerson, summary, users, filters }: any) {
+export default function Insentif({ byPerson, summary, employees, filters }: any) {
     const today = new Date().toISOString().slice(0, 10);
     const firstDay = today.slice(0, 8) + '01';
 
     const [f, setF] = useState({
-        from:    filters?.from    ?? firstDay,
-        to:      filters?.to      ?? today,
-        user_id: filters?.user_id ?? '',
-        rate:    filters?.rate    ?? '5',
+        from:        filters?.from        ?? firstDay,
+        to:          filters?.to          ?? today,
+        employee_id: filters?.employee_id ?? '',
+        rate:        filters?.rate        ?? '5',
     });
 
     const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -41,9 +41,9 @@ export default function Insentif({ byPerson, summary, users, filters }: any) {
             <FilterBar onApply={() => applyFilters('/reports/insentif', f)} onExport={handleExport}>
                 <FilterDate label="From" value={f.from} onChange={v => setF({ ...f, from: v })} />
                 <FilterDate label="To" value={f.to} onChange={v => setF({ ...f, to: v })} />
-                <FilterSelect label="Sales Person" value={f.user_id} onChange={v => setF({ ...f, user_id: v })}>
+                <FilterSelect label="Sales Person" value={f.employee_id} onChange={v => setF({ ...f, employee_id: v })}>
                     <option value="">All Sales</option>
-                    {users?.map((u: any) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    {employees?.map((e: any) => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </FilterSelect>
                 <div className="flex flex-col gap-1">
                     <label className="text-xs font-medium text-gray-500">Incentive Rate (%)</label>

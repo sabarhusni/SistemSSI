@@ -8,12 +8,11 @@ export default function Stock({ stocks, summary, categories, filters }: any) {
 
     const handleExport = () => exportToExcel('Stock_Report', [{
         name: 'Stock',
-        headers: ['Product', 'Category', 'Unit', 'Current Stock', 'Minimum Stock', 'Location', 'Stock Value', 'Status'],
+        headers: ['Product', 'Category', 'Unit', 'Current Stock', 'Minimum Stock', 'Status'],
         rows: (stocks ?? []).map((s: any) => [
             s.product?.name ?? '-', s.product?.category?.name ?? '-',
             s.product?.unit_of_measure?.symbol ?? s.product?.unit ?? '-',
-            Number(s.quantity ?? 0), Number(s.minimum_stock ?? 0), s.warehouse_location ?? '-',
-            Number(s.quantity ?? 0) * Number(s.product?.cost ?? 0), s.status,
+            Number(s.quantity ?? 0), Number(s.minimum_stock ?? 0), s.status,
         ]),
     }]);
 
@@ -48,7 +47,7 @@ export default function Stock({ stocks, summary, categories, filters }: any) {
             </div>
 
             <ReportTable
-                headers={['Product', 'Category', 'Unit', 'Current Stock', 'Minimum Stock', 'Location', 'Stock Value', 'Status']}
+                headers={['Product', 'Category', 'Unit', 'Current Stock', 'Minimum Stock', 'Status']}
                 empty={!stocks?.length}
             >
                 {stocks?.map((s: any) => (
@@ -58,18 +57,9 @@ export default function Stock({ stocks, summary, categories, filters }: any) {
                         <td className="px-4 py-2 text-gray-500">{s.product?.unit_of_measure?.symbol ?? s.product?.unit ?? '—'}</td>
                         <td className="px-4 py-2 font-semibold text-right">{fmtNum(s.quantity)}</td>
                         <td className="px-4 py-2 text-right text-gray-500">{fmtNum(s.minimum_stock)}</td>
-                        <td className="px-4 py-2 text-gray-500">{s.warehouse_location ?? '—'}</td>
-                        <td className="px-4 py-2 text-right">{fmt(s.quantity * (s.product?.cost ?? 0))}</td>
                         <td className="px-4 py-2">{statusBadge(s.status)}</td>
                     </tr>
                 ))}
-                {stocks?.length > 0 && (
-                    <tr className="bg-gray-50 font-semibold border-t">
-                        <td colSpan={6} className="px-4 py-2 text-right">Total Value</td>
-                        <td className="px-4 py-2 text-right text-emerald-700">{fmt(summary?.total_value)}</td>
-                        <td></td>
-                    </tr>
-                )}
             </ReportTable>
         </AppLayout>
     );

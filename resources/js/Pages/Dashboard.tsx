@@ -7,8 +7,8 @@ import VisitVsWoChart, { VisitVsWoData } from '@/Components/VisitVsWoChart';
 interface Stats {
     total_customers: number;
     total_active_contracts: number;
-    total_sales_orders: number;
-    total_service_orders: number;
+    total_collections: number;
+    total_invoices: number;
     revenue_this_month: number;
     overdue_invoices: number;
 }
@@ -53,13 +53,13 @@ export default function Dashboard({
             <Head title="Dashboard" />
 
             {/* Stat cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mb-8">
                 <StatCard label="Total Customers"     value={stats.total_customers}        color="bg-blue-500" />
                 <StatCard label="Active Contracts"    value={stats.total_active_contracts}  color="bg-emerald-500" />
-                <StatCard label="Sales Orders (mo)"   value={stats.total_sales_orders}      color="bg-violet-500" />
-                <StatCard label="Work Orders (mo)"    value={stats.total_service_orders}    color="bg-orange-500" />
+                <StatCard label="Collections"    value={stats.total_collections}       color="bg-violet-500" />
                 <StatCard label="Revenue This Month"  value={fmt(stats.revenue_this_month)} color="bg-teal-500" />
-                <StatCard label="Overdue Invoices"    value={stats.overdue_invoices}        color="bg-red-500" />
+                <StatCard label="Invoices"       value={fmt(stats.total_invoices)}          color="bg-orange-500" />
+                <StatCard label="Overdue Invoices"    value={fmt(stats.overdue_invoices)}        color="bg-red-500" />
             </div>
 
             {/* Kalender Jadwal Visit Plan */}

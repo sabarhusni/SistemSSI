@@ -25,7 +25,7 @@ class WorkOrderController extends Controller
         $sortBy   = in_array($request->sort_by, $sortable) ? $request->sort_by : 'created_at';
         $sortDir  = $request->sort_dir === 'asc' ? 'asc' : 'desc';
 
-        $query = WorkOrder::with(['technician', 'salesOrder', 'contract'])
+        $query = WorkOrder::with(['technician', 'salesOrder.premise', 'contract'])
             ->when($request->search, fn($q, $s) => $q->where('wo_number', 'ilike', "%$s%")->orWhereHas('technician', fn($tq) => $tq->where('name', 'ilike', "%$s%")))
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->when($request->contract_id, fn($q, $v) => $q->where('contract_id', $v))

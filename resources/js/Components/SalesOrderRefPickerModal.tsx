@@ -3,14 +3,13 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 interface Props {
     salesOrders: any[];       // SO berstatus confirmed pada kontrak terpilih
     customerName?: string;    // customer kontrak (sama untuk semua SO)
-    selectedIds: string[];    // SO yang sudah terpilih sebelumnya (dicentang saat modal dibuka)
-    onConfirm: (ids: string[]) => void;
+    selectedId?: string;      // SO yang sudah terpilih sebelumnya (disorot di daftar)
+    onSelect: (so: any) => void;
     onClose: () => void;
 }
 
-export default function SalesOrderRefPickerModal({ salesOrders, customerName, selectedIds, onConfirm, onClose }: Props) {
+export default function SalesOrderRefPickerModal({ salesOrders, customerName, selectedId, onSelect, onClose }: Props) {
     const [search, setSearch] = useState('');
-    const [picked, setPicked] = useState<string[]>(selectedIds ?? []);
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => { inputRef.current?.focus(); }, []);
@@ -31,22 +30,6 @@ export default function SalesOrderRefPickerModal({ salesOrders, customerName, se
             so.premise?.pic?.toLowerCase().includes(q)
         );
     }, [search, salesOrders]);
-
-    const toggle = (id: string) => {
-        setPicked(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-    };
-
-    const allFilteredPicked = filtered.length > 0 && filtered.every((so: any) => picked.includes(so.id));
-    const toggleAllFiltered = () => {
-        if (allFilteredPicked) {
-            const filteredIds = new Set(filtered.map((so: any) => so.id));
-            setPicked(prev => prev.filter(id => !filteredIds.has(id)));
-        } else {
-            const merged = new Set(picked);
-            filtered.forEach((so: any) => merged.add(so.id));
-            setPicked(Array.from(merged));
-        }
-    };
 
     return (
         <div
@@ -76,9 +59,6 @@ export default function SalesOrderRefPickerModal({ salesOrders, customerName, se
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 sticky top-0 border-b">
                                 <tr className="text-left text-gray-500 text-xs">
-                                    <th className="px-4 py-2 w-8">
-                                        <input type="checkbox" checked={allFilteredPicked} onChange={toggleAllFiltered} />
-                                    </th>
                                     <th className="px-3 py-2">No SO</th>
                                     <th className="px-3 py-2">Customer</th>
                                     <th className="px-3 py-2">Premis Lokasi</th>
@@ -90,12 +70,9 @@ export default function SalesOrderRefPickerModal({ salesOrders, customerName, se
                                 {filtered.map((so: any) => (
                                     <tr
                                         key={so.id}
-                                        className="hover:bg-red-50 cursor-pointer"
-                                        onClick={() => toggle(so.id)}
+                                        className={`hover:bg-red-50 cursor-pointer ${String(so.id) === String(selectedId) ? 'bg-emerald-50' : ''}`}
+                                        onClick={() => { onSelect(so); onClose(); }}
                                     >
-                                        <td className="px-4 py-2" onClick={e => e.stopPropagation()}>
-                                            <input type="checkbox" checked={picked.includes(so.id)} onChange={() => toggle(so.id)} />
-                                        </td>
                                         <td className="px-3 py-2 font-mono text-xs font-medium text-gray-800">{so.so_number}</td>
                                         <td className="px-3 py-2 text-gray-700">{customerName ?? so.customer?.name ?? '—'}</td>
                                         <td className="px-3 py-2 text-gray-700">{so.premise?.location ?? '—'}</td>
@@ -108,18 +85,9 @@ export default function SalesOrderRefPickerModal({ salesOrders, customerName, se
                     )}
                 </div>
 
-                <div className="px-4 py-3 border-t flex items-center justify-between">
-                    <span className="text-xs text-gray-400">{filtered.length} SO · {picked.length} dipilih</span>
-                    <div className="flex gap-2">
-                        <button type="button" onClick={onClose}
-                            className="px-4 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">
-                            Batal
-                        </button>
-                        <button type="button" onClick={() => onConfirm(picked)}
-                            className="px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700">
-                            Terapkan ({picked.length} dipilih)
-                        </button>
-                    </div>
+                <div className="px-4 py-2 border-t flex items-center justify-between text-xs text-gray-400">
+                    <span>{filtered.length} SO ditemukan</span>
+                    <span>Press <kbd className="px-1 py-0.5 border rounded text-gray-500">Esc</kbd> to close</span>
                 </div>
             </div>
         </div>

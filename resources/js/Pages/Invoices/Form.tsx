@@ -3,10 +3,12 @@ import FormField, { inputCls } from '@/Components/FormField';
 import ContractPickerModal from '@/Components/ContractPickerModal';
 import WorkOrderRefPickerModal from '@/Components/WorkOrderRefPickerModal';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 
 const fmt = (n: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
+
+const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'Pest Control' : v === 'scenting' ? 'Scenting' : '—';
 
 const emptyItem = (month = 1) => ({
     product_id:     '',
@@ -105,7 +107,7 @@ function itemsFromSelectedWOs(
     return rows.sort((a: any, b: any) => a.month - b.month);
 }
 
-export default function Form({ invoice, contracts, products, nextNumber, invoicedKeys = {}, taxType = 'exclude', invoicedTotalsByContract = {} }: any) {
+export default function Form({ invoice, contracts, products, nextNumber, invoicedKeys = {}, taxType = 'exclude', invoicedTotalsByContract = {}, invoiceCountByContract = {}, billingMethodByContract = {} }: any) {
     const editing = !!invoice;
     // Invoice yang sudah lunas (paid) hanya bisa dilihat, tidak dapat diubah.
     const locked = editing && invoice?.status === 'paid';
@@ -113,6 +115,7 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
 
     const { data, setData, post, put, processing, errors } = useForm<any>({
         contract_id:     invoice?.contract_id     ?? '',
+        billing_method:  invoice?.billing_method  ?? 'wo_reference',
         customer_id:     invoice?.customer_id     ?? '',
         work_order_ids:  invoice?.work_orders?.map((w: any) => w.id) ?? [],
         invoice_number: invoice?.invoice_number ?? nextNumber ?? '',
@@ -143,25 +146,64 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
 
     const linkedWos = invoiceableWos.filter((w: any) => data.work_order_ids.includes(w.id));
 
-    // Kontrak pest hama unik: nilai invoice diambil dari nilai kontrak, bukan item SO.
-    const isUniquePest    = selectedContract?.service_type === 'pest_control' && !!selectedContract?.is_unique_pest;
+    // Kontrak pest hama unik: nilai invoice diambil dari nilai kontrak, bukan item SO —
+    // tidak ada pilihan metode tagihan (selalu Nilai Kontrak). Kontrak lain boleh memilih
+    // antara Referensi WO (skema lama) atau Nilai Kontrak (input manual, sama seperti
+    // hama unik) lewat data.billing_method.
+    const isUniquePest      = selectedContract?.service_type === 'pest_control' && !!selectedContract?.is_unique_pest;
+    const usesContractValue = isUniquePest || data.billing_method === 'contract_value';
+    // Metode tagihan invoice ke-2 dst pada satu kontrak mengikuti invoice pertama
+    // kontrak tersebut (dikirim dari backend) — tidak bisa diubah lagi.
+    const establishedBillingMethod = billingMethodByContract?.[selectedContract?.id] ?? null;
+    const billingMethodLocked = !!establishedBillingMethod;
     const alreadyInvoiced = Number(invoicedTotalsByContract?.[selectedContract?.id]) || 0;
     const remainingBalance = Math.max(0, (Number(selectedContract?.contract_value) || 0) - alreadyInvoiced);
 
-    // Pilih kontrak: reset WO & item. Kontrak pest hama unik langsung menghasilkan
-    // 1 baris ringkasan senilai sisa kontrak — tidak perlu memilih referensi apa pun.
-    // Kontrak biasa: item terisi setelah WO dipilih.
+    // Posisi termin invoice ini terhadap Invoice Term Frequency kontrak (dihitung dari
+    // jumlah invoice non-cancelled lain pada kontrak yang sama + invoice ini sendiri).
+    const invoiceFrequency     = Number(selectedContract?.invoice_frequency) || 0;
+    const existingInvoiceCount = Number(invoiceCountByContract?.[selectedContract?.id]) || 0;
+    const invoicePosition      = existingInvoiceCount + 1;
+    const isLastTerm           = invoiceFrequency > 0 && invoicePosition === invoiceFrequency;
+    const exceedsTermFrequency = invoiceFrequency > 0 && invoicePosition > invoiceFrequency;
+
+    // Termin terakhir + Nilai Kontrak: Nilai Tagihan dikunci ke sisa nilai kontrak persis
+    // (tidak bisa ditagih nilai lain), supaya total seluruh invoice pas sama dengan Nilai Kontrak.
+    useEffect(() => {
+        if (!usesContractValue || !isLastTerm) return;
+        const current = Number(data.items[0]?.unit_price) || 0;
+        if (Math.abs(current - remainingBalance) > 0.01) {
+            setData('items', [recalcItem({ ...(data.items[0] ?? {}), unit_price: remainingBalance }, taxType)]);
+        }
+    }, [usesContractValue, isLastTerm, remainingBalance]);
+
+    // Pilih kontrak: reset WO, item, & metode tagihan. Kontrak pest hama unik langsung
+    // menghasilkan 1 baris ringkasan senilai sisa kontrak. Kontrak lain default ke
+    // Referensi WO (skema lama) — bisa diganti ke Nilai Kontrak lewat toggle di bawah.
     const handleSelectContract = (contract: any) => {
         const uniquePest = contract.service_type === 'pest_control' && !!contract.is_unique_pest;
+        const established = billingMethodByContract?.[contract.id] ?? null;
         const invoicedTotal = Number(invoicedTotalsByContract?.[contract.id]) || 0;
         const remaining     = Math.max(0, (Number(contract.contract_value) || 0) - invoicedTotal);
+        const method = uniquePest ? 'contract_value' : (established ?? 'wo_reference');
 
         setData({
             ...data,
             contract_id:    contract.id,
+            billing_method: method,
             customer_id:    contract.customer_id ?? '',
             work_order_ids: [],
-            items:          uniquePest ? [pestUnikItem(remaining, contract, taxType)] : [],
+            items:          method === 'contract_value' ? [pestUnikItem(remaining, contract, taxType)] : [],
+        });
+    };
+
+    // Ganti metode tagihan (hanya tersedia untuk kontrak selain pest hama unik).
+    const handleChangeBillingMethod = (method: 'wo_reference' | 'contract_value') => {
+        setData({
+            ...data,
+            billing_method: method,
+            work_order_ids: [],
+            items: method === 'contract_value' ? [pestUnikItem(remainingBalance, selectedContract, taxType)] : [],
         });
     };
 
@@ -223,7 +265,7 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
                 />
             )}
 
-            {!isUniquePest && woPickerOpen && (
+            {!usesContractValue && woPickerOpen && (
                 <WorkOrderRefPickerModal
                     workOrders={invoiceableWos}
                     customerName={selectedContract?.customer?.name}
@@ -273,7 +315,7 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
                         </FormField>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-2">
                         <FormField label="Contract Ref.">
                             <button
                                 type="button"
@@ -295,7 +337,52 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
                                 }
                             </div>
                         </FormField>
-                        {!isUniquePest && (
+                    </div>
+
+                    {selectedContract && (
+                        <div className="grid grid-cols-2 gap-2">
+                            <FormField label="Jenis Services">
+                                <div className={`${inputCls} bg-gray-50 cursor-default`}>
+                                    <span className="text-gray-700">{serviceTypeLabel(selectedContract.service_type)}</span>
+                                </div>
+                            </FormField>
+                            <FormField label="Status Hama Unik">
+                                <div className={`${inputCls} bg-gray-50 cursor-default`}>
+                                    {selectedContract.service_type === 'pest_control'
+                                        ? <span className={isUniquePest ? 'text-emerald-700 font-medium' : 'text-gray-700'}>{isUniquePest ? 'Ya (Hama Unik)' : 'Tidak'}</span>
+                                        : <span className="text-gray-400 italic text-xs">Tidak berlaku (bukan Pest Control)</span>
+                                    }
+                                </div>
+                            </FormField>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                        {selectedContract && !isUniquePest && (
+                            <FormField label="Metode Tagihan" error={errors.billing_method}>
+                                <div className="flex gap-6">
+                                    {[{ val: 'wo_reference', label: 'Referensi WO' }, { val: 'contract_value', label: 'Nilai Kontrak' }].map(opt => (
+                                        <label key={opt.val} className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="billing_method"
+                                                value={opt.val}
+                                                disabled={locked || billingMethodLocked}
+                                                checked={data.billing_method === opt.val}
+                                                onChange={() => handleChangeBillingMethod(opt.val as 'wo_reference' | 'contract_value')}
+                                                className="w-4 h-4 text-red-600 focus:ring-red-500"
+                                            />
+                                            <span className="text-sm text-gray-700">{opt.label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                {billingMethodLocked && !locked && (
+                                    <p className="text-xs text-gray-500 mt-1">Mengikuti metode tagihan invoice pertama kontrak ini, tidak dapat diubah.</p>
+                                )}
+                            </FormField>
+                        )}
+
+                        {!usesContractValue && (
                             <FormField label="Referensi No WO (Completed)" error={errors.work_order_ids}>
                                 <button
                                     type="button"
@@ -312,7 +399,40 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
                         )}
                     </div>
 
-                    {isUniquePest && (
+
+
+                    {selectedContract && invoiceFrequency > 0 && (
+                        <div className="grid grid-cols-3 gap-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-3">
+                            <div>
+                                <span className="text-gray-500 block text-xs">Invoice Term Frequency</span>
+                                <span className="font-medium text-gray-800 text-sm">{invoiceFrequency} termin</span>
+                            </div>
+                            <div>
+                                <span className="text-gray-500 block text-xs">Termin Invoice Ini</span>
+                                <span className="font-medium text-gray-800 text-sm">Ke-{invoicePosition} dari {invoiceFrequency}</span>
+                            </div>
+                            <div>
+                                <span className="text-gray-500 block text-xs">Sisa Termin Setelah Invoice Ini</span>
+                                <span className="font-medium text-gray-800 text-sm">{Math.max(0, invoiceFrequency - invoicePosition)} termin</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {exceedsTermFrequency && (
+                        <div className="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                            Jumlah invoice untuk kontrak ini sudah mencapai batas Invoice Term Frequency ({invoiceFrequency}). Invoice ini tidak dapat disimpan.
+                        </div>
+                    )}
+                    {isLastTerm && !exceedsTermFrequency && (
+                        <div className="rounded-md bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+                            Ini adalah invoice termin terakhir (ke-{invoiceFrequency} dari Invoice Term Frequency kontrak).{' '}
+                            {usesContractValue
+                                ? 'Nilai Tagihan otomatis dikunci ke sisa nilai kontrak.'
+                                : 'SEMUA Work Order pada kontrak ini harus berstatus Completed sebelum invoice dapat disimpan.'}
+                        </div>
+                    )}
+
+                    {usesContractValue && (
                         <div className="grid grid-cols-3 gap-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-3">
                             <FormField label="Total Nilai Kontrak">
                                 <div className={`${inputCls} bg-white`}>{fmt(Number(selectedContract?.contract_value) || 0)}</div>
@@ -321,14 +441,17 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
                                 <div className={`${inputCls} bg-white`}>{fmt(alreadyInvoiced)}</div>
                             </FormField>
                             <FormField label="Nilai Tagihan" required>
-                                <input type="number" className={inputCls + lockCls} disabled={locked || !data.items[0]}
+                                <input type="number" className={inputCls + lockCls} disabled={locked || !data.items[0] || isLastTerm}
                                     value={data.items[0]?.unit_price ?? ''}
                                     onChange={e => handleNilaiTagihanChange(+e.target.value || 0)} />
+                                {isLastTerm && (
+                                    <p className="text-xs text-amber-700 mt-1">Termin terakhir — nilai tagihan dikunci ke sisa nilai kontrak, tidak dapat diubah.</p>
+                                )}
                             </FormField>
                         </div>
                     )}
 
-                    {!isUniquePest && (
+                    {!usesContractValue && (
                         <div>
                             <div className="flex items-center justify-between mb-2">
                                 <h3 className="font-semibold text-gray-700">Invoice Items</h3>
@@ -441,7 +564,7 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
 
                     <div className="flex gap-3 pt-2">
                         {!locked && (
-                            <button type="submit" disabled={processing}
+                            <button type="submit" disabled={processing || exceedsTermFrequency}
                                 className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60">
                                 {processing ? 'Saving...' : 'Save'}
                             </button>

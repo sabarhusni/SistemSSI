@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\Employee;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Setting;
 use Illuminate\Http\Request;
@@ -57,32 +58,51 @@ class ContractController extends Controller
     }
 
     /**
-     * Contract value = grand total per month (incl. tax) × duration in months.
-     * Iterates premises → products. Visit frequency is informational only.
+     * Grand total (incl./excl. tax per taxType) for a single premise's products.
      */
-    private function computeContractValue(array $premises, int $months, string $taxType): float
+    private function premiseGrand(array $premise, string $taxType): float
     {
         $subtotal = 0.0;
         $taxTotal = 0.0;
-        foreach ($premises as $premise) {
-            foreach (($premise['products'] ?? []) as $prod) {
-                if (empty($prod['product_id'])) continue;
-                $sub = (float) $prod['quantity'] * (float) $prod['unit_price'];
-                $subtotal += $sub;
-                $taxTotal += $this->lineTax($sub, (float) ($prod['tax_rate'] ?? 0), $taxType);
-            }
+        foreach (($premise['products'] ?? []) as $prod) {
+            if (empty($prod['product_id'])) continue;
+            $sub = (float) $prod['quantity'] * (float) $prod['unit_price'];
+            $subtotal += $sub;
+            $taxTotal += $this->lineTax($sub, (float) ($prod['tax_rate'] ?? 0), $taxType);
         }
         // exclude: tax added on top | include: tax already embedded in subtotal
-        $grandPerMonth = $taxType === 'exclude' ? $subtotal + $taxTotal : $subtotal;
+        return $taxType === 'exclude' ? $subtotal + $taxTotal : $subtotal;
+    }
+
+    /**
+     * Contract value, computed per the selected mode:
+     * - duration: grand total per month (incl. tax) × duration in months.
+     * - visit: Σ per premise (premise grand total × premise visit frequency).
+     */
+    private function computeContractValue(array $premises, int $months, string $taxType, string $mode): float
+    {
+        if ($mode === 'visit') {
+            $total = 0.0;
+            foreach ($premises as $premise) {
+                $total += $this->premiseGrand($premise, $taxType) * (float) ($premise['visit_frequency'] ?? 0);
+            }
+            return $total;
+        }
+
+        $grandPerMonth = 0.0;
+        foreach ($premises as $premise) {
+            $grandPerMonth += $this->premiseGrand($premise, $taxType);
+        }
         return $grandPerMonth * max($months, 1);
     }
 
     /**
      * When the contract value is overridden manually, every product line (across all
-     * premises) gets an equal share: (contract value ÷ duration in months) ÷ number of
-     * products. Visit frequency is not taken into account.
+     * premises) gets an equal share. Mode visit: contract value ÷ total visit frequency
+     * (number of products is no longer a divisor). Mode duration: contract value ÷
+     * duration in months ÷ number of products (unchanged legacy formula).
      */
-    private function applyManualContractValue(array $premises, float $contractValue, int $months): array
+    private function applyManualContractValue(array $premises, float $contractValue, int $months, string $mode): array
     {
         $productCount = 0;
         foreach ($premises as $premise) {
@@ -93,13 +113,26 @@ class ContractController extends Controller
         }
         if ($productCount <= 0) return $premises;
 
-        $unitPrice = $contractValue / max($months, 1) / $productCount;
+        if ($mode === 'visit') {
+            $totalVisitFrequency = 0.0;
+            foreach ($premises as $premise) {
+                $totalVisitFrequency += (float) ($premise['visit_frequency'] ?? 0);
+            }
+            if ($totalVisitFrequency <= 0) return $premises;
+            $unitPrice = $contractValue / $totalVisitFrequency;
+        } else {
+            $divisor = max($months, 1);
+            $unitPrice = $contractValue / $divisor / $productCount;
+        }
+
         foreach ($premises as &$premise) {
-            foreach (($premise['products'] ?? []) as &$prod) {
+            $products = $premise['products'] ?? [];
+            foreach ($products as &$prod) {
                 if (empty($prod['product_id'])) continue;
                 $prod['unit_price'] = $unitPrice;
             }
             unset($prod);
+            $premise['products'] = $products;
         }
         unset($premise);
 
@@ -122,6 +155,7 @@ class ContractController extends Controller
             'service_type'           => 'required|in:pest_control,scenting',
             'is_unique_pest'         => 'nullable|boolean',
             'is_manual_contract_value' => 'nullable|boolean',
+            'contract_value_mode'    => 'nullable|in:duration,visit',
             'contract_value'         => 'nullable|numeric|min:0',
             'notes'                  => 'nullable|string',
             'sales_type'             => 'nullable|in:canvas,lead',
@@ -226,15 +260,16 @@ class ContractController extends Controller
         }
 
         $taxType = Setting::get('tax_type', 'exclude');
+        $mode    = $data['contract_value_mode'] ?? 'duration';
         // Ubah Nilai Kontrak only applies to Pest Control contracts with Hama Unik checked.
         $data['is_manual_contract_value'] = ($data['is_manual_contract_value'] ?? false)
             && $data['service_type'] === 'pest_control'
             && ($data['is_unique_pest'] ?? false);
         if ($data['is_manual_contract_value']) {
             $data['contract_value'] = (float) ($data['contract_value'] ?? 0);
-            $data['premises'] = $this->applyManualContractValue($data['premises'] ?? [], $data['contract_value'], (int) $data['duration_months']);
+            $data['premises'] = $this->applyManualContractValue($data['premises'] ?? [], $data['contract_value'], (int) $data['duration_months'], $mode);
         } else {
-            $data['contract_value'] = $this->computeContractValue($data['premises'] ?? [], (int) $data['duration_months'], $taxType);
+            $data['contract_value'] = $this->computeContractValue($data['premises'] ?? [], (int) $data['duration_months'], $taxType, $mode);
         }
 
         DB::transaction(function () use ($data, $taxType) {
@@ -275,15 +310,16 @@ class ContractController extends Controller
         }
 
         $taxType = Setting::get('tax_type', 'exclude');
+        $mode    = $data['contract_value_mode'] ?? 'duration';
         // Ubah Nilai Kontrak only applies to Pest Control contracts with Hama Unik checked.
         $data['is_manual_contract_value'] = ($data['is_manual_contract_value'] ?? false)
             && $data['service_type'] === 'pest_control'
             && ($data['is_unique_pest'] ?? false);
         if ($data['is_manual_contract_value']) {
             $data['contract_value'] = (float) ($data['contract_value'] ?? 0);
-            $data['premises'] = $this->applyManualContractValue($data['premises'] ?? [], $data['contract_value'], (int) $data['duration_months']);
+            $data['premises'] = $this->applyManualContractValue($data['premises'] ?? [], $data['contract_value'], (int) $data['duration_months'], $mode);
         } else {
-            $data['contract_value'] = $this->computeContractValue($data['premises'] ?? [], (int) $data['duration_months'], $taxType);
+            $data['contract_value'] = $this->computeContractValue($data['premises'] ?? [], (int) $data['duration_months'], $taxType, $mode);
         }
 
         DB::transaction(function () use ($data, $contract, $taxType) {
@@ -322,6 +358,35 @@ class ContractController extends Controller
         $contract->delete();
 
         return redirect('/contracts')->with('success', 'Kontrak berhasil dihapus.');
+    }
+
+    /**
+     * Cancel a contract and cascade the cancellation to every related Sales Order,
+     * Work Order, Invoice, and (non-verified) Payment. Admin role only.
+     */
+    public function cancel(Contract $contract)
+    {
+        abort_unless(optional(auth()->user()->role)->name === 'Admin', 403);
+
+        if ($contract->status === 'cancelled') {
+            return back()->with('error', 'Kontrak sudah dibatalkan.');
+        }
+
+        DB::transaction(function () use ($contract) {
+            $contract->update(['status' => 'cancelled']);
+            $contract->salesOrders()->where('status', '!=', 'cancelled')->update(['status' => 'cancelled']);
+            $contract->workOrders()->where('status', '!=', 'cancelled')->update(['status' => 'cancelled']);
+            $contract->invoices()->where('status', '!=', 'cancelled')->update(['status' => 'cancelled']);
+
+            // Payment has no 'cancelled' status; 'verified' payments are immutable
+            // elsewhere in the app (already reconciled), so only pending/received ones
+            // are flipped to 'rejected'.
+            Payment::whereIn('invoice_id', $contract->invoices()->pluck('id'))
+                ->whereNotIn('status', ['verified', 'rejected'])
+                ->update(['status' => 'rejected']);
+        });
+
+        return redirect('/contracts')->with('success', 'Kontrak dan seluruh transaksi terkait berhasil dibatalkan.');
     }
 
     /**
