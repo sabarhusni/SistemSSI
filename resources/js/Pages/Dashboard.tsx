@@ -56,9 +56,9 @@ export default function Dashboard({
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mb-8">
                 <StatCard label="Total Customers"     value={stats.total_customers}        color="bg-blue-500" />
                 <StatCard label="Active Contracts"    value={stats.total_active_contracts}  color="bg-emerald-500" />
-                <StatCard label="Collections"    value={stats.total_collections}       color="bg-violet-500" />
                 <StatCard label="Revenue This Month"  value={fmt(stats.revenue_this_month)} color="bg-teal-500" />
                 <StatCard label="Invoices"       value={fmt(stats.total_invoices)}          color="bg-orange-500" />
+                <StatCard label="Collections"    value={fmt(stats.total_collections)}       color="bg-violet-500" />
                 <StatCard label="Overdue Invoices"    value={fmt(stats.overdue_invoices)}        color="bg-red-500" />
             </div>
 

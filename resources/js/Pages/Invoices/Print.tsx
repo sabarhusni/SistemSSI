@@ -14,7 +14,7 @@ const statusLabel: Record<string, string> = {
 // Identitas brand berbeda per tipe layanan kontrak — sejalan dengan BRANDS di Contracts/Print.tsx.
 const BRANDS: Record<string, { brand: string; tagline: string }> = {
     pest_control: { brand: 'U-PEST', tagline: 'Pest Management' },
-    U-Scent:     { brand: 'U-SCENT', tagline: 'Oil Aroma' },
+    scenting:     { brand: 'U-SCENT', tagline: 'Oil Aroma' },
 };
 
 function Row({ label, value }: { label: string; value: any }) {

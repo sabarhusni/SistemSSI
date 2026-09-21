@@ -23,7 +23,7 @@ class DashboardController extends Controller
             'total_active_contracts' => Contract::where('status', 'active')->count(),
             'total_collections' => Payment::whereMonth('created_at', $currentMonth->month)
                 ->whereIn('status', ['received', 'verified'])
-                ->count(),
+                ->sum('amount'),
             'total_invoices' => Invoice::whereMonth('created_at', $currentMonth->month)->sum('total_amount'),
             'revenue_this_month' => SalesOrder::whereMonth('created_at', $currentMonth->month)->sum('total_amount'),
             'overdue_invoices' => Invoice::where('due_date', '<', Carbon::now())

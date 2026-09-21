@@ -35,7 +35,7 @@ const COMPANY = {
 // Identitas brand & susunan dokumen berbeda per tipe layanan (U-Pest vs U-Scent).
 const BRANDS: Record<string, { brand: string; tagline: string; signerTitle: string; internalLabel: string }> = {
     pest_control: { brand: 'U-PEST', tagline: 'Pest Management', signerTitle: 'Business Consultant', internalLabel: 'U-Pest' },
-    U-Scent:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Sales Consultant',    internalLabel: 'U-Scent' },
+    scenting:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Sales Consultant',    internalLabel: 'U-Scent' },
 };
 
 // Satu baris dalam kotak informasi: Label : Value.
@@ -74,7 +74,7 @@ function PerjanjianItems({ months, start, end, paymentTerms, extra }: { months: 
 }
 
 // 13 ketentuan baku perjanjian kontrak U-Scent (halaman 2).
-const SYARAT_U-Scent: string[] = [
+const SYARAT_SCENT: string[] = [
     'Pihak Pelanggan sepakat untuk melakukan kerjasama sewa alat mesin U-Scent dan Refill Oil Aroma kepada CV. Sinergy Serve Indonesia. Dalam kerja sama tersebut, CV. Sinergy Serve Indonesia akan menyewakan unit mesin U-Scent berlaku selama periode kontrak berjalan.',
     'Pihak Pelanggan mengijinkan CV. Sinergy Serve Indonesia untuk melakukan pemasangan mesin U-Scent, dan pihak pelanggan mengijinkan CV. Sinergy Serve Indonesia untuk melakukan pelepasan dan penarikan unit apabila kontrak kerjasama tersebut telah berakhir.',
     'Kontrak baru mulai efektif apabila unit mesin U-Scent telah terpasang dan terisi Oil Aroma oleh CV. Sinergy Serve Indonesia, atau terhitung sejak pekerjaan pertama dilakukan dan Pelanggan telah menandatangani laporan pekerjaan untuk periode kontrak yang telah disepakati.',
@@ -113,8 +113,8 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
     }, []);
 
     const isPest = contract.service_type === 'pest_control';
-    const BRAND = BRANDS[contract.service_type] ?? BRANDS.U-Scent;
-    const SYARAT = isPest ? SYARAT_PEST : SYARAT_U-Scent;
+    const BRAND = BRANDS[contract.service_type] ?? BRANDS.scenting;
+    const SYARAT = isPest ? SYARAT_PEST : SYARAT_SCENT;
 
     const customer = contract.customer ?? {};
     const premises = contract.premises ?? [];

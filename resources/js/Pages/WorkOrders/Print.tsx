@@ -35,7 +35,7 @@ const COMPANY = {
 // Identitas brand & susunan dokumen berbeda per tipe layanan (U-Pest vs U-Scent).
 const BRANDS: Record<string, { brand: string; tagline: string; signerTitle: string; internalLabel: string }> = {
     pest_control: { brand: 'U-PEST', tagline: 'Pest Management', signerTitle: 'Business Consultant', internalLabel: 'U-Pest' },
-    U-Scent:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Sales Consultant',    internalLabel: 'U-Scent' },
+    scenting:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Sales Consultant',    internalLabel: 'U-Scent' },
 };
 
 function Row({ label, value }: { label: string; value: any }) {
@@ -79,7 +79,7 @@ export default function Print({ workOrder, companyName }: any) {
 
     const premise = workOrder.sales_order?.premise ?? null;
 
-    const BRAND = BRANDS[workOrder.contract?.service_type] ?? BRANDS.U-Scent;
+    const BRAND = BRANDS[workOrder.contract?.service_type] ?? BRANDS.scenting;
 
     return (
         <div className="min-h-screen bg-gray-100 print:bg-white py-8 print:py-0">
@@ -272,7 +272,7 @@ function PestControlServiceReport({ workOrder, companyName }: any) {
     const visitTypes: string[] = workOrder.visit_types ?? [];
     const purpose = visitTypes.length ? visitTypes.map(v => purposeLabel[v] ?? v).join(', ') : '—';
     const companyNameResolved = companyName || COMPANY.name;
-    const BRAND = BRANDS[workOrder.contract?.service_type] ?? BRANDS.U-Scent;
+    const BRAND = BRANDS[workOrder.contract?.service_type] ?? BRANDS.scenting;
 
     return (
         <div className="min-h-screen bg-gray-100 print:bg-white py-8 print:py-0 text-[11px] leading-snug text-gray-900">
