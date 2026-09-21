@@ -32,10 +32,10 @@ const COMPANY = {
     addressLines: ['Sekedengdeur No. 15, Ujungberung', 'Kota Bandung, Jawa Barat 40167'],
 };
 
-// Identitas brand & susunan dokumen berbeda per tipe layanan (Pest Control vs Scenting).
+// Identitas brand & susunan dokumen berbeda per tipe layanan (U-Pest vs U-Scent).
 const BRANDS: Record<string, { brand: string; tagline: string; signerTitle: string; internalLabel: string }> = {
     pest_control: { brand: 'U-PEST', tagline: 'Pest Management', signerTitle: 'Business Consultant', internalLabel: 'U-Pest' },
-    scenting:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Sales Consultant',    internalLabel: 'U-Scent' },
+    U-Scent:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Sales Consultant',    internalLabel: 'U-Scent' },
 };
 
 // Satu baris dalam kotak informasi: Label : Value.
@@ -73,16 +73,16 @@ function PerjanjianItems({ months, start, end, paymentTerms, extra }: { months: 
     );
 }
 
-// 13 ketentuan baku perjanjian kontrak Scenting (halaman 2).
-const SYARAT_SCENTING: string[] = [
-    'Pihak Pelanggan sepakat untuk melakukan kerjasama sewa alat mesin Scenting dan Refill Oil Aroma kepada CV. Sinergy Serve Indonesia. Dalam kerja sama tersebut, CV. Sinergy Serve Indonesia akan menyewakan unit mesin Scenting berlaku selama periode kontrak berjalan.',
-    'Pihak Pelanggan mengijinkan CV. Sinergy Serve Indonesia untuk melakukan pemasangan mesin Scenting, dan pihak pelanggan mengijinkan CV. Sinergy Serve Indonesia untuk melakukan pelepasan dan penarikan unit apabila kontrak kerjasama tersebut telah berakhir.',
-    'Kontrak baru mulai efektif apabila unit mesin Scenting telah terpasang dan terisi Oil Aroma oleh CV. Sinergy Serve Indonesia, atau terhitung sejak pekerjaan pertama dilakukan dan Pelanggan telah menandatangani laporan pekerjaan untuk periode kontrak yang telah disepakati.',
-    'Karyawan CV. Sinergy Serve Indonesia yang telah terlatih akan melakukan kunjungan untuk melakukan pengecekan atau perbaikan unit mesin Scenting, pengisian refill Oil Aroma sesuai jadwal dan frekuensi service yang telah disepakati kedua belah pihak untuk memastikan unit yang ada di lokasi pelanggan dapat berfungsi dengan baik selama masa periode kontrak.',
+// 13 ketentuan baku perjanjian kontrak U-Scent (halaman 2).
+const SYARAT_U-Scent: string[] = [
+    'Pihak Pelanggan sepakat untuk melakukan kerjasama sewa alat mesin U-Scent dan Refill Oil Aroma kepada CV. Sinergy Serve Indonesia. Dalam kerja sama tersebut, CV. Sinergy Serve Indonesia akan menyewakan unit mesin U-Scent berlaku selama periode kontrak berjalan.',
+    'Pihak Pelanggan mengijinkan CV. Sinergy Serve Indonesia untuk melakukan pemasangan mesin U-Scent, dan pihak pelanggan mengijinkan CV. Sinergy Serve Indonesia untuk melakukan pelepasan dan penarikan unit apabila kontrak kerjasama tersebut telah berakhir.',
+    'Kontrak baru mulai efektif apabila unit mesin U-Scent telah terpasang dan terisi Oil Aroma oleh CV. Sinergy Serve Indonesia, atau terhitung sejak pekerjaan pertama dilakukan dan Pelanggan telah menandatangani laporan pekerjaan untuk periode kontrak yang telah disepakati.',
+    'Karyawan CV. Sinergy Serve Indonesia yang telah terlatih akan melakukan kunjungan untuk melakukan pengecekan atau perbaikan unit mesin U-Scent, pengisian refill Oil Aroma sesuai jadwal dan frekuensi service yang telah disepakati kedua belah pihak untuk memastikan unit yang ada di lokasi pelanggan dapat berfungsi dengan baik selama masa periode kontrak.',
     'CV. Sinergy Serve Indonesia akan mengirimkan invoice dan faktur pajak sebagai bukti penagihan melalui email/WA/ekspedisi.',
     'Semua penagihan akan di bayarkan di awal periode sesuai TOP (term of payment) atau jangka waktu pembayaran yang di sepakati kedua belah pihak.',
     'Pembayaran dilakukan melalui transfer ke bank dan nomor rekening yang tercantum dalam dokumen Invoice.',
-    'Pelanggan wajib menjaga semua unit milik CV. Sinergy Serve Indonesia yang terpasang agar terhindar dari pengrusakan atau kehilangan. Apabila terjadi kerusakan dan kehilangan unit mesin Scenting yang disebabkan oleh kelalaian Pihak Pelanggan dimana kerusakan tersebut dapat dibuktikan dan mencapai 75% (tujuh puluh lima persen), maka akan dikenakan biaya denda kehilangan unit sesuai harga yang berlaku di CV. Sinergy Serve Indonesia.',
+    'Pelanggan wajib menjaga semua unit milik CV. Sinergy Serve Indonesia yang terpasang agar terhindar dari pengrusakan atau kehilangan. Apabila terjadi kerusakan dan kehilangan unit mesin U-Scent yang disebabkan oleh kelalaian Pihak Pelanggan dimana kerusakan tersebut dapat dibuktikan dan mencapai 75% (tujuh puluh lima persen), maka akan dikenakan biaya denda kehilangan unit sesuai harga yang berlaku di CV. Sinergy Serve Indonesia.',
     'Periode kontrak diberlakukan sesuai jangka waktu di atas dan selanjutnya dapat diperpanjang berdasarkan kesepakatan yang telah disetujui kedua belah pihak pada saat perpanjangan kontrak. Apabila pihak pelanggan tidak ingin melanjutkan kontrak kerjasama, maka pihak pelanggan wajib memberitahukan secara tertulis kepada CV. Sinergy Serve Indonesia minimum 30 hari sebelum jatuh tempo kontrak berakhir. Apabila tidak ada pemberitahuan secara tertulis dari pelanggan, maka kontrak ini akan secara otomatis diperpanjang dengan syarat dan kondisi yang sama dan telah disetujui pihak CV. Sinergy Serve Indonesia.',
     'Hanya pihak CV. Sinergy Serve Indonesia yang berwenang dan berhak melakukan pemasangan, pemindahan, perbaikan, dan pelepasan unit. Apabila terjadi pemindahan atau pelepasan unit oleh pihak lain di lokasi pelanggan, maka CV. Sinergy Serve Indonesia akan memberikan surat teguran kepada Pelanggan.',
     'Apabila terjadi dan atau sampai terjadi kehilangan akibat kelalaian Pelanggan maka CV. Sinergy Serve Indonesia akan mengenakan sanksi berupa penggantian administrasi berdasarkan list harga untuk setiap unitnya.',
@@ -90,7 +90,7 @@ const SYARAT_SCENTING: string[] = [
     'Perjanjian ini disetujui dan ditandatangani oleh kedua belah pihak dalam keadaan sehat jasmani dan rohani tanpa ada paksaan dari pihak manapun.',
 ];
 
-// 12 ketentuan baku perjanjian kontrak Pest Control (halaman 2).
+// 12 ketentuan baku perjanjian kontrak U-Pest (halaman 2).
 const SYARAT_PEST: string[] = [
     'Seluruh persyaratan dan kondisi dalam perjanjian ini berlaku selama masa perjanjian yang disepakati antara CV. Sinergy Serve Indonesia dan Pelanggan.',
     'CV. Sinergy Serve Indonesia bertanggung jawab melaksanakan pengendalian terhadap semua jenis hama yang telah disepakati kedua belah pihak pada perjanjian ini.',
@@ -113,8 +113,8 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
     }, []);
 
     const isPest = contract.service_type === 'pest_control';
-    const BRAND = BRANDS[contract.service_type] ?? BRANDS.scenting;
-    const SYARAT = isPest ? SYARAT_PEST : SYARAT_SCENTING;
+    const BRAND = BRANDS[contract.service_type] ?? BRANDS.U-Scent;
+    const SYARAT = isPest ? SYARAT_PEST : SYARAT_U-Scent;
 
     const customer = contract.customer ?? {};
     const premises = contract.premises ?? [];
@@ -127,7 +127,7 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
 
     const months = contract.duration_months ?? monthsBetween(contract.start_date, contract.end_date) ?? 0;
 
-    // Pest Control ditagih untuk seluruh masa kontrak sekaligus (bukan per bulan).
+    // U-Pest ditagih untuk seluruh masa kontrak sekaligus (bukan per bulan).
     const lineContractTotal = (svc: any) => {
         const monthly = taxType === 'exclude' ? Number(svc.total_price || 0) + Number(svc.tax_amount || 0) : Number(svc.total_price || 0);
         return monthly;
@@ -227,7 +227,7 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
                 </div>
 
                 {isPest ? (
-                    /* ── Pest Control: 2x2 — Alamat Pekerjaan / Identitas Pelanggan / Invoice / Perjanjian ── */
+                    /* ── U-Pest: 2x2 — Alamat Pekerjaan / Identitas Pelanggan / Invoice / Perjanjian ── */
                     <div className="grid grid-cols-2 gap-3 items-start">
                         <div>
                             <SectionTitle>Kontak & Alamat Pekerjaan</SectionTitle>
@@ -281,7 +281,7 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
                         </div>
                     </div>
                 ) : (
-                    /* ── Scenting: 2 kolom — Invoice / Identitas Pelanggan ── */
+                    /* ── U-Scent: 2 kolom — Invoice / Identitas Pelanggan ── */
                     <div className="grid grid-cols-2 gap-3 items-start">
                         <div>
                             <SectionTitle>Kontak & Alamat Pengiriman Invoice</SectionTitle>

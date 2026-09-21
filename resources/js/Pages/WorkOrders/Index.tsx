@@ -8,8 +8,8 @@ import ConfirmDelete from '@/Components/ConfirmDelete';
 import { Head, Link } from '@inertiajs/react';
 import { fmtDate } from '@/utils/date';
 
-const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'Pest Control' : v === 'scenting' ? 'Scenting' : '—';
-const serviceTypeCls = (v: string) => v === 'pest_control' ? 'bg-amber-100 text-amber-700' : v === 'scenting' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400';
+const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'U-Pest' : v === 'U-Scent' ? 'U-Scent' : '—';
+const serviceTypeCls = (v: string) => v === 'pest_control' ? 'bg-amber-100 text-amber-700' : v === 'U-Scent' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400';
 
 export default function Index({ workOrders, filters, contracts = [], salesOrders = [] }: any) {
     const sortProps = {
@@ -32,7 +32,7 @@ export default function Index({ workOrders, filters, contracts = [], salesOrders
                     { key: 'contract_id', label: 'No Kontrak', type: 'picker', options: contracts.map((c: any) => ({ label: c.contract_number, value: c.id })) },
                     { key: 'sales_order_id', label: 'No SO', type: 'picker', options: salesOrders.map((s: any) => ({ label: s.so_number, value: s.id })) },
                     { key: 'service_type', label: 'All Services', options: [
-                        { label: 'Pest Control', value: 'pest_control' }, { label: 'Scenting', value: 'scenting' },
+                        { label: 'U-Pest', value: 'pest_control' }, { label: 'U-Scent', value: 'U-Scent' },
                     ]},
                 ]}
             />

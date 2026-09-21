@@ -97,11 +97,11 @@ export default function Form({ contract, customers, products, employees, taxType
     const productUnit = (p: any) => p?.unit_of_measure?.symbol ?? p?.unit ?? '';
 
     // Product category shown in the picker follows the selected Services option.
-    const serviceCategory = data.service_type === 'pest_control' ? 'Pest Control'
-        : data.service_type === 'scenting' ? 'Scenting'
+    const serviceCategory = data.service_type === 'pest_control' ? 'U-Pest'
+        : data.service_type === 'U-Scent' ? 'U-Scent'
         : undefined;
 
-    // Ubah Nilai Kontrak hanya berlaku untuk kontrak Pest Control dengan Hama Unik.
+    // Ubah Nilai Kontrak hanya berlaku untuk kontrak U-Pest dengan Hama Unik.
     const canManualContractValue = data.service_type === 'pest_control' && data.is_unique_pest;
 
     // Per-line tax, honoring global tax type (exclude: added on top | include: embedded).
@@ -125,9 +125,9 @@ export default function Form({ contract, customers, products, employees, taxType
     // ── Premise helpers ────────────────────────────────────────────────────
     const setPremises = (premises: any[]) => setData('premises', premises);
 
-    // Ganti Services (Pest Control/Scenting) → produk yang sudah dipilih tidak lagi
+    // Ganti Services (U-Pest/U-Scent) → produk yang sudah dipilih tidak lagi
     // relevan dengan kategori baru, jadi reset ke satu baris produk kosong per premis.
-    // Ubah Nilai Kontrak hanya berlaku untuk Pest Control + Hama Unik, jadi ikut direset.
+    // Ubah Nilai Kontrak hanya berlaku untuk U-Pest + Hama Unik, jadi ikut direset.
     const handleServiceTypeChange = (val: string) => {
         setData({
             ...data,
@@ -237,7 +237,7 @@ export default function Form({ contract, customers, products, employees, taxType
         : grandMonthly * months;
 
     // Contract Value auto-fills per the selected mode — unless manually overridden
-    // (Ubah Nilai Kontrak only applies to Pest Control + Hama Unik).
+    // (Ubah Nilai Kontrak only applies to U-Pest + Hama Unik).
     useEffect(() => {
         if (canManualContractValue && data.is_manual_contract_value) return;
         if (computedValue !== (parseFloat(data.contract_value) || 0)) {
@@ -350,7 +350,7 @@ export default function Form({ contract, customers, products, employees, taxType
 
                     <FormField label="Services" error={errors.service_type} required>
                         <div className="flex gap-6">
-                            {[{ val: 'pest_control', label: 'Pest Control' }, { val: 'scenting', label: 'Scenting' }].map(opt => (
+                            {[{ val: 'pest_control', label: 'U-Pest' }, { val: 'U-Scent', label: 'U-Scent' }].map(opt => (
                                 <label key={opt.val} className="flex items-center gap-2 cursor-pointer">
                                     <input
                                         type="radio"

@@ -15,7 +15,7 @@ interface Props {
     // Bila diisi, hanya produk dengan product_type tsb yang ditampilkan (mis. 'goods').
     // Menjadi tipe default saat allowTypeToggle aktif.
     typeFilter?: 'goods' | 'service';
-    // Bila diisi, hanya produk dengan nama kategori tsb yang ditampilkan (mis. 'Pest Control').
+    // Bila diisi, hanya produk dengan nama kategori tsb yang ditampilkan (mis. 'U-Pest').
     // Otomatis diabaikan saat user beralih ke tab "Goods".
     categoryFilter?: string;
     // Tampilkan tab Service/Goods agar user bisa beralih tipe produk di dalam modal.
@@ -50,7 +50,7 @@ export default function ProductPickerModal({
     const filtered = useMemo(() => {
         const q = search.toLowerCase().trim();
         const byType = effectiveType ? products.filter(p => p.product_type === effectiveType) : products;
-        // Kategori Pest Control/Scenting hanya berlaku untuk produk service.
+        // Kategori U-Pest/U-Scent hanya berlaku untuk produk service.
         const byCategory = (categoryFilter && effectiveType !== 'goods') ? byType.filter(p => p.category?.name === categoryFilter) : byType;
         if (!q) return byCategory;
         return byCategory.filter(p =>

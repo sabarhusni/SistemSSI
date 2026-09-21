@@ -10,8 +10,8 @@ const fmt = (n: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
 const SERVICE_TYPES = [
-    { value: 'pest_control', label: 'Pest Control' },
-    { value: 'scenting',     label: 'Scenting' },
+    { value: 'pest_control', label: 'U-Pest' },
+    { value: 'U-Scent',     label: 'U-Scent' },
 ];
 
 const woBadgeCls = (s: string) =>
@@ -203,8 +203,8 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
         [contracts, effectiveServiceType]
     );
     // Kategori produk yang ditampilkan pada picker mengikuti Tipe Layanan yang dipilih.
-    const serviceCategory = effectiveServiceType === 'pest_control' ? 'Pest Control'
-        : effectiveServiceType === 'scenting' ? 'Scenting'
+    const serviceCategory = effectiveServiceType === 'pest_control' ? 'U-Pest'
+        : effectiveServiceType === 'U-Scent' ? 'U-Scent'
         : undefined;
     const premiseOptions   = selectedContract?.premises ?? [];
     const selectedPremise  = premiseOptions.find((p: any) => String(p.id) === String(data.contract_premise_id));

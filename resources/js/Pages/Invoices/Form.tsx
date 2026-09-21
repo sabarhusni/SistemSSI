@@ -8,7 +8,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 const fmt = (n: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
-const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'Pest Control' : v === 'scenting' ? 'Scenting' : '—';
+const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'U-Pest' : v === 'U-Scent' ? 'U-Scent' : '—';
 
 const emptyItem = (month = 1) => ({
     product_id:     '',
@@ -54,7 +54,7 @@ const itemFromSO = (it: any, taxType: string) => recalcItem({
 // "Nilai Tagihan" (bukan dijumlah dari item Sales Order).
 const pestUnikItem = (nilaiTagihan: number, contract: any, taxType: string) => recalcItem({
     product_id:     '',
-    description:    `Jasa Pest Control - ${contract?.contract_number ?? ''}`,
+    description:    `Jasa U-Pest - ${contract?.contract_number ?? ''}`,
     month:          1,
     work_order_id:    null,
     premise_location: '',
@@ -350,7 +350,7 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
                                 <div className={`${inputCls} bg-gray-50 cursor-default`}>
                                     {selectedContract.service_type === 'pest_control'
                                         ? <span className={isUniquePest ? 'text-emerald-700 font-medium' : 'text-gray-700'}>{isUniquePest ? 'Ya (Hama Unik)' : 'Tidak'}</span>
-                                        : <span className="text-gray-400 italic text-xs">Tidak berlaku (bukan Pest Control)</span>
+                                        : <span className="text-gray-400 italic text-xs">Tidak berlaku (bukan U-Pest)</span>
                                     }
                                 </div>
                             </FormField>

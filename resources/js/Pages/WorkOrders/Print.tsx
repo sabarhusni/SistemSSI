@@ -4,7 +4,7 @@ import { Fragment, useEffect } from 'react';
 const fmtDate = (d: string) =>
     d ? new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
 
-// Tanggal gaya DD/MM/YYYY dipakai pada Service Report Pest Control.
+// Tanggal gaya DD/MM/YYYY dipakai pada Service Report U-Pest.
 const fmtShort = (d: string) => {
     if (!d) return '—';
     const dt = new Date(d);
@@ -32,10 +32,10 @@ const COMPANY = {
     addressLines: ['Sekedengdeur No. 15, Ujungberung', 'Kota Bandung, Jawa Barat 40167'],
 };
 
-// Identitas brand & susunan dokumen berbeda per tipe layanan (Pest Control vs Scenting).
+// Identitas brand & susunan dokumen berbeda per tipe layanan (U-Pest vs U-Scent).
 const BRANDS: Record<string, { brand: string; tagline: string; signerTitle: string; internalLabel: string }> = {
     pest_control: { brand: 'U-PEST', tagline: 'Pest Management', signerTitle: 'Business Consultant', internalLabel: 'U-Pest' },
-    scenting:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Sales Consultant',    internalLabel: 'U-Scent' },
+    U-Scent:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Sales Consultant',    internalLabel: 'U-Scent' },
 };
 
 function Row({ label, value }: { label: string; value: any }) {
@@ -53,7 +53,7 @@ export default function Print({ workOrder, companyName }: any) {
         return () => clearTimeout(t);
     }, []);
 
-    // Pest Control pakai layout Service Report (Form H). Tipe service lain (mis. Scenting)
+    // U-Pest pakai layout Service Report (Form H). Tipe service lain (mis. U-Scent)
     // tetap memakai layout generik di bawah, tidak berubah.
     if (workOrder.contract?.service_type === 'pest_control') {
         return <PestControlServiceReport workOrder={workOrder} companyName={companyName} />;
@@ -79,7 +79,7 @@ export default function Print({ workOrder, companyName }: any) {
 
     const premise = workOrder.sales_order?.premise ?? null;
 
-    const BRAND = BRANDS[workOrder.contract?.service_type] ?? BRANDS.scenting;
+    const BRAND = BRANDS[workOrder.contract?.service_type] ?? BRANDS.U-Scent;
 
     return (
         <div className="min-h-screen bg-gray-100 print:bg-white py-8 print:py-0">
@@ -220,7 +220,7 @@ export default function Print({ workOrder, companyName }: any) {
     );
 }
 
-// Kop surat dipakai berulang di tiap halaman Service Report Pest Control.
+// Kop surat dipakai berulang di tiap halaman Service Report U-Pest.
 function PestHeader({ companyNameResolved, woNumber, brand_name, brand_tagline }: { companyNameResolved: string; woNumber: string; brand_name: string; brand_tagline: string }) {
     return (
         <div className="flex items-start justify-between border-b-2 border-amber-600 pb-3 mb-3">
@@ -258,7 +258,7 @@ function PestRow({ label, value }: { label: string; value: any }) {
     );
 }
 
-// Layout Service Report (Form H) khusus kontrak Pest Control. Kolom yang datanya belum
+// Layout Service Report (Form H) khusus kontrak U-Pest. Kolom yang datanya belum
 // dicatat sistem (Active Ingredient, Class, Conc. %, Total Area Treated, Licence No,
 // Vehicle No, Site Risk Assessment, Pest Status, Recommendations) dicetak kosong untuk
 // diisi manual — tidak ada penambahan skema database untuk atribut tersebut.
@@ -272,7 +272,7 @@ function PestControlServiceReport({ workOrder, companyName }: any) {
     const visitTypes: string[] = workOrder.visit_types ?? [];
     const purpose = visitTypes.length ? visitTypes.map(v => purposeLabel[v] ?? v).join(', ') : '—';
     const companyNameResolved = companyName || COMPANY.name;
-    const BRAND = BRANDS[workOrder.contract?.service_type] ?? BRANDS.scenting;
+    const BRAND = BRANDS[workOrder.contract?.service_type] ?? BRANDS.U-Scent;
 
     return (
         <div className="min-h-screen bg-gray-100 print:bg-white py-8 print:py-0 text-[11px] leading-snug text-gray-900">

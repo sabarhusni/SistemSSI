@@ -152,7 +152,7 @@ class ContractController extends Controller
             'duration_months'        => 'required|integer|min:1',
             'invoice_frequency'      => 'required|integer|min:1',
             'status'                 => 'required|in:draft,active,completed,cancelled',
-            'service_type'           => 'required|in:pest_control,scenting',
+            'service_type'           => 'required|in:pest_control,U-Scent',
             'is_unique_pest'         => 'nullable|boolean',
             'is_manual_contract_value' => 'nullable|boolean',
             'contract_value_mode'    => 'nullable|in:duration,visit',
@@ -261,7 +261,7 @@ class ContractController extends Controller
 
         $taxType = Setting::get('tax_type', 'exclude');
         $mode    = $data['contract_value_mode'] ?? 'duration';
-        // Ubah Nilai Kontrak only applies to Pest Control contracts with Hama Unik checked.
+        // Ubah Nilai Kontrak only applies to U-Pest contracts with Hama Unik checked.
         $data['is_manual_contract_value'] = ($data['is_manual_contract_value'] ?? false)
             && $data['service_type'] === 'pest_control'
             && ($data['is_unique_pest'] ?? false);
@@ -311,7 +311,7 @@ class ContractController extends Controller
 
         $taxType = Setting::get('tax_type', 'exclude');
         $mode    = $data['contract_value_mode'] ?? 'duration';
-        // Ubah Nilai Kontrak only applies to Pest Control contracts with Hama Unik checked.
+        // Ubah Nilai Kontrak only applies to U-Pest contracts with Hama Unik checked.
         $data['is_manual_contract_value'] = ($data['is_manual_contract_value'] ?? false)
             && $data['service_type'] === 'pest_control'
             && ($data['is_unique_pest'] ?? false);

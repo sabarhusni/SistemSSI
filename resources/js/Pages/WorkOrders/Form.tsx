@@ -13,8 +13,8 @@ const VISIT_TYPES = [
 ];
 
 const SERVICE_TYPES = [
-    { value: 'pest_control', label: 'Pest Control' },
-    { value: 'scenting',     label: 'Scenting' },
+    { value: 'pest_control', label: 'U-Pest' },
+    { value: 'U-Scent',     label: 'U-Scent' },
 ];
 
 const emptyMaterial = (month = 1) => ({
