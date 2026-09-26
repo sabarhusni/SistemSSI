@@ -14,7 +14,7 @@ const VISIT_TYPES = [
 
 const SERVICE_TYPES = [
     { value: 'pest_control', label: 'U-Pest' },
-    { value: 'U-Scent',     label: 'U-Scent' },
+    { value: 'scenting',    label: 'U-Scent' },
 ];
 
 const emptyMaterial = (month = 1) => ({

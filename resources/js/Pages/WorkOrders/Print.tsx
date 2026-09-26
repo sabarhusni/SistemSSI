@@ -35,7 +35,7 @@ const COMPANY = {
 // Identitas brand & susunan dokumen berbeda per tipe layanan (U-Pest vs U-Scent).
 const BRANDS: Record<string, { brand: string; tagline: string; signerTitle: string; internalLabel: string }> = {
     pest_control: { brand: 'U-PEST', tagline: 'Pest Management', signerTitle: 'Business Consultant', internalLabel: 'U-Pest' },
-    scenting:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Sales Consultant',    internalLabel: 'U-Scent' },
+    scenting:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Business Consultant',    internalLabel: 'U-Scent' },
 };
 
 function Row({ label, value }: { label: string; value: any }) {

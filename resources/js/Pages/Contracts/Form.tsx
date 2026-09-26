@@ -33,7 +33,15 @@ function monthsBetween(start: string, end: string): number | '' {
     return m > 0 ? m : '';
 }
 
-export default function Form({ contract, customers, products, employees, taxType = 'exclude', taxRateSo = 11, locked = false }: any) {
+// Perkiraan nomor dokumen [NNNN]/[UP|US]-[KIND]/[MMYYYY]; nomor final dibuat server saat simpan.
+const previewDocNumber = (seq: number, serviceType: string | undefined, kind: 'SSI' | 'INV') => {
+    if (!seq || !serviceType) return 'Otomatis';
+    const now = new Date();
+    const period = String(now.getMonth() + 1).padStart(2, '0') + now.getFullYear();
+    return `${String(seq).padStart(4, '0')}/${serviceType === 'scenting' ? 'US' : 'UP'}-${kind}/${period}`;
+};
+
+export default function Form({ contract, customers, products, employees, taxType = 'exclude', taxRateSo = 11, locked = false, nextSequence = 0 }: any) {
     const editing = !!contract;
     const { auth } = usePage().props as any;
     const canCancelContract = editing && auth?.role === 'Admin' && contract.status !== 'cancelled';
@@ -47,7 +55,6 @@ export default function Form({ contract, customers, products, employees, taxType
 
     const { data, setData, post, put, processing, errors } = useForm<any>({
         customer_id:          contract?.customer_id          ?? '',
-        contract_number:      contract?.contract_number      ?? '',
         start_date:           contract?.start_date           ?? '',
         end_date:             contract?.end_date             ?? '',
         duration_months:      contract?.duration_months ?? (contract ? monthsBetween(contract.start_date, contract.end_date) : ''),
@@ -97,8 +104,8 @@ export default function Form({ contract, customers, products, employees, taxType
     const productUnit = (p: any) => p?.unit_of_measure?.symbol ?? p?.unit ?? '';
 
     // Product category shown in the picker follows the selected Services option.
-    const serviceCategory = data.service_type === 'pest_control' ? 'U-Pest'
-        : data.service_type === 'U-Scent' ? 'U-Scent'
+    const serviceCategory = data.service_type === 'pest_control' ? 'Pest Control'
+        : data.service_type === 'scenting' ? 'Scenting'
         : undefined;
 
     // Ubah Nilai Kontrak hanya berlaku untuk kontrak U-Pest dengan Hama Unik.
@@ -335,8 +342,10 @@ export default function Form({ contract, customers, products, employees, taxType
 
                     <fieldset disabled={locked} className="space-y-4 m-0 p-0 border-0 disabled:opacity-70">
                     <div className="grid grid-cols-2 gap-4">
-                        <FormField label="Contract No." error={errors.contract_number} required>
-                            <input className={inputCls} value={data.contract_number} onChange={e => setData('contract_number', e.target.value)} />
+                        <FormField label="Contract No.">
+                            <input className={inputCls + ' bg-gray-50'} readOnly tabIndex={-1}
+                                value={contract?.contract_number ?? previewDocNumber(nextSequence, data.service_type, 'SSI')} />
+                            {!contract && <p className="mt-1 text-xs text-gray-400">Dibuat otomatis saat disimpan</p>}
                         </FormField>
                         <FormField label="Status">
                             <select className={inputCls} value={data.status} onChange={e => setData('status', e.target.value)}>
@@ -350,7 +359,7 @@ export default function Form({ contract, customers, products, employees, taxType
 
                     <FormField label="Services" error={errors.service_type} required>
                         <div className="flex gap-6">
-                            {[{ val: 'pest_control', label: 'U-Pest' }, { val: 'U-Scent', label: 'U-Scent' }].map(opt => (
+                            {[{ val: 'pest_control', label: 'U-Pest' }, { val: 'scenting', label: 'U-Scent' }].map(opt => (
                                 <label key={opt.val} className="flex items-center gap-2 cursor-pointer">
                                     <input
                                         type="radio"
@@ -394,6 +403,41 @@ export default function Form({ contract, customers, products, employees, taxType
                             }
                         </button>
                     </FormField>
+
+                    {selectedCustomer && (
+                        <div className="border rounded-md p-3 bg-gray-50/50">
+                            <p className="text-xs font-semibold text-gray-600 mb-2">
+                                PIC Penagihan <span className="font-normal text-gray-400">— dari master customer</span>
+                            </p>
+                            <div className="grid grid-cols-4 gap-2">
+                                {[
+                                    ['Name', selectedCustomer.billing_pic_name],
+                                    ['Position', selectedCustomer.billing_pic_position],
+                                    ['Email', selectedCustomer.billing_pic_email],
+                                    ['Phone', selectedCustomer.billing_pic_phone],
+                                ].map(([label, value]) => (
+                                    <FormField key={label} label={label}>
+                                        <div className={`${inputCls} bg-gray-50 cursor-default min-h-[38px]`}>
+                                            {value
+                                                ? <span className="text-gray-700">{value}</span>
+                                                : <span className="text-gray-400">—</span>
+                                            }
+                                        </div>
+                                    </FormField>
+                                ))}
+                            </div>
+                            <div className="mt-2">
+                                <FormField label="Address">
+                                    <div className={`${inputCls} bg-gray-50 cursor-default min-h-[38px] whitespace-pre-line`}>
+                                        {selectedCustomer.billing_pic_address
+                                            ? <span className="text-gray-700">{selectedCustomer.billing_pic_address}</span>
+                                            : <span className="text-gray-400">—</span>
+                                        }
+                                    </div>
+                                </FormField>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-4 gap-4">
                         <FormField label="Start Date" error={errors.start_date} required>

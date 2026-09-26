@@ -8,7 +8,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 const fmt = (n: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
-const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'U-Pest' : v === 'U-Scent' ? 'U-Scent' : '—';
+const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'U-Pest' : v === 'scenting' ? 'U-Scent' : '—';
 
 const emptyItem = (month = 1) => ({
     product_id:     '',
@@ -107,7 +107,15 @@ function itemsFromSelectedWOs(
     return rows.sort((a: any, b: any) => a.month - b.month);
 }
 
-export default function Form({ invoice, contracts, products, nextNumber, invoicedKeys = {}, taxType = 'exclude', invoicedTotalsByContract = {}, invoiceCountByContract = {}, billingMethodByContract = {} }: any) {
+// Perkiraan nomor dokumen [NNNN]/[UP|US]-[KIND]/[MMYYYY]; nomor final dibuat server saat simpan.
+const previewDocNumber = (seq: number, serviceType: string | undefined, kind: 'SSI' | 'INV') => {
+    if (!seq || !serviceType) return 'Otomatis';
+    const now = new Date();
+    const period = String(now.getMonth() + 1).padStart(2, '0') + now.getFullYear();
+    return `${String(seq).padStart(4, '0')}/${serviceType === 'scenting' ? 'US' : 'UP'}-${kind}/${period}`;
+};
+
+export default function Form({ invoice, contracts, products, nextSequence = 0, invoicedKeys = {}, taxType = 'exclude', invoicedTotalsByContract = {}, invoiceCountByContract = {}, billingMethodByContract = {} }: any) {
     const editing = !!invoice;
     // Invoice yang sudah lunas (paid) hanya bisa dilihat, tidak dapat diubah.
     const locked = editing && invoice?.status === 'paid';
@@ -117,8 +125,13 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
         contract_id:     invoice?.contract_id     ?? '',
         billing_method:  invoice?.billing_method  ?? 'wo_reference',
         customer_id:     invoice?.customer_id     ?? '',
+        customer_name:   invoice?.customer_name   ?? invoice?.customer?.name ?? '',
+        billing_pic_name:     invoice?.billing_pic_name     ?? '',
+        billing_pic_position: invoice?.billing_pic_position ?? '',
+        billing_pic_email:    invoice?.billing_pic_email    ?? '',
+        billing_pic_phone:    invoice?.billing_pic_phone    ?? '',
+        billing_pic_address:  invoice?.billing_pic_address  ?? '',
         work_order_ids:  invoice?.work_orders?.map((w: any) => w.id) ?? [],
-        invoice_number: invoice?.invoice_number ?? nextNumber ?? '',
         invoice_date:   invoice?.invoice_date   ?? '',
         due_date:       invoice?.due_date        ?? '',
         status:         invoice?.status          ?? 'draft',
@@ -192,6 +205,12 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
             contract_id:    contract.id,
             billing_method: method,
             customer_id:    contract.customer_id ?? '',
+            customer_name:  contract.customer?.name ?? '',
+            billing_pic_name:     contract.customer?.billing_pic_name     ?? '',
+            billing_pic_position: contract.customer?.billing_pic_position ?? '',
+            billing_pic_email:    contract.customer?.billing_pic_email    ?? '',
+            billing_pic_phone:    contract.customer?.billing_pic_phone    ?? '',
+            billing_pic_address:  contract.customer?.billing_pic_address  ?? '',
             work_order_ids: [],
             items:          method === 'contract_value' ? [pestUnikItem(remaining, contract, taxType)] : [],
         });
@@ -291,8 +310,9 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
                     )}
 
                     <div className="grid grid-cols-4 gap-4">
-                        <FormField label="Invoice No." error={errors.invoice_number} required>
-                            <input className={inputCls + ' bg-gray-50'} value={data.invoice_number} readOnly tabIndex={-1} />
+                        <FormField label="Invoice No.">
+                            <input className={inputCls + ' bg-gray-50'} readOnly tabIndex={-1}
+                                value={invoice?.invoice_number ?? previewDocNumber(nextSequence, selectedContract?.service_type, 'INV')} />
                         </FormField>
                         <FormField label="Invoice Date" error={errors.invoice_date} required>
                             <input type="date" className={inputCls + lockCls} value={data.invoice_date} disabled={locked}
@@ -329,15 +349,56 @@ export default function Form({ invoice, contracts, products, nextNumber, invoice
                                 }
                             </button>
                         </FormField>
-                        <FormField label="Customer">
-                            <div className={`${inputCls} bg-gray-50 cursor-default`}>
-                                {selectedContract?.customer?.name
-                                    ? <span className="text-gray-700">{selectedContract.customer.name}</span>
-                                    : <span className="text-gray-400 italic text-xs">Automatic from contract</span>
-                                }
-                            </div>
+                        <FormField label="Customer" error={errors.customer_name}>
+                            <input
+                                className={inputCls + (locked || !selectedContract ? ' bg-gray-100 cursor-not-allowed' : '')}
+                                value={data.customer_name}
+                                onChange={e => setData('customer_name', e.target.value)}
+                                disabled={locked || !selectedContract}
+                                placeholder="Automatic from contract"
+                            />
+                            {selectedContract && !locked && (
+                                <p className="text-xs text-gray-400 mt-1">Hanya mengubah nama di invoice ini, data master customer tidak berubah.</p>
+                            )}
                         </FormField>
                     </div>
+
+                    {selectedContract && (
+                        <div className="border rounded-md p-3 bg-gray-50/50">
+                            <p className="text-xs font-semibold text-gray-600 mb-2">
+                                PIC Penagihan <span className="font-normal text-gray-400">— dari customer, bisa diubah khusus untuk invoice ini</span>
+                            </p>
+                            <div className="grid grid-cols-4 gap-2">
+                                {([
+                                    ['billing_pic_name', 'Name', 'text'],
+                                    ['billing_pic_position', 'Position', 'text'],
+                                    ['billing_pic_email', 'Email', 'email'],
+                                    ['billing_pic_phone', 'Phone', 'text'],
+                                ] as const).map(([key, label, type]) => (
+                                    <FormField key={key} label={label} error={errors[key]}>
+                                        <input
+                                            type={type}
+                                            className={inputCls + lockCls}
+                                            value={data[key]}
+                                            onChange={e => setData(key, e.target.value)}
+                                            disabled={locked}
+                                        />
+                                    </FormField>
+                                ))}
+                            </div>
+                            <div className="mt-2">
+                                <FormField label="Address" error={errors.billing_pic_address}>
+                                    <textarea
+                                        rows={2}
+                                        className={inputCls + lockCls}
+                                        value={data.billing_pic_address}
+                                        onChange={e => setData('billing_pic_address', e.target.value)}
+                                        disabled={locked}
+                                    />
+                                </FormField>
+                            </div>
+                        </div>
+                    )}
 
                     {selectedContract && (
                         <div className="grid grid-cols-2 gap-2">

@@ -101,9 +101,16 @@ export default function Print({ invoice, companyName, invoiceFrequency = 0, invo
                 <div className="grid grid-cols-2 gap-8 mb-6">
                     <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-400 mb-2">Bill To</h3>
-                        <p className="font-semibold text-gray-900">{invoice.customer?.name ?? '—'}</p>
-                        {invoice.customer?.address && <p className="text-sm text-gray-600">{invoice.customer.address}</p>}
-                        {invoice.customer?.phone && <p className="text-sm text-gray-600">Phone: {invoice.customer.phone}</p>}
+                        <p className="font-semibold text-gray-900">{invoice.customer_name || invoice.customer?.name || '—'}</p>
+                        {invoice.billing_pic_name && (
+                            <p className="text-sm text-gray-700">
+                                Attn: {invoice.billing_pic_name}
+                                {invoice.billing_pic_position && <span className="text-gray-500"> ({invoice.billing_pic_position})</span>}
+                            </p>
+                        )}
+                        {invoice.billing_pic_address && <p className="text-sm text-gray-600 whitespace-pre-line">{invoice.billing_pic_address}</p>}
+                        {invoice.billing_pic_phone && <p className="text-sm text-gray-600">Phone: {invoice.billing_pic_phone}</p>}
+                        {invoice.billing_pic_email && <p className="text-sm text-gray-600">Email: {invoice.billing_pic_email}</p>}
                     </div>
                     <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-400 mb-2">Details</h3>
@@ -193,12 +200,8 @@ export default function Print({ invoice, companyName, invoiceFrequency = 0, invo
                     </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-8 mt-16 text-sm">
-                    <div className="text-center">
-                        <p className="text-gray-500 mb-16">Customer</p>
-                        <p className="border-t border-gray-400 pt-1">{invoice.customer?.name ?? '(______________)'}</p>
-                    </div>
-                    <div className="text-center">
+                <div className="flex justify-end mt-16 text-sm">
+                    <div className="text-center w-1/2">
                         <p className="text-gray-500 mb-16">{companyName || 'Company'}</p>
                         <p className="border-t border-gray-400 pt-1">(______________)</p>
                     </div>

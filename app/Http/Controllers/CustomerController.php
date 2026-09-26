@@ -8,21 +8,29 @@ use Inertia\Inertia;
 
 class CustomerController extends Controller
 {
-    public function index(Request $request)
+    private function filteredQuery(Request $request)
     {
         $sortable = ['code', 'name', 'email', 'city', 'status', 'created_at'];
         $sortBy   = in_array($request->sort_by, $sortable) ? $request->sort_by : 'created_at';
         $sortDir  = $request->sort_dir === 'asc' ? 'asc' : 'desc';
 
-        $query = Customer::query()
-            ->when($request->search, fn($q, $s) => $q->where('name', 'ilike', "%$s%")->orWhere('code', 'ilike', "%$s%")->orWhere('email', 'ilike', "%$s%"))
+        return Customer::query()
+            ->when($request->search, fn($q, $s) => $q->where(fn($w) => $w->where('name', 'ilike', "%$s%")->orWhere('code', 'ilike', "%$s%")->orWhere('email', 'ilike', "%$s%")))
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->orderBy($sortBy, $sortDir);
+    }
 
+    public function index(Request $request)
+    {
         return Inertia::render('Customers/Index', [
-            'customers' => $query->paginate(15)->withQueryString(),
+            'customers' => $this->filteredQuery($request)->paginate(15)->withQueryString(),
             'filters'   => $request->only('search', 'status', 'sort_by', 'sort_dir'),
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        return response()->json($this->filteredQuery($request)->get());
     }
 
     private function generateNextCode(): string
@@ -61,6 +69,11 @@ class CustomerController extends Controller
             'payment_terms'   => 'nullable|string|max:100',
             'npwp'            => 'nullable|string|max:30',
             'jabatan_kontak'  => 'nullable|string|max:100',
+            'billing_pic_name'     => 'nullable|string|max:255',
+            'billing_pic_position' => 'nullable|string|max:100',
+            'billing_pic_email'    => 'nullable|email|max:255',
+            'billing_pic_phone'    => 'nullable|string|max:50',
+            'billing_pic_address'  => 'nullable|string',
         ]);
 
         if (empty($data['code'])) {
@@ -95,6 +108,11 @@ class CustomerController extends Controller
             'payment_terms'   => 'nullable|string|max:100',
             'npwp'            => 'nullable|string|max:30',
             'jabatan_kontak'  => 'nullable|string|max:100',
+            'billing_pic_name'     => 'nullable|string|max:255',
+            'billing_pic_position' => 'nullable|string|max:100',
+            'billing_pic_email'    => 'nullable|email|max:255',
+            'billing_pic_phone'    => 'nullable|string|max:50',
+            'billing_pic_address'  => 'nullable|string',
         ]);
 
         $customer->update($data);

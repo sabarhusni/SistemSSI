@@ -35,7 +35,7 @@ const COMPANY = {
 // Identitas brand & susunan dokumen berbeda per tipe layanan (U-Pest vs U-Scent).
 const BRANDS: Record<string, { brand: string; tagline: string; signerTitle: string; internalLabel: string }> = {
     pest_control: { brand: 'U-PEST', tagline: 'Pest Management', signerTitle: 'Business Consultant', internalLabel: 'U-Pest' },
-    scenting:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Sales Consultant',    internalLabel: 'U-Scent' },
+    scenting:     { brand: 'U-SCENT', tagline: 'Oil Aroma',       signerTitle: 'Business Consultant',    internalLabel: 'U-Scent' },
 };
 
 // Satu baris dalam kotak informasi: Label : Value.
@@ -58,6 +58,46 @@ function SectionTitle({ children }: { children: any }) {
         <h3 className="text-[11px] font-bold uppercase text-amber-600 border-b border-amber-600 mb-1 mt-3">
             {children}
         </h3>
+    );
+}
+
+// Kontak & alamat pekerjaan diambil dari premis kontrak. Hanya diisi bila premisnya
+// tepat 1 — bila lebih dari 1 lokasi, kolom dikosongkan (diisi manual).
+function WorkContactSection({ work }: { work: any }) {
+    const address = [work.location, work.address].filter(Boolean).join('\n');
+    return (
+        <div>
+            <SectionTitle>Kontak & Alamat Pekerjaan</SectionTitle>
+            <table className="w-full border-collapse">
+                <tbody>
+                    <InfoRow label="Alamat" value={<span className="whitespace-pre-line">{address}</span>} />
+                    <InfoRow label="PIC Servis" value={work.pic} />
+                    <InfoRow label="Jabatan" value={work.position} />
+                    <InfoRow label="Nomor Telepon" value={work.phone} />
+                    <InfoRow label="Nomor HP" value={work.phone} />
+                    <InfoRow label="Email" value={work.email} />
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+// Kontak & alamat pengiriman invoice diambil dari PIC Penagihan customer.
+function InvoiceContactSection({ customer }: { customer: any }) {
+    return (
+        <div>
+            <SectionTitle>Kontak & Alamat Pengiriman Invoice</SectionTitle>
+            <table className="w-full border-collapse">
+                <tbody>
+                    <InfoRow label="Alamat" value={<span className="whitespace-pre-line">{customer.billing_pic_address}</span>} />
+                    <InfoRow label="PIC Penagihan" value={customer.billing_pic_name} />
+                    <InfoRow label="Jabatan" value={customer.billing_pic_position} />
+                    <InfoRow label="Nomor Telepon" value={customer.billing_pic_phone} />
+                    <InfoRow label="Nomor HP" value={customer.billing_pic_phone} />
+                    <InfoRow label="Email" value={customer.billing_pic_email} />
+                </tbody>
+            </table>
+        </div>
     );
 }
 
@@ -118,7 +158,7 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
 
     const customer = contract.customer ?? {};
     const premises = contract.premises ?? [];
-    const work = premises[0] ?? {};       // lokasi pekerjaan utama
+    const work = premises.length === 1 ? premises[0] : {};   // kosong bila premis > 1
     const allServices = premises.flatMap((p: any) => p.services ?? []);
 
     const subtotal = allServices.reduce((s: number, it: any) => s + Number(it.total_price || 0), 0);
@@ -142,7 +182,6 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
     const paymentTerms = customer.payment_terms ?? 30;
     const companyNameResolved = companyName || COMPANY.name;
 
-    const workAddress = [work.location, work.address].filter(Boolean).join('\n');
     const custAddress = [customer.address, customer.city, customer.province].filter(Boolean).join(', ');
 
     const internalOptions = isPest
@@ -229,19 +268,7 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
                 {isPest ? (
                     /* ── U-Pest: 2x2 — Alamat Pekerjaan / Identitas Pelanggan / Invoice / Perjanjian ── */
                     <div className="grid grid-cols-2 gap-3 items-start">
-                        <div>
-                            <SectionTitle>Kontak & Alamat Pekerjaan</SectionTitle>
-                            <table className="w-full border-collapse">
-                                <tbody>
-                                    <InfoRow label="Alamat" value={<span className="whitespace-pre-line">{workAddress || custAddress}</span>} />
-                                    <InfoRow label="PIC Servis" value={work.pic} />
-                                    <InfoRow label="Jabatan" value={customer.jabatan_kontak} />
-                                    <InfoRow label="Nomor Telepon" value={work.phone} />
-                                    <InfoRow label="Nomor HP" value={work.phone} />
-                                    <InfoRow label="Email" value={work.email} />
-                                </tbody>
-                            </table>
-                        </div>
+                        <WorkContactSection work={work} />
 
                         <div>
                             <SectionTitle>Identitas Pelanggan</SectionTitle>
@@ -259,19 +286,7 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
                             </table>
                         </div>
 
-                        <div>
-                            <SectionTitle>Kontak & Alamat Pengiriman Invoice</SectionTitle>
-                            <table className="w-full border-collapse">
-                                <tbody>
-                                    <InfoRow label="Alamat" value={<span className="whitespace-pre-line">{custAddress || workAddress}</span>} />
-                                    <InfoRow label="PIC Penagihan" value={customer.name} />
-                                    <InfoRow label="Jabatan" value={customer.jabatan_kontak} />
-                                    <InfoRow label="Nomor Telepon" value={customer.phone} />
-                                    <InfoRow label="Nomor HP" value={customer.phone} />
-                                    <InfoRow label="Email" value={customer.email} />
-                                </tbody>
-                            </table>
-                        </div>
+                        <InvoiceContactSection customer={customer} />
 
                         <div>
                             <SectionTitle>Perjanjian</SectionTitle>
@@ -281,20 +296,11 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
                         </div>
                     </div>
                 ) : (
-                    /* ── U-Scent: 2 kolom — Invoice / Identitas Pelanggan ── */
+                    /* ── U-Scent: 2 kolom — (Alamat Pekerjaan + Invoice) / Identitas Pelanggan ── */
                     <div className="grid grid-cols-2 gap-3 items-start">
                         <div>
-                            <SectionTitle>Kontak & Alamat Pengiriman Invoice</SectionTitle>
-                            <table className="w-full border-collapse">
-                                <tbody>
-                                    <InfoRow label="Alamat" value={<span className="whitespace-pre-line">{custAddress || workAddress}</span>} />
-                                    <InfoRow label="PIC Penagihan" value={customer.name} />
-                                    <InfoRow label="Jabatan" value={customer.jabatan_kontak} />
-                                    <InfoRow label="Nomor Telepon" value={customer.phone} />
-                                    <InfoRow label="Nomor HP" value={customer.phone} />
-                                    <InfoRow label="Email" value={customer.email} />
-                                </tbody>
-                            </table>
+                            <WorkContactSection work={work} />
+                            <InvoiceContactSection customer={customer} />
                         </div>
 
                         <div>

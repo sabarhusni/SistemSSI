@@ -52,7 +52,7 @@ export default function Index({ invoices, filters, contracts = [], workOrders = 
                         {invoices.data?.map((inv: any) => (
                             <tr key={inv.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-mono text-xs font-medium">{inv.invoice_number}</td>
-                                <td className="px-4 py-3">{inv.customer?.name}</td>
+                                <td className="px-4 py-3">{inv.customer_name || inv.customer?.name}</td>
                                 <td className="px-4 py-3 text-gray-500 font-mono text-xs">{inv.contract?.contract_number ?? '-'}</td>
                                 <td className="px-4 py-3 text-gray-500 font-mono text-xs">{(inv.work_orders ?? []).map((w: any) => w.wo_number).join(', ') || '-'}</td>
                                 <td className="px-4 py-3">{fmtDate(inv.invoice_date)}</td>

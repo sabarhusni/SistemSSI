@@ -15,7 +15,7 @@ interface Props {
     // Bila diisi, hanya produk dengan product_type tsb yang ditampilkan (mis. 'goods').
     // Menjadi tipe default saat allowTypeToggle aktif.
     typeFilter?: 'goods' | 'service';
-    // Bila diisi, hanya produk dengan nama kategori tsb yang ditampilkan (mis. 'U-Pest').
+    // Bila diisi, hanya produk dengan nama kategori tsb yang ditampilkan (mis. 'Pest Control').
     // Otomatis diabaikan saat user beralih ke tab "Goods".
     categoryFilter?: string;
     // Tampilkan tab Service/Goods agar user bisa beralih tipe produk di dalam modal.

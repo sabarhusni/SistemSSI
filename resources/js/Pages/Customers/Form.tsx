@@ -20,6 +20,11 @@ export default function Form({ customer, nextCode }: any) {
         payment_terms:   customer?.payment_terms   ?? '',
         npwp:            customer?.npwp            ?? '',
         jabatan_kontak:  customer?.jabatan_kontak  ?? '',
+        billing_pic_name:     customer?.billing_pic_name     ?? '',
+        billing_pic_position: customer?.billing_pic_position ?? '',
+        billing_pic_email:    customer?.billing_pic_email    ?? '',
+        billing_pic_phone:    customer?.billing_pic_phone    ?? '',
+        billing_pic_address:  customer?.billing_pic_address  ?? '',
     });
 
     const submit = (e: React.FormEvent) => {
@@ -30,8 +35,8 @@ export default function Form({ customer, nextCode }: any) {
     return (
         <AppLayout header={editing ? 'Edit Customer' : 'Add Customer'}>
             <Head title={editing ? 'Edit Customer' : 'Add Customer'} />
-            <div className="max-w-2xl bg-white rounded-xl shadow p-6">
-                <form onSubmit={submit} className="space-y-4">
+            <form onSubmit={submit} className="max-w-2xl space-y-6">
+                <div className="bg-white rounded-xl shadow p-6 space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                         <FormField label="Code" error={errors.code} required>
                             <input
@@ -122,15 +127,41 @@ export default function Form({ customer, nextCode }: any) {
                     <FormField label="Notes">
                         <textarea rows={2} className={inputCls} value={data.notes} onChange={e => setData('notes', e.target.value)} />
                     </FormField>
+                </div>
 
-                    <div className="flex gap-3 pt-2">
-                        <button type="submit" disabled={processing} className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60">
-                            {processing ? 'Saving...' : 'Save'}
-                        </button>
-                        <Link href="/customers" className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancel</Link>
+                <div className="bg-white rounded-xl shadow p-6 space-y-4">
+                    <div>
+                        <h3 className="text-base font-semibold text-gray-800">PIC Penagihan</h3>
+                        <p className="text-xs text-gray-400">Billing contact person. Used as the default PIC on contracts and invoices.</p>
                     </div>
-                </form>
-            </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField label="Name" error={errors.billing_pic_name}>
+                            <input className={inputCls} value={data.billing_pic_name} onChange={e => setData('billing_pic_name', e.target.value)} />
+                        </FormField>
+                        <FormField label="Position" error={errors.billing_pic_position}>
+                            <input className={inputCls} value={data.billing_pic_position} onChange={e => setData('billing_pic_position', e.target.value)} placeholder="Finance, Accounting, ..." />
+                        </FormField>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField label="Email" error={errors.billing_pic_email}>
+                            <input type="email" className={inputCls} value={data.billing_pic_email} onChange={e => setData('billing_pic_email', e.target.value)} />
+                        </FormField>
+                        <FormField label="Phone" error={errors.billing_pic_phone}>
+                            <input className={inputCls} value={data.billing_pic_phone} onChange={e => setData('billing_pic_phone', e.target.value)} />
+                        </FormField>
+                    </div>
+                    <FormField label="Address" error={errors.billing_pic_address}>
+                        <textarea rows={2} className={inputCls} value={data.billing_pic_address} onChange={e => setData('billing_pic_address', e.target.value)} placeholder="Billing / invoice delivery address" />
+                    </FormField>
+                </div>
+
+                <div className="flex gap-3">
+                    <button type="submit" disabled={processing} className="px-5 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-60">
+                        {processing ? 'Saving...' : 'Save'}
+                    </button>
+                    <Link href="/customers" className="px-5 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">Cancel</Link>
+                </div>
+            </form>
         </AppLayout>
     );
 }

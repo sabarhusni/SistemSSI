@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Setting;
+use App\Support\DocumentNumber;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -43,6 +44,7 @@ class ContractController extends Controller
             'employees' => Employee::where('status', 'active')->orderBy('name')->get(['id', 'name', 'position', 'department']),
             'taxType'   => Setting::get('tax_type', 'exclude'),
             'taxRateSo' => (float) Setting::get('tax_rate_so', 11),
+            'nextSequence' => DocumentNumber::nextSequence('contracts', 'contract_number', 'SSI'),
         ]);
     }
 
@@ -140,19 +142,19 @@ class ContractController extends Controller
     }
 
     /**
-     * Validation rules shared by store/update (the unique rule differs per caller).
+     * Validation rules shared by store/update. contract_number is system-generated
+     * on store and never changes afterwards, so it is not accepted from the request.
      */
-    private function rules(string $contractNumberUnique): array
+    private function rules(): array
     {
         return [
             'customer_id'            => 'required|uuid|exists:customers,id',
-            'contract_number'        => 'required|string|max:50|' . $contractNumberUnique,
             'start_date'             => 'required|date',
             'end_date'               => 'required|date|after:start_date',
             'duration_months'        => 'required|integer|min:1',
             'invoice_frequency'      => 'required|integer|min:1',
             'status'                 => 'required|in:draft,active,completed,cancelled',
-            'service_type'           => 'required|in:pest_control,U-Scent',
+            'service_type'           => 'required|in:pest_control,scenting',
             'is_unique_pest'         => 'nullable|boolean',
             'is_manual_contract_value' => 'nullable|boolean',
             'contract_value_mode'    => 'nullable|in:duration,visit',
@@ -253,7 +255,7 @@ class ContractController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate($this->rules('unique:contracts,contract_number'));
+        $data = $request->validate($this->rules());
 
         if ($this->hasDuplicateProductPerPremise($data['premises'] ?? [])) {
             return back()->withErrors(['premises' => 'Produk tidak boleh duplikat dalam satu premis.'])->withInput();
@@ -273,6 +275,8 @@ class ContractController extends Controller
         }
 
         DB::transaction(function () use ($data, $taxType) {
+            DocumentNumber::lock('contracts');
+            $data['contract_number'] = DocumentNumber::next('contracts', 'contract_number', 'SSI', $data['service_type']);
             $contract = Contract::create(collect($data)->except('premises')->toArray());
             $this->savePremises($contract, $data['premises'] ?? [], $taxType);
         });
@@ -303,7 +307,7 @@ class ContractController extends Controller
             ])->withInput();
         }
 
-        $data = $request->validate($this->rules('unique:contracts,contract_number,' . $contract->id));
+        $data = $request->validate($this->rules());
 
         if ($this->hasDuplicateProductPerPremise($data['premises'] ?? [])) {
             return back()->withErrors(['premises' => 'Produk tidak boleh duplikat dalam satu premis.'])->withInput();

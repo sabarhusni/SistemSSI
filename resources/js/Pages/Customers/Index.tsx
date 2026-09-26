@@ -5,7 +5,9 @@ import SortableColumn from '@/Components/SortableColumn';
 import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
 import ConfirmDelete from '@/Components/ConfirmDelete';
+import { exportToExcel } from '@/Pages/Reports/_shared';
 import { Head, Link } from '@inertiajs/react';
+import { useState } from 'react';
 
 export default function Index({ customers, filters }: any) {
     const sortProps = {
@@ -15,10 +17,56 @@ export default function Index({ customers, filters }: any) {
         filters,
     };
 
+    const [exporting, setExporting] = useState(false);
+
+    const handleExport = async () => {
+        setExporting(true);
+        try {
+            const params = new URLSearchParams(
+                Object.entries(filters ?? {}).filter(([, v]) => v != null && v !== '') as [string, string][]
+            );
+            const res = await fetch(`/customers/export?${params}`, { headers: { Accept: 'application/json' } });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const rows: any[] = await res.json();
+            exportToExcel('Master_Customer', [{
+                name: 'Customers',
+                headers: [
+                    'Code', 'Contact Name', 'Contact Position', 'Company Name', 'NPWP', 'Email', 'Phone',
+                    'Address', 'City', 'Province', 'Postal Code', 'Payment Method', 'Payment Terms',
+                    'PIC Penagihan - Name', 'PIC Penagihan - Position', 'PIC Penagihan - Email', 'PIC Penagihan - Phone', 'PIC Penagihan - Address',
+                    'Status', 'Notes',
+                ],
+                rows: rows.map(c => [
+                    c.code, c.name, c.jabatan_kontak, c.company_name, c.npwp, c.email, c.phone,
+                    c.address, c.city, c.province, c.postal_code, c.payment_method, c.payment_terms,
+                    c.billing_pic_name, c.billing_pic_position, c.billing_pic_email, c.billing_pic_phone, c.billing_pic_address,
+                    c.status, c.notes,
+                ]),
+            }]);
+        } catch {
+            alert('Export gagal, silakan coba lagi.');
+        } finally {
+            setExporting(false);
+        }
+    };
+
     return (
         <AppLayout header="Customer">
             <Head title="Customer" />
-            <PageHeader title="Customer List" createHref="/customers/create" />
+            <PageHeader
+                title="Customer List"
+                createHref="/customers/create"
+                actions={
+                    <button
+                        type="button"
+                        onClick={handleExport}
+                        disabled={exporting}
+                        className="inline-flex items-center gap-1 rounded-md border border-green-600 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-60 transition-colors"
+                    >
+                        {exporting ? 'Exporting...' : 'Export Excel'}
+                    </button>
+                }
+            />
             <SearchFilter
                 routeName="customers.index"
                 filters={filters}

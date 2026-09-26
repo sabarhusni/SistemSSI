@@ -22,8 +22,8 @@ function monthsBetween(start: string, end: string): number | null {
     return m > 0 ? m : null;
 }
 
-const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'U-Pest' : v === 'U-Scent' ? 'U-Scent' : '—';
-const serviceTypeCls = (v: string) => v === 'pest_control' ? 'bg-amber-100 text-amber-700' : v === 'U-Scent' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400';
+const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'U-Pest' : v === 'scenting' ? 'U-Scent' : '—';
+const serviceTypeCls = (v: string) => v === 'pest_control' ? 'bg-amber-100 text-amber-700' : v === 'scenting' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400';
 
 export default function Index({ contracts, filters }: any) {
     const { flash, auth } = usePage().props as any;
@@ -51,7 +51,7 @@ export default function Index({ contracts, filters }: any) {
                         { label: 'Completed', value: 'completed' }, { label: 'Cancelled', value: 'cancelled' },
                     ]},
                     { key: 'service_type', label: 'All Services', options: [
-                        { label: 'U-Pest', value: 'pest_control' }, { label: 'U-Scent', value: 'U-Scent' },
+                        { label: 'U-Pest', value: 'pest_control' }, { label: 'U-Scent', value: 'scenting' },
                     ]},
                 ]}
             />

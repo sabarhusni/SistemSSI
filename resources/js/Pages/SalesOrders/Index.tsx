@@ -9,8 +9,8 @@ import { Head, Link } from '@inertiajs/react';
 
 const fmt = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
-const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'U-Pest' : v === 'U-Scent' ? 'U-Scent' : '—';
-const serviceTypeCls = (v: string) => v === 'pest_control' ? 'bg-amber-100 text-amber-700' : v === 'U-Scent' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400';
+const serviceTypeLabel = (v: string) => v === 'pest_control' ? 'U-Pest' : v === 'scenting' ? 'U-Scent' : '—';
+const serviceTypeCls = (v: string) => v === 'pest_control' ? 'bg-amber-100 text-amber-700' : v === 'scenting' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400';
 
 export default function Index({ salesOrders, filters, contracts = [], premises = [] }: any) {
     const sortProps = {
@@ -33,7 +33,7 @@ export default function Index({ salesOrders, filters, contracts = [], premises =
                     { key: 'contract_id', label: 'No Kontrak', type: 'picker', options: contracts.map((c: any) => ({ label: c.contract_number, value: c.id })) },
                     { key: 'contract_premise_id', label: 'Premis', type: 'picker', options: premises.map((p: any) => ({ label: p.location, value: p.id })) },
                     { key: 'service_type', label: 'All Services', options: [
-                        { label: 'U-Pest', value: 'pest_control' }, { label: 'U-Scent', value: 'U-Scent' },
+                        { label: 'U-Pest', value: 'pest_control' }, { label: 'U-Scent', value: 'scenting' },
                     ]},
                 ]}
             />

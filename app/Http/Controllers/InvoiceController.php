@@ -5,12 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Contract;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\Setting;
 use App\Models\WorkOrder;
+use App\Support\DocumentNumber;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class InvoiceController extends Controller
@@ -22,8 +23,9 @@ class InvoiceController extends Controller
         $sortDir  = $request->sort_dir === 'asc' ? 'asc' : 'desc';
 
         $query = Invoice::with(['customer', 'contract', 'workOrders'])
-            ->when($request->search, fn($q, $s) => $q->where('invoice_number', 'ilike', "%$s%")
-                ->orWhereHas('customer', fn($cq) => $cq->where('name', 'ilike', "%$s%")))
+            ->when($request->search, fn($q, $s) => $q->where(fn($w) => $w->where('invoice_number', 'ilike', "%$s%")
+                ->orWhere('customer_name', 'ilike', "%$s%")
+                ->orWhereHas('customer', fn($cq) => $cq->where('name', 'ilike', "%$s%"))))
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->when($request->contract_id, fn($q, $v) => $q->where('contract_id', $v))
             ->when($request->work_order_id, fn($q, $v) => $q->whereHas('workOrders', fn($sq) => $sq->where('work_orders.id', $v)))
@@ -35,17 +37,6 @@ class InvoiceController extends Controller
             'contracts'  => Contract::whereHas('invoices')->orderBy('contract_number')->get(['id', 'contract_number']),
             'workOrders' => WorkOrder::whereHas('invoices')->orderBy('wo_number')->get(['id', 'wo_number']),
         ]);
-    }
-
-    private function generateNextNumber(): string
-    {
-        $year   = date('y');
-        $prefix = 'INV' . $year;
-        $last   = Invoice::where('invoice_number', 'like', $prefix . '%')
-            ->orderBy('invoice_number', 'desc')
-            ->value('invoice_number');
-        $seq = $last ? ((int) substr($last, strlen($prefix)) + 1) : 1;
-        return $prefix . str_pad($seq, 4, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -155,7 +146,7 @@ class InvoiceController extends Controller
                 ->orderBy('contract_number')->get(),
             'products'   => Product::where('status', 'active')->orderBy('name')
                 ->get(['id', 'code', 'name', 'unit', 'sales_price']),
-            'nextNumber'    => $this->generateNextNumber(),
+            'nextSequence'  => DocumentNumber::nextSequence('invoices', 'invoice_number', 'INV'),
             'invoicedKeys'  => $this->invoicedKeysBySo(),
             'taxType'       => Setting::get('tax_type', 'exclude'),
             'invoicedTotalsByContract' => $this->invoicedTotalsByContract(),
@@ -342,9 +333,14 @@ class InvoiceController extends Controller
             'contract_id'        => 'nullable|uuid|exists:contracts,id',
             'billing_method'     => 'nullable|in:wo_reference,contract_value',
             'customer_id'        => 'nullable|uuid|exists:customers,id',
+            'customer_name'      => 'nullable|string|max:255',
+            'billing_pic_name'     => 'nullable|string|max:255',
+            'billing_pic_position' => 'nullable|string|max:100',
+            'billing_pic_email'    => 'nullable|email|max:255',
+            'billing_pic_phone'    => 'nullable|string|max:50',
+            'billing_pic_address'  => 'nullable|string',
             'work_order_ids'     => 'nullable|array',
             'work_order_ids.*'   => 'uuid|exists:work_orders,id',
-            'invoice_number' => ['required', 'string', 'max:50', Rule::unique('invoices', 'invoice_number')->whereNull('deleted_at')],
             'invoice_date'   => 'required|date',
             'due_date'       => 'required|date|after_or_equal:invoice_date',
             'status'         => 'required|in:draft,sent,paid,cancelled',
@@ -362,10 +358,6 @@ class InvoiceController extends Controller
             'items.*.unit_price'     => 'required|numeric|min:0',
             'items.*.tax_rate'       => 'nullable|numeric|min:0|max:100',
         ]);
-
-        if (empty($data['invoice_number'])) {
-            $data['invoice_number'] = $this->generateNextNumber();
-        }
 
         if ($error = $this->activeWorkOrderError($data['items'])) {
             return back()->withErrors(['items' => $error])->withInput();
@@ -388,9 +380,19 @@ class InvoiceController extends Controller
             $data['customer_id'] = Contract::find($data['contract_id'])?->customer_id;
         }
 
+        // Nama customer di invoice bisa diubah tanpa mengubah master customer.
+        if (empty($data['customer_name']) && !empty($data['customer_id'])) {
+            $data['customer_name'] = Customer::find($data['customer_id'])?->name;
+        }
+
         $taxType = Setting::get('tax_type', 'exclude');
 
         DB::transaction(function () use ($data, $taxType) {
+            // No invoice dibuat sistem: [NNNN]/[UP|US]-INV/[MMYYYY] mengikuti jenis layanan kontrak.
+            DocumentNumber::lock('invoices');
+            $serviceType = !empty($data['contract_id']) ? Contract::whereKey($data['contract_id'])->value('service_type') : null;
+            $data['invoice_number'] = DocumentNumber::next('invoices', 'invoice_number', 'INV', $serviceType);
+
             [$subtotal, $tax, $total, $itemTax] = $this->computeTotals($data['items'], $taxType);
 
             $invoice = Invoice::create(array_merge(
@@ -468,9 +470,14 @@ class InvoiceController extends Controller
             'contract_id'        => 'nullable|uuid|exists:contracts,id',
             'billing_method'     => 'nullable|in:wo_reference,contract_value',
             'customer_id'        => 'nullable|uuid|exists:customers,id',
+            'customer_name'      => 'nullable|string|max:255',
+            'billing_pic_name'     => 'nullable|string|max:255',
+            'billing_pic_position' => 'nullable|string|max:100',
+            'billing_pic_email'    => 'nullable|email|max:255',
+            'billing_pic_phone'    => 'nullable|string|max:50',
+            'billing_pic_address'  => 'nullable|string',
             'work_order_ids'     => 'nullable|array',
             'work_order_ids.*'   => 'uuid|exists:work_orders,id',
-            'invoice_number' => ['required', 'string', 'max:50', Rule::unique('invoices', 'invoice_number')->ignore($invoice->id)->whereNull('deleted_at')],
             'invoice_date'   => 'required|date',
             'due_date'       => 'required|date|after_or_equal:invoice_date',
             'status'         => 'required|in:draft,sent,paid,cancelled',
@@ -507,6 +514,11 @@ class InvoiceController extends Controller
 
         if (empty($data['customer_id']) && !empty($data['contract_id'])) {
             $data['customer_id'] = Contract::find($data['contract_id'])?->customer_id;
+        }
+
+        // Nama customer di invoice bisa diubah tanpa mengubah master customer.
+        if (empty($data['customer_name']) && !empty($data['customer_id'])) {
+            $data['customer_name'] = Customer::find($data['customer_id'])?->name;
         }
 
         $taxType = Setting::get('tax_type', 'exclude');

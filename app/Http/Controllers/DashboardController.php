@@ -10,25 +10,42 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\WorkOrder;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $currentMonth = Carbon::now();
+        $now   = Carbon::now();
+        $month = (int) $request->input('month', $now->month);
+        $year  = (int) $request->input('year', $now->year);
+        if ($month < 1 || $month > 12) $month = $now->month;
+        if ($year < 2000 || $year > 2100) $year = $now->year;
+
+        $periodStart = Carbon::create($year, $month, 1)->startOfDay();
+        $periodEnd   = $periodStart->copy()->endOfMonth();
+
+        // Invoice overdue pada periode: jatuh tempo di bulan terpilih, sudah lewat hari ini, dan belum dibayar.
+        $overdueQuery = fn () => Invoice::whereBetween('due_date', [$periodStart->toDateString(), $periodEnd->toDateString()])
+            ->where('due_date', '<', $now->toDateString())
+            ->whereIn('status', ['draft', 'sent']);
 
         $stats = [
             'total_customers' => Customer::count(),
-            'total_active_contracts' => Contract::where('status', 'active')->count(),
-            'total_collections' => Payment::whereMonth('created_at', $currentMonth->month)
+            // Kontrak aktif yang masa berlakunya beririsan dengan bulan terpilih.
+            'total_active_contracts' => Contract::where('status', 'active')
+                ->where(fn ($q) => $q->whereNull('start_date')->orWhere('start_date', '<=', $periodEnd->toDateString()))
+                ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $periodStart->toDateString()))
+                ->count(),
+            'total_collections' => Payment::whereBetween('payment_date', [$periodStart->toDateString(), $periodEnd->toDateString()])
                 ->whereIn('status', ['received', 'verified'])
                 ->sum('amount'),
-            'total_invoices' => Invoice::whereMonth('created_at', $currentMonth->month)->sum('total_amount'),
-            'revenue_this_month' => SalesOrder::whereMonth('created_at', $currentMonth->month)->sum('total_amount'),
-            'overdue_invoices' => Invoice::where('due_date', '<', Carbon::now())
-                ->whereIn('status', ['draft', 'sent'])
+            'total_invoices' => Invoice::whereBetween('invoice_date', [$periodStart->toDateString(), $periodEnd->toDateString()])
                 ->sum('total_amount'),
+            'revenue_this_month' => SalesOrder::whereBetween('order_date', [$periodStart->toDateString(), $periodEnd->toDateString()])
+                ->sum('total_amount'),
+            'overdue_invoices' => $overdueQuery()->sum('total_amount'),
         ];
 
         $activeServiceOrders = WorkOrder::where('status', '!=', 'completed')
@@ -37,9 +54,9 @@ class DashboardController extends Controller
             ->limit(10)
             ->get();
 
-        $overdueInvoices = Invoice::where('due_date', '<', Carbon::now())
-            ->whereIn('status', ['draft', 'sent'])
+        $overdueInvoices = $overdueQuery()
             ->with('customer')
+            ->orderBy('due_date')
             ->limit(10)
             ->get();
 
@@ -48,6 +65,7 @@ class DashboardController extends Controller
 
         return Inertia::render('Dashboard', [
             'stats' => $stats,
+            'filters' => ['month' => $month, 'year' => $year],
             'activeServiceOrders' => $activeServiceOrders,
             'overdueInvoices' => $overdueInvoices,
             'revenueChart' => $revenueChart,

@@ -1,5 +1,5 @@
 import AppLayout from '@/Layouts/AppLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import StatusBadge from '@/Components/StatusBadge';
 import VisitCalendar, { VisitEvent } from '@/Components/VisitCalendar';
 import VisitVsWoChart, { VisitVsWoData } from '@/Components/VisitVsWoChart';
@@ -35,28 +35,61 @@ const StatCard = ({ label, value, color }: { label: string; value: string | numb
     </div>
 );
 
+const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
 export default function Dashboard({
     stats,
+    filters,
     activeServiceOrders = [],
     overdueInvoices = [],
     visitEvents = [],
     visitVsWoChart,
 }: {
     stats: Stats;
+    filters: { month: number; year: number };
     activeServiceOrders: WorkOrder[];
     overdueInvoices: Invoice[];
     visitEvents: VisitEvent[];
     visitVsWoChart: VisitVsWoData;
 }) {
+    const thisYear = new Date().getFullYear();
+    const years = Array.from({ length: 7 }, (_, i) => thisYear + 1 - i);
+    if (!years.includes(filters.year)) years.push(filters.year);
+
+    const applyFilter = (next: Partial<{ month: number; year: number }>) => {
+        router.get('/dashboard', { ...filters, ...next }, { preserveState: true, preserveScroll: true, replace: true });
+    };
+
+    const periodLabel = `${MONTHS[filters.month - 1]} ${filters.year}`;
+
     return (
         <AppLayout header="Dashboard">
             <Head title="Dashboard" />
+
+            {/* Filter periode */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+                <span className="text-sm font-medium text-gray-600">Periode:</span>
+                <select
+                    value={filters.month}
+                    onChange={(e) => applyFilter({ month: Number(e.target.value) })}
+                    className="rounded-md border-gray-300 text-sm shadow-sm focus:border-red-500 focus:ring-red-500"
+                >
+                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                </select>
+                <select
+                    value={filters.year}
+                    onChange={(e) => applyFilter({ year: Number(e.target.value) })}
+                    className="rounded-md border-gray-300 text-sm shadow-sm focus:border-red-500 focus:ring-red-500"
+                >
+                    {years.sort((a, b) => b - a).map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+            </div>
 
             {/* Stat cards */}
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 mb-8">
                 <StatCard label="Total Customers"     value={stats.total_customers}        color="bg-blue-500" />
                 <StatCard label="Active Contracts"    value={stats.total_active_contracts}  color="bg-emerald-500" />
-                <StatCard label="Revenue This Month"  value={fmt(stats.revenue_this_month)} color="bg-teal-500" />
+                <StatCard label={`Revenue ${periodLabel}`} value={fmt(stats.revenue_this_month)} color="bg-teal-500" />
                 <StatCard label="Invoices"       value={fmt(stats.total_invoices)}          color="bg-orange-500" />
                 <StatCard label="Collections"    value={fmt(stats.total_collections)}       color="bg-violet-500" />
                 <StatCard label="Overdue Invoices"    value={fmt(stats.overdue_invoices)}        color="bg-red-500" />
@@ -110,7 +143,7 @@ export default function Dashboard({
                 {/* Overdue Invoices */}
                 <div className="bg-white rounded-xl shadow p-5">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-gray-800">Overdue Invoices</h3>
+                        <h3 className="font-semibold text-gray-800">Overdue Invoices – {periodLabel}</h3>
                         <Link href="/invoices" className="text-sm text-red-600 hover:underline">View all</Link>
                     </div>
                     <table className="w-full text-sm">
