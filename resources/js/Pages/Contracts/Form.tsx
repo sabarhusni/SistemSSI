@@ -51,7 +51,7 @@ export default function Form({ contract, customers, products, employees, taxType
         product_id: '', quantity: 1, unit_price: '', total_price: 0,
         tax_rate: taxRateSo, tax_amount: 0, location_note: '', sub_products: [] as any[],
     });
-    const emptyPremise = () => ({ location: '', address: '', pic: '', phone: '', email: '', visit_frequency: 1, products: [emptyProduct()] });
+    const emptyPremise = () => ({ location: '', address: '', pic: '', position: '', phone: '', email: '', visit_frequency: 1, products: [emptyProduct()] });
 
     const { data, setData, post, put, processing, errors } = useForm<any>({
         customer_id:          contract?.customer_id          ?? '',
@@ -73,6 +73,7 @@ export default function Form({ contract, customers, products, employees, taxType
             location: p.location ?? '',
             address:  p.address  ?? '',
             pic:      p.pic      ?? '',
+            position: p.position ?? '',
             phone:    p.phone    ?? '',
             email:    p.email    ?? '',
             visit_frequency: p.visit_frequency ?? 1,
@@ -398,7 +399,7 @@ export default function Form({ contract, customers, products, employees, taxType
                             className="w-full text-left px-3 py-2 border rounded-md text-sm bg-white hover:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-400 transition"
                         >
                             {selectedCustomer
-                                ? <span className="text-gray-800">{selectedCustomer.name}</span>
+                                ? <span className="text-gray-800">{selectedCustomer.company_name || selectedCustomer.name}</span>
                                 : <span className="text-gray-400">— Select Customer —</span>
                             }
                         </button>
@@ -490,12 +491,15 @@ export default function Form({ contract, customers, products, employees, taxType
                                     </div>
 
                                     {/* Level 1: Premise data */}
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-3 gap-3">
                                         <FormField label="Lokasi" error={errors[`premises.${pi}.location`]} required>
                                             <input className={inputCls} value={prem.location} onChange={e => updatePremise(pi, 'location', e.target.value)} />
                                         </FormField>
                                         <FormField label="PIC">
                                             <input className={inputCls} value={prem.pic} onChange={e => updatePremise(pi, 'pic', e.target.value)} />
+                                        </FormField>
+                                        <FormField label="Jabatan" error={errors[`premises.${pi}.position`]}>
+                                            <input className={inputCls} value={prem.position} onChange={e => updatePremise(pi, 'position', e.target.value)} />
                                         </FormField>
                                     </div>
                                     <FormField label="Alamat Lokasi">

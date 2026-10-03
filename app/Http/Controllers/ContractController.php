@@ -23,7 +23,7 @@ class ContractController extends Controller
 
         $query = Contract::with('customer')
             ->withCount(['salesOrders as active_so_count' => fn($q) => $q->whereNotIn('status', ['draft', 'cancelled'])])
-            ->when($request->search, fn($q, $s) => $q->where('contract_number', 'ilike', "%$s%")->orWhereHas('customer', fn($cq) => $cq->where('name', 'ilike', "%$s%")))
+            ->when($request->search, fn($q, $s) => $q->where('contract_number', 'ilike', "%$s%")->orWhereHas('customer', fn($cq) => $cq->where('name', 'ilike', "%$s%")->orWhere('company_name', 'ilike', "%$s%")))
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->when($request->service_type, fn($q, $s) => $q->where('service_type', $s))
             ->orderBy($sortBy, $sortDir);
@@ -169,6 +169,7 @@ class ContractController extends Controller
             'premises.*.location'               => 'required|string|max:255',
             'premises.*.address'                => 'nullable|string',
             'premises.*.pic'                    => 'nullable|string|max:255',
+            'premises.*.position'               => 'nullable|string|max:100',
             'premises.*.phone'                  => 'nullable|string|max:50',
             'premises.*.email'                  => 'nullable|email|max:255',
             'premises.*.visit_frequency'        => 'nullable|integer|min:0',
@@ -218,6 +219,7 @@ class ContractController extends Controller
                 'location'        => $prem['location'],
                 'address'         => $prem['address'] ?? null,
                 'pic'             => $prem['pic'] ?? null,
+                'position'        => $prem['position'] ?? null,
                 'phone'           => $prem['phone'] ?? null,
                 'email'           => $prem['email'] ?? null,
                 'visit_frequency' => $prem['visit_frequency'] ?? null,

@@ -10,12 +10,12 @@ class CustomerController extends Controller
 {
     private function filteredQuery(Request $request)
     {
-        $sortable = ['code', 'name', 'email', 'city', 'status', 'created_at'];
+        $sortable = ['code', 'name', 'company_name', 'email', 'city', 'status', 'created_at'];
         $sortBy   = in_array($request->sort_by, $sortable) ? $request->sort_by : 'created_at';
         $sortDir  = $request->sort_dir === 'asc' ? 'asc' : 'desc';
 
         return Customer::query()
-            ->when($request->search, fn($q, $s) => $q->where(fn($w) => $w->where('name', 'ilike', "%$s%")->orWhere('code', 'ilike', "%$s%")->orWhere('email', 'ilike', "%$s%")))
+            ->when($request->search, fn($q, $s) => $q->where(fn($w) => $w->where('name', 'ilike', "%$s%")->orWhere('company_name', 'ilike', "%$s%")->orWhere('code', 'ilike', "%$s%")->orWhere('email', 'ilike', "%$s%")))
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->orderBy($sortBy, $sortDir);
     }

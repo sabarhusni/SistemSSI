@@ -60,7 +60,7 @@ export default function Index({ contracts, filters }: any) {
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
                             <SortableColumn sortKey="contract_number" label="Contract No." {...sortProps} />
-                            <th className="px-4 py-3">Customer</th>
+                            <th className="px-4 py-3">Company / Name</th>
                             <th className="px-4 py-3">Services</th>
                             <SortableColumn sortKey="start_date" label="Start" {...sortProps} />
                             <th className="px-4 py-3 text-right">Duration (Months)</th>
@@ -74,7 +74,10 @@ export default function Index({ contracts, filters }: any) {
                         {contracts.data?.map((c: any) => (
                             <tr key={c.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-mono text-xs font-medium">{c.contract_number}</td>
-                                <td className="px-4 py-3">{c.customer?.name}</td>
+                                <td className="px-4 py-3">
+                                    <div className="font-medium">{c.customer?.company_name || '—'}</div>
+                                    <div className="text-xs text-gray-500">{c.customer?.name}</div>
+                                </td>
                                 <td className="px-4 py-3">
                                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${serviceTypeCls(c.service_type)}`}>
                                         {serviceTypeLabel(c.service_type)}

@@ -392,6 +392,8 @@ class InvoiceController extends Controller
             DocumentNumber::lock('invoices');
             $serviceType = !empty($data['contract_id']) ? Contract::whereKey($data['contract_id'])->value('service_type') : null;
             $data['invoice_number'] = DocumentNumber::next('invoices', 'invoice_number', 'INV', $serviceType);
+            // Pembuat invoice dipakai sebagai penanda tangan pada print invoice.
+            $data['created_by'] = auth()->id();
 
             [$subtotal, $tax, $total, $itemTax] = $this->computeTotals($data['items'], $taxType);
 
@@ -521,6 +523,12 @@ class InvoiceController extends Controller
             $data['customer_name'] = Customer::find($data['customer_id'])?->name;
         }
 
+        // Invoice lama (dibuat sebelum ada created_by) diisi user yang menyimpannya,
+        // agar tanda tangan print invoice tetap terisi.
+        if (empty($invoice->created_by)) {
+            $data['created_by'] = auth()->id();
+        }
+
         $taxType = Setting::get('tax_type', 'exclude');
 
         DB::transaction(function () use ($data, $invoice, $taxType) {
@@ -605,6 +613,7 @@ class InvoiceController extends Controller
         $invoice->load([
             'customer',
             'contract',
+            'creator:id,name,position',
             'workOrders:id,wo_number',
             'items.product',
         ]);

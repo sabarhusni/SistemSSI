@@ -42,7 +42,10 @@ export default function Index({ users, filters }: any) {
                     <tbody className="divide-y">
                         {users.data?.map((user: any) => (
                             <tr key={user.id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 font-medium">{user.name}</td>
+                                <td className="px-4 py-3">
+                                    <div className="font-medium">{user.name}</div>
+                                    {user.position && <div className="text-xs text-gray-400">{user.position}</div>}
+                                </td>
                                 <td className="px-4 py-3 font-mono text-xs text-gray-600">{user.username}</td>
                                 <td className="px-4 py-3 text-gray-500">{user.email}</td>
                                 <td className="px-4 py-3">

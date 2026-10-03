@@ -50,6 +50,13 @@ const itemFromSO = (it: any, taxType: string) => recalcItem({
     tax_rate:       Number(it.tax_rate ?? 0),
 }, taxType);
 
+// Item invoice tersimpan: nama produk diambil dari description (bisa sudah diubah
+// khusus untuk invoice ini), fallback ke nama master produk untuk data lama.
+const itemFromInvoice = (it: any, taxType: string) => ({
+    ...itemFromSO(it, taxType),
+    description: it.description || it.product?.name || '',
+});
+
 // Baris ringkasan invoice untuk kontrak pest hama unik: nilai diambil dari input
 // "Nilai Tagihan" (bukan dijumlah dari item Sales Order).
 const pestUnikItem = (nilaiTagihan: number, contract: any, taxType: string) => recalcItem({
@@ -136,7 +143,7 @@ export default function Form({ invoice, contracts, products, nextSequence = 0, i
         due_date:       invoice?.due_date        ?? '',
         status:         invoice?.status          ?? 'draft',
         notes:          invoice?.notes           ?? '',
-        items: invoice?.items?.map((it: any) => itemFromSO(it, taxType)) ?? [emptyItem()],
+        items: invoice?.items?.map((it: any) => itemFromInvoice(it, taxType)) ?? [emptyItem()],
     });
 
     const [contractPickerOpen, setContractPickerOpen] = useState(false);
@@ -242,6 +249,11 @@ export default function Form({ invoice, contracts, products, nextSequence = 0, i
 
         setData({ ...data, work_order_ids: ids, items: [...keep, ...added] });
         setWoPickerOpen(false);
+    };
+
+    // Nama produk service hanya diubah di invoice ini — master produk tidak berubah.
+    const handleItemNameChange = (idx: number, value: string) => {
+        setData('items', data.items.map((it: any, i: number) => i === idx ? { ...it, description: value } : it));
     };
 
     const handleNilaiTagihanChange = (value: number) => {
@@ -517,7 +529,7 @@ export default function Form({ invoice, contracts, products, nextSequence = 0, i
                             <div className="flex items-center justify-between mb-2">
                                 <h3 className="font-semibold text-gray-700">Invoice Items</h3>
                                 <span className="text-xs text-gray-400">
-                                    Item diambil otomatis dari Work Order — tidak dapat diubah.
+                                    Item diambil otomatis dari Work Order — hanya nama produk yang dapat diubah (master produk tidak berubah).
                                 </span>
                             </div>
                             <div className="border rounded-lg overflow-x-auto mb-2">
@@ -551,21 +563,21 @@ export default function Form({ invoice, contracts, products, nextSequence = 0, i
                                                     </td>
                                                 </tr>
                                                 {group.rows.map(({ item, idx }) => {
-                                                    const selected = getProduct(item.product_id);
-                                                    const displayName = selected?.name ?? item.description;
+                                                    const masterName = getProduct(item.product_id)?.name;
                                                     return (
                                                         <tr key={idx} className="align-middle">
                                                             <td className="px-3 py-2">
-                                                                <button
-                                                                    type="button"
-                                                                    disabled
-                                                                    className="w-full text-left px-3 py-1.5 border rounded-md text-sm bg-gray-100 cursor-not-allowed transition"
-                                                                >
-                                                                    {displayName
-                                                                        ? <span className="text-gray-800">{displayName}</span>
-                                                                        : <span className="text-gray-400">—</span>
-                                                                    }
-                                                                </button>
+                                                                <input
+                                                                    className={inputCls + lockCls}
+                                                                    value={item.description ?? ''}
+                                                                    placeholder={masterName ?? ''}
+                                                                    disabled={locked}
+                                                                    maxLength={255}
+                                                                    onChange={e => handleItemNameChange(idx, e.target.value)}
+                                                                />
+                                                                {masterName && item.description && item.description !== masterName && (
+                                                                    <p className="text-[11px] text-gray-400 mt-0.5">Master: {masterName}</p>
+                                                                )}
                                                             </td>
                                                             <td className="px-3 py-2 text-center text-xs text-gray-600 whitespace-nowrap">
                                                                 Visit ke-{item.month ?? 1}

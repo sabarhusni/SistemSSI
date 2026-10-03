@@ -12,7 +12,7 @@ class ContractPremise extends Model
     use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
-        'contract_id', 'location', 'address', 'pic', 'phone', 'email', 'visit_frequency', 'sort_order',
+        'contract_id', 'location', 'address', 'pic', 'position', 'phone', 'email', 'visit_frequency', 'sort_order',
     ];
 
     public function contract() { return $this->belongsTo(Contract::class); }

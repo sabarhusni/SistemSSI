@@ -157,7 +157,7 @@ export default function Print({ invoice, companyName, invoiceFrequency = 0, invo
                                         return (
                                             <tr key={counter}>
                                                 <td className="border border-gray-300 px-2 py-1.5 text-center">{counter}</td>
-                                                <td className="border border-gray-300 px-2 py-1.5">{it.product?.name ?? it.description ?? '—'}</td>
+                                                <td className="border border-gray-300 px-2 py-1.5">{it.description || it.product?.name || '—'}</td>
                                                 {!isUniquePest && <td className="border border-gray-300 px-2 py-1.5 text-center">Visit ke-{it.month ?? 1}</td>}
                                                 <td className="border border-gray-300 px-2 py-1.5 text-center">{it.quantity}</td>
                                                 {!isUniquePest && <td className="border border-gray-300 px-2 py-1.5">{it.uom || it.product?.unit || '—'}</td>}
@@ -203,7 +203,11 @@ export default function Print({ invoice, companyName, invoiceFrequency = 0, invo
                 <div className="flex justify-end mt-16 text-sm">
                     <div className="text-center w-1/2">
                         <p className="text-gray-500 mb-16">{companyName || 'Company'}</p>
-                        <p className="border-t border-gray-400 pt-1">(______________)</p>
+                        {/* Penanda tangan = user pembuat invoice beserta jabatannya. */}
+                        <p className="border-t border-gray-400 pt-1 font-semibold">
+                            {invoice.creator?.name ? invoice.creator.name : '(______________)'}
+                        </p>
+                        {invoice.creator?.position && <p className="text-gray-600">{invoice.creator.position}</p>}
                     </div>
                 </div>
             </div>

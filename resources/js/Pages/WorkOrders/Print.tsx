@@ -118,7 +118,7 @@ export default function Print({ workOrder, companyName }: any) {
                 <div className="grid grid-cols-2 gap-8 mb-6">
                     <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-400 mb-2">Customer</h3>
-                        <p className="font-semibold text-gray-900">{workOrder.contract?.customer?.name ?? '—'}</p>
+                        <p className="font-semibold text-gray-900">{workOrder.contract?.customer?.company_name || workOrder.contract?.customer?.name || '—'}</p>
                         {workOrder.contract?.customer?.address && <p className="text-sm text-gray-600">{workOrder.contract.customer.address}</p>}
                         {workOrder.contract?.customer?.phone && <p className="text-sm text-gray-600">Phone: {workOrder.contract.customer.phone}</p>}
                     </div>
@@ -304,7 +304,7 @@ function PestControlServiceReport({ workOrder, companyName }: any) {
                             <PestRow label="Contract / Job No." value={workOrder.contract?.contract_number} />
                             <PestRow label="Service Area" value={workOrder.service_area} />
                             <PestRow label="Type of Premises" value={null} />
-                            <PestRow label="Customer Name" value={customer.name} />
+                            <PestRow label="Company Name" value={customer.company_name || customer.name} />
                             <PestRow label="Contact Name" value={premise?.pic} />
                             <PestRow label="Contact Number" value={premise?.phone} />
                             <PestRow label="Address Site Of Application" value={premise?.address} />

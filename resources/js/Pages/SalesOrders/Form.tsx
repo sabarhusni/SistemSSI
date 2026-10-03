@@ -658,10 +658,10 @@ export default function Form({ salesOrder, contracts, products, uoms = [], nextN
                                 </p>
                             )}
                         </FormField>
-                        <FormField label="Customer">
+                        <FormField label="Nama Perusahaan">
                             <div className={`${inputCls} bg-gray-50 cursor-default`}>
-                                {selectedContract?.customer?.name
-                                    ? <span className="text-gray-700">{selectedContract.customer.name}</span>
+                                {selectedContract?.customer
+                                    ? <span className="text-gray-700">{selectedContract.customer.company_name || selectedContract.customer.name}</span>
                                     : <span className="text-gray-400 italic text-xs">Otomatis dari kontrak</span>
                                 }
                             </div>

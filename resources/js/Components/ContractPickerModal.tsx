@@ -34,6 +34,7 @@ export default function ContractPickerModal({ contracts, onSelect, onClose }: Pr
         if (!q) return contracts;
         return contracts.filter(c =>
             c.contract_number?.toLowerCase().includes(q) ||
+            c.customer?.company_name?.toLowerCase().includes(q) ||
             c.customer?.name?.toLowerCase().includes(q)
         );
     }, [search, contracts]);
@@ -55,7 +56,7 @@ export default function ContractPickerModal({ contracts, onSelect, onClose }: Pr
                     <input
                         ref={inputRef}
                         className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
-                        placeholder="Search by contract number or customer name..."
+                        placeholder="Search by contract number or company name..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                     />
@@ -70,7 +71,7 @@ export default function ContractPickerModal({ contracts, onSelect, onClose }: Pr
                             <thead className="bg-gray-50 sticky top-0 border-b">
                                 <tr className="text-left text-gray-500 text-xs">
                                     <th className="px-4 py-2">Contract No.</th>
-                                    <th className="px-3 py-2">Customer</th>
+                                    <th className="px-3 py-2">Nama Perusahaan</th>
                                     <th className="px-3 py-2">Period</th>
                                     <th className="px-3 py-2">Status</th>
                                 </tr>
@@ -83,7 +84,7 @@ export default function ContractPickerModal({ contracts, onSelect, onClose }: Pr
                                         onClick={() => { onSelect(c); onClose(); }}
                                     >
                                         <td className="px-4 py-2 font-mono text-xs font-medium text-gray-800">{c.contract_number}</td>
-                                        <td className="px-3 py-2 text-gray-700">{c.customer?.name ?? '—'}</td>
+                                        <td className="px-3 py-2 text-gray-700">{c.customer?.company_name || c.customer?.name || '—'}</td>
                                         <td className="px-3 py-2 text-gray-500 text-xs whitespace-nowrap">
                                             {c.start_date} – {c.end_date}
                                         </td>

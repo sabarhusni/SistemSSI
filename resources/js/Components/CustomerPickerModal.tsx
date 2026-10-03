@@ -22,6 +22,7 @@ export default function CustomerPickerModal({ customers, onSelect, onClose }: Pr
         const q = search.toLowerCase().trim();
         if (!q) return customers;
         return customers.filter(c =>
+            c.company_name?.toLowerCase().includes(q) ||
             c.name?.toLowerCase().includes(q) ||
             c.email?.toLowerCase().includes(q) ||
             c.phone?.toLowerCase().includes(q)
@@ -33,7 +34,7 @@ export default function CustomerPickerModal({ customers, onSelect, onClose }: Pr
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
             onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}
         >
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 flex flex-col" style={{ maxHeight: '80vh' }}>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col" style={{ maxHeight: '80vh' }}>
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b">
                     <span className="font-semibold text-gray-800">Select Customer</span>
@@ -45,7 +46,7 @@ export default function CustomerPickerModal({ customers, onSelect, onClose }: Pr
                     <input
                         ref={inputRef}
                         className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
-                        placeholder="Search by name, email, or phone..."
+                        placeholder="Search by company, contact name, email, or phone..."
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                     />
@@ -59,7 +60,8 @@ export default function CustomerPickerModal({ customers, onSelect, onClose }: Pr
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 sticky top-0 border-b">
                                 <tr className="text-left text-gray-500 text-xs">
-                                    <th className="px-4 py-2">Name</th>
+                                    <th className="px-4 py-2">Nama Perusahaan</th>
+                                    <th className="px-3 py-2">Nama Kontak</th>
                                     <th className="px-3 py-2">Email</th>
                                     <th className="px-3 py-2">Phone</th>
                                 </tr>
@@ -71,7 +73,8 @@ export default function CustomerPickerModal({ customers, onSelect, onClose }: Pr
                                         className="hover:bg-red-50 cursor-pointer"
                                         onClick={() => { onSelect(c); onClose(); }}
                                     >
-                                        <td className="px-4 py-2 font-medium text-gray-800">{c.name}</td>
+                                        <td className="px-4 py-2 font-medium text-gray-800">{c.company_name || '—'}</td>
+                                        <td className="px-3 py-2 text-gray-700">{c.name}</td>
                                         <td className="px-3 py-2 text-gray-500 text-xs">{c.email ?? '—'}</td>
                                         <td className="px-3 py-2 text-gray-500 text-xs">{c.phone ?? '—'}</td>
                                     </tr>

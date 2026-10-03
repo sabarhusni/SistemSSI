@@ -27,7 +27,7 @@ class SalesOrderController extends Controller
                 'premise:id,location,address,pic',
             ])
             ->withCount(['items', 'workOrders'])
-            ->when($request->search, fn($q, $s) => $q->where('so_number', 'ilike', "%$s%")->orWhereHas('customer', fn($cq) => $cq->where('name', 'ilike', "%$s%")))
+            ->when($request->search, fn($q, $s) => $q->where('so_number', 'ilike', "%$s%")->orWhereHas('customer', fn($cq) => $cq->where('name', 'ilike', "%$s%")->orWhere('company_name', 'ilike', "%$s%")))
             ->when($request->status, fn($q, $s) => $q->where('status', $s))
             ->when($request->contract_id, fn($q, $v) => $q->where('contract_id', $v))
             ->when($request->contract_premise_id, fn($q, $v) => $q->where('contract_premise_id', $v))

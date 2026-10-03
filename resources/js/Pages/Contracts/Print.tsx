@@ -393,6 +393,7 @@ export default function Print({ contract, companyName, taxType = 'exclude' }: an
                                                 Premis: {prem.location || '—'}
                                                 {prem.address && <span className="font-normal text-gray-600"> — {prem.address}</span>}
                                                 {prem.pic && <span className="font-normal text-gray-600"> | PIC: {prem.pic}</span>}
+                                                {prem.position && <span className="font-normal text-gray-600"> | Jabatan: {prem.position}</span>}
                                                 {prem.phone && <span className="font-normal text-gray-600"> | Telp: {prem.phone}</span>}
                                             </td>
                                         </tr>

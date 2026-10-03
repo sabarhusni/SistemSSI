@@ -77,7 +77,7 @@ export default function Index({ customers, filters }: any) {
                     <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-gray-600">
                             <SortableColumn sortKey="code" label="Code" {...sortProps} />
-                            <SortableColumn sortKey="name" label="Name / Company" {...sortProps} />
+                            <SortableColumn sortKey="company_name" label="Company / Name" {...sortProps} />
                             <SortableColumn sortKey="email" label="Email" {...sortProps} />
                             <th className="px-4 py-3">Phone</th>
                             <SortableColumn sortKey="city" label="City" {...sortProps} />
@@ -92,8 +92,8 @@ export default function Index({ customers, filters }: any) {
                             <tr key={c.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-mono text-xs">{c.code}</td>
                                 <td className="px-4 py-3">
-                                    <div className="font-medium">{c.name}</div>
-                                    {c.company_name && <div className="text-xs text-gray-400">{c.company_name}</div>}
+                                    <div className="font-medium">{c.company_name || '—'}</div>
+                                    <div className="text-xs text-gray-500">{c.name}</div>
                                 </td>
                                 <td className="px-4 py-3 text-gray-500">{c.email}</td>
                                 <td className="px-4 py-3">{c.phone}</td>

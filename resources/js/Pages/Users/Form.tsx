@@ -6,6 +6,7 @@ export default function Form({ user, roles }: any) {
     const editing = !!user;
     const { data, setData, post, put, processing, errors } = useForm<any>({
         name:                  user?.name     ?? '',
+        position:              user?.position ?? '',
         username:              user?.username  ?? '',
         email:                 user?.email     ?? '',
         role_id:               user?.role_id   ?? '',
@@ -24,9 +25,15 @@ export default function Form({ user, roles }: any) {
             <Head title="User" />
             <div className="max-w-2xl bg-white rounded-xl shadow p-6">
                 <form onSubmit={submit} className="space-y-4">
-                    <FormField label="Full Name" error={errors.name} required>
-                        <input className={inputCls} value={data.name} onChange={e => setData('name', e.target.value)} />
-                    </FormField>
+                    <div className="grid grid-cols-2 gap-4">
+                        <FormField label="Full Name" error={errors.name} required>
+                            <input className={inputCls} value={data.name} onChange={e => setData('name', e.target.value)} />
+                        </FormField>
+                        <FormField label="Position (Jabatan)" error={errors.position}>
+                            <input className={inputCls} value={data.position} onChange={e => setData('position', e.target.value)}
+                                placeholder="Mis. Finance Manager" />
+                        </FormField>
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                         <FormField label="Username" error={errors.username} required>
                             <input className={inputCls} value={data.username} onChange={e => setData('username', e.target.value)} autoComplete="off" />
